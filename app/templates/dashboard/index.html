@@ -1,0 +1,50 @@
+{% extends 'layout/admin_layout.html' %}
+
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+
+<!-- Welcome Row -->
+<div class="dashboard-welcome">
+    <div>
+        <h2 class="dashboard-welcome-title">Welcome to MotoAdmin</h2>
+        <p class="dashboard-welcome-sub">
+            Motorbike Sales &amp; Servicing Management System &mdash; Admin Panel
+        </p>
+    </div>
+
+    <div class="dashboard-phase-badge">
+        <i class="fa-solid fa-circle-check me-1"></i>
+        Phase 2 &mdash; Admin Panel Active
+    </div>
+    
+</div>
+
+<!-- Stat Cards Grid -->
+<div class="row g-3">
+    {% for card in cards %}
+    <div class="col-xl-3 col-lg-4 col-sm-6">
+        <a href="{{ card.url }}" class="stat-card">
+
+            <div class="stat-card-header">
+                <div class="stat-card-icon">
+                    <i class="fa-solid {{ card.icon }}"></i>
+                </div>
+            </div>
+
+            <div class="stat-card-label">{{ card.label }}</div>
+            <div class="stat-card-count">{{ card.count }}</div>
+            <div class="stat-card-desc">{{ card.desc }}</div>
+
+            <div class="stat-card-link">
+                View all
+                <i class="fa-solid fa-arrow-right stat-card-arrow"></i>
+            </div>
+
+        </a>
+    </div>
+    {% endfor %}
+</div>
+
+{% endblock %}

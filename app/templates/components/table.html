@@ -1,0 +1,99 @@
+{#
+  components/table.html
+  Reusable table macros for all CRUD list views.
+
+  Usage example:
+    {% from 'components/table.html' import search_bar, data_table %}
+
+    {{ search_bar(url_for('color.index'), search_query, 'Search colors...') }}
+
+    {% call data_table(['Color Name', 'Created By', 'Date Created'], total=pagination.total) %}
+        {% for row in pagination.items %}
+        <tr>
+            <td>{{ row.Color }}</td>
+            <td>{{ row.Created_By }}</td>
+            <td>{{ row.Date_Created }}</td>
+            <td class="text-end">
+                ... action buttons ...
+            </td>
+        </tr>
+        {% endfor %}
+    {% endcall %}
+#}
+
+
+{# -----------------------------------------------------------------------
+   search_bar
+   Renders a GET search form.
+
+   Parameters:
+     action      — the form action URL (url_for('module.index'))
+     query       — the current search string (from request.args.get('q', ''))
+     placeholder — input placeholder text
+   ----------------------------------------------------------------------- #}
+{% macro search_bar(action, query='', placeholder='Search...') %}
+<form method="GET" action="{{ action }}" class="search-form">
+    <div class="input-group">
+        <span class="input-group-text search-icon-addon">
+            <i class="fa-solid fa-magnifying-glass"></i>
+        </span>
+        <input
+            type="text"
+            name="q"
+            value="{{ query }}"
+            class="form-control"
+            placeholder="{{ placeholder }}"
+            autocomplete="off">
+        <button type="submit" class="btn btn-accent">
+            <i class="fa-solid fa-magnifying-glass me-1"></i>Search
+        </button>
+        {% if query %}
+        <a href="{{ action }}" class="btn btn-outline-secondary" title="Clear search">
+            <i class="fa-solid fa-xmark me-1"></i>Clear
+        </a>
+        {% endif %}
+    </div>
+</form>
+{% endmacro %}
+
+
+{# -----------------------------------------------------------------------
+   data_table
+   Renders a table container. Use with Jinja2 call block syntax to
+   inject the <tbody> row content.
+
+   Parameters:
+     headers       — list of column header label strings
+     total         — total number of records (from pagination.total)
+     empty_message — message shown when total is 0
+
+   Usage: {% call data_table([...], total=pagination.total) %}
+              ... <tr> rows here ...
+          {% endcall %}
+   ----------------------------------------------------------------------- #}
+{% macro data_table(headers, total=0, empty_message='No records found.') %}
+{% if not total or total == 0 %}
+<div class="table-empty-state">
+    <div class="table-empty-icon-wrap">
+        <i class="fa-solid fa-inbox"></i>
+    </div>
+    <p class="table-empty-text">{{ empty_message }}</p>
+</div>
+{% else %}
+<div class="table-responsive">
+    <table class="table admin-table">
+        <thead>
+            <tr>
+                {% for header in headers %}
+                <th>{{ header }}</th>
+                {% endfor %}
+                <th class="text-end actions-col">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{ caller() }}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endmacro %}

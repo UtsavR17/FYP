@@ -1,0 +1,99 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/form_field.html' import text_field, select_field, readonly_field %}
+
+{% block title %}{{ 'Edit Model' if is_edit else 'Add Model' }}{% endblock %}
+{% block page_title %}{{ 'Edit Model' if is_edit else 'Add Model' }}{% endblock %}
+
+{% block content %}
+
+<!-- Page header -->
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            {{ 'Edit Model' if is_edit else 'Add Model' }}
+        </h2>
+        <p class="page-header-subtitle">
+            {{ 'Update the model record.' if is_edit else 'Add a new motorbike model.' }}
+        </p>
+    </div>
+    <a href="{{ url_for('model.index') }}" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to Models
+    </a>
+</div>
+
+<!-- Form card -->
+<div class="form-card">
+    <p class="form-section-title">Model Details</p>
+
+    <form method="POST" novalidate>
+
+        <!-- Row 1: Brand | Description -->
+        <div class="row">
+            <div class="col-md-6">
+                {{ select_field(
+                    name        = 'Brand_Brand_ID',
+                    label       = 'Brand',
+                    options     = brand_options,
+                    selected    = form_data.get('Brand_Brand_ID', ''),
+                    required    = True,
+                    error       = errors.get('Brand_Brand_ID', ''),
+                    empty_label = '— Select a Brand —'
+                ) }}
+            </div>
+            <div class="col-md-6">
+                {{ text_field(
+                    name        = 'Description',
+                    label       = 'Model Description',
+                    value       = form_data.get('Description', ''),
+                    required    = True,
+                    error       = errors.get('Description', ''),
+                    placeholder = 'e.g. Honda CB Shine 125cc',
+                    help_text   = 'Maximum 50 characters.'
+                ) }}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-floppy-disk me-2"></i>
+                {{ 'Save Changes' if is_edit else 'Add Model' }}
+            </button>
+            <a href="{{ url_for('model.index') }}" class="btn btn-outline-secondary">
+                Cancel
+            </a>
+        </div>
+
+    </form>
+</div>
+
+<!-- Audit information (Edit only) -->
+{% if is_edit and record %}
+<div class="form-card">
+    <p class="form-section-title">Audit Information</p>
+    <div class="row">
+        <div class="col-md-6">
+            {{ readonly_field('Created By', record.Created_By) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Created',
+                record.Date_Created[:19].replace('T', ' ') if record.Date_Created else '—'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Updated By',
+                record.Updated_By if record.Updated_By else '—'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Updated',
+                record.Date_Updated[:19].replace('T', ' ') if record.Date_Updated else '—'
+            ) }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

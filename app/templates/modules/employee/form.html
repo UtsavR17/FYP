@@ -1,0 +1,141 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/form_field.html' import text_field, select_field, readonly_field %}
+
+{% block title %}{{ 'Edit Employee' if is_edit else 'Add Employee' }}{% endblock %}
+{% block page_title %}{{ 'Edit Employee' if is_edit else 'Add Employee' }}{% endblock %}
+
+{% block content %}
+
+<!-- Page header -->
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            {{ 'Edit Employee' if is_edit else 'Add Employee' }}
+        </h2>
+        <p class="page-header-subtitle">
+            {{ 'Update the employee record.' if is_edit else 'Add a new staff member.' }}
+        </p>
+    </div>
+    <a href="{{ url_for('employee.index') }}" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to Employees
+    </a>
+</div>
+
+<!-- Form card -->
+<div class="form-card">
+    <p class="form-section-title">Employee Details</p>
+
+    <form method="POST" novalidate>
+
+        <!-- Row 1: First Name | Last Name -->
+        <div class="row">
+            <div class="col-md-6">
+                {{ text_field(
+                    name        = 'FirstName',
+                    label       = 'First Name',
+                    value       = form_data.get('FirstName', ''),
+                    required    = True,
+                    error       = errors.get('FirstName', ''),
+                    placeholder = 'e.g. Arun',
+                    help_text   = 'Maximum 50 characters.'
+                ) }}
+            </div>
+            <div class="col-md-6">
+                {{ text_field(
+                    name        = 'LastName',
+                    label       = 'Last Name',
+                    value       = form_data.get('LastName', ''),
+                    required    = True,
+                    error       = errors.get('LastName', ''),
+                    placeholder = 'e.g. Lallah',
+                    help_text   = 'Maximum 50 characters.'
+                ) }}
+            </div>
+        </div>
+
+        <!-- Row 2: Phone | Role -->
+        <div class="row">
+            <div class="col-md-6">
+                {{ text_field(
+                    name        = 'Phone',
+                    label       = 'Phone Number',
+                    value       = form_data.get('Phone', ''),
+                    required    = True,
+                    error       = errors.get('Phone', ''),
+                    placeholder = 'e.g. 57001234',
+                    help_text   = 'Maximum 20 characters.'
+                ) }}
+            </div>
+            <div class="col-md-6">
+                {{ select_field(
+                    name        = 'Role_Role_ID',
+                    label       = 'Role',
+                    options     = role_options,
+                    selected    = form_data.get('Role_Role_ID', ''),
+                    required    = True,
+                    error       = errors.get('Role_Role_ID', ''),
+                    empty_label = '— Select a Role —'
+                ) }}
+            </div>
+        </div>
+
+        <!-- Row 3: Supervisor (optional) -->
+        <div class="row">
+            <div class="col-md-6">
+                {{ select_field(
+                    name        = 'SupervisorID',
+                    label       = 'Supervisor',
+                    options     = supervisor_options,
+                    selected    = form_data.get('SupervisorID', ''),
+                    required    = False,
+                    error       = errors.get('SupervisorID', ''),
+                    empty_label = '— No Supervisor (Senior Staff) —',
+                    help_text   = 'Leave blank if this employee has no supervisor.'
+                ) }}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-floppy-disk me-2"></i>
+                {{ 'Save Changes' if is_edit else 'Add Employee' }}
+            </button>
+            <a href="{{ url_for('employee.index') }}" class="btn btn-outline-secondary">
+                Cancel
+            </a>
+        </div>
+
+    </form>
+</div>
+
+<!-- Audit information (Edit only) -->
+{% if is_edit and record %}
+<div class="form-card">
+    <p class="form-section-title">Audit Information</p>
+    <div class="row">
+        <div class="col-md-6">
+            {{ readonly_field('Created By', record.Created_By) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Created',
+                record.Date_Created[:19].replace('T', ' ') if record.Date_Created else '—'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Updated By',
+                record.Updated_By if record.Updated_By else '—'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Updated',
+                record.Date_Updated[:19].replace('T', ' ') if record.Date_Updated else '—'
+            ) }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

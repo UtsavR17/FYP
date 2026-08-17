@@ -1,0 +1,133 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/form_field.html' import text_field, select_field,
+    textarea_field, readonly_field %}
+
+{% block title %}{{ 'Edit Spare Part' if is_edit else 'Add Spare Part' }}{% endblock %}
+{% block page_title %}{{ 'Edit Spare Part' if is_edit else 'Add Spare Part' }}{% endblock %}
+
+{% block content %}
+
+<!-- Page header -->
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            {{ 'Edit Spare Part' if is_edit else 'Add Spare Part' }}
+        </h2>
+        <p class="page-header-subtitle">
+            {{ 'Update the spare part record.' if is_edit
+               else 'Add a new spare part to the catalogue.' }}
+        </p>
+    </div>
+    <a href="{{ url_for('spare_parts.index') }}" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to Spare Parts
+    </a>
+</div>
+
+<!-- Form card -->
+<div class="form-card">
+    <p class="form-section-title">Spare Part Details</p>
+
+    <form method="POST" novalidate>
+
+        <!-- Row 1: Part Name | Category -->
+        <div class="row">
+            <div class="col-md-6">
+                {{ text_field(
+                    name        = 'SP_name',
+                    label       = 'Part Name',
+                    value       = form_data.get('SP_name', ''),
+                    required    = True,
+                    error       = errors.get('SP_name', ''),
+                    placeholder = 'e.g. Spark Plug NGK CR7HSA',
+                    help_text   = 'Maximum 50 characters.'
+                ) }}
+            </div>
+            <div class="col-md-6">
+                {{ select_field(
+                    name        = 'Category_CAT_ID',
+                    label       = 'Category',
+                    options     = category_options,
+                    selected    = form_data.get('Category_CAT_ID', ''),
+                    required    = True,
+                    error       = errors.get('Category_CAT_ID', ''),
+                    empty_label = '— Select a Category —'
+                ) }}
+            </div>
+        </div>
+
+        <!-- Row 2: Model Compatibility (optional) -->
+        <div class="row">
+            <div class="col-md-6">
+                {{ select_field(
+                    name        = 'Model_Model_No',
+                    label       = 'Model Compatibility',
+                    options     = model_options,
+                    selected    = form_data.get('Model_Model_No', ''),
+                    required    = False,
+                    error       = errors.get('Model_Model_No', ''),
+                    empty_label = '— Universal / Not model-specific —',
+                    help_text   = 'Leave blank if this part is compatible with all models.'
+                ) }}
+            </div>
+        </div>
+
+        <!-- Row 3: Description (full width) -->
+        <div class="row">
+            <div class="col-12">
+                {{ textarea_field(
+                    name        = 'SP_desc',
+                    label       = 'Description',
+                    value       = form_data.get('SP_desc', ''),
+                    required    = True,
+                    error       = errors.get('SP_desc', ''),
+                    placeholder = 'e.g. NGK spark plug compatible with multiple models',
+                    rows        = 4,
+                    help_text   = 'Maximum 255 characters.'
+                ) }}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-floppy-disk me-2"></i>
+                {{ 'Save Changes' if is_edit else 'Add Spare Part' }}
+            </button>
+            <a href="{{ url_for('spare_parts.index') }}" class="btn btn-outline-secondary">
+                Cancel
+            </a>
+        </div>
+
+    </form>
+</div>
+
+<!-- Audit information (Edit only) -->
+{% if is_edit and record %}
+<div class="form-card">
+    <p class="form-section-title">Audit Information</p>
+    <div class="row">
+        <div class="col-md-6">
+            {{ readonly_field('Created By', record.Created_By) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Created',
+                record.Date_Created[:19].replace('T', ' ') if record.Date_Created else '—'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Updated By',
+                record.Updated_By if record.Updated_By else '—'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Updated',
+                record.Date_Updated[:19].replace('T', ' ') if record.Date_Updated else '—'
+            ) }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

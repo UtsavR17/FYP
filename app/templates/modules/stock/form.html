@@ -1,0 +1,158 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/form_field.html' import text_field, number_field,
+    select_field, readonly_field %}
+
+{% block title %}{{ 'Edit Stock Entry' if is_edit else 'Add Stock Entry' }}{% endblock %}
+{% block page_title %}{{ 'Edit Stock Entry' if is_edit else 'Add Stock Entry' }}{% endblock %}
+
+{% block content %}
+
+<!-- Page header -->
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            {{ 'Edit Stock Entry' if is_edit else 'Add Stock Entry' }}
+        </h2>
+        <p class="page-header-subtitle">
+            {{ 'Update the stock record.' if is_edit
+               else 'Add a new stock entry to the inventory.' }}
+        </p>
+    </div>
+    <a href="{{ url_for('stock.index') }}" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to Stock
+    </a>
+</div>
+
+<!-- Form card -->
+<div class="form-card">
+    <p class="form-section-title">Stock Details</p>
+
+    <form method="POST" novalidate>
+
+        <!-- Row 1: Spare Part | Brand -->
+        <div class="row">
+            <div class="col-md-6">
+                {{ select_field(
+                    name        = 'Spare_Parts_SP_id',
+                    label       = 'Spare Part',
+                    options     = spare_part_options,
+                    selected    = form_data.get('Spare_Parts_SP_id', ''),
+                    required    = True,
+                    error       = errors.get('Spare_Parts_SP_id', ''),
+                    empty_label = '— Select a Spare Part —'
+                ) }}
+            </div>
+            <div class="col-md-6">
+                {{ select_field(
+                    name        = 'Brand_Brand_ID',
+                    label       = 'Brand',
+                    options     = brand_options,
+                    selected    = form_data.get('Brand_Brand_ID', ''),
+                    required    = True,
+                    error       = errors.get('Brand_Brand_ID', ''),
+                    empty_label = '— Select a Brand —'
+                ) }}
+            </div>
+        </div>
+
+        <!-- Row 2: Size | QOH | Warranty -->
+        <div class="row">
+            <div class="col-md-4">
+                {{ text_field(
+                    name        = 'Size',
+                    label       = 'Size',
+                    value       = form_data.get('Size', ''),
+                    required    = True,
+                    error       = errors.get('Size', ''),
+                    placeholder = 'e.g. 90/90-17',
+                    help_text   = 'Alphanumeric size. Maximum 20 characters.'
+                ) }}
+            </div>
+            <div class="col-md-4">
+                {{ number_field(
+                    name        = 'QOH',
+                    label       = 'Quantity on Hand',
+                    value       = form_data.get('QOH', ''),
+                    required    = True,
+                    error       = errors.get('QOH', ''),
+                    placeholder = '0',
+                    step        = '1',
+                    min_val     = '0'
+                ) }}
+            </div>
+            <div class="col-md-4">
+                {{ number_field(
+                    name        = 'Warranty',
+                    label       = 'Warranty (Months)',
+                    value       = form_data.get('Warranty', ''),
+                    required    = True,
+                    error       = errors.get('Warranty', ''),
+                    placeholder = '0',
+                    step        = '1',
+                    min_val     = '0',
+                    help_text   = 'Enter 0 if no warranty.'
+                ) }}
+            </div>
+        </div>
+
+        <!-- Row 3: Selling Price -->
+        <div class="row">
+            <div class="col-md-4">
+                {{ number_field(
+                    name        = 'S_Price',
+                    label       = 'Selling Price (Rs.)',
+                    value       = form_data.get('S_Price', ''),
+                    required    = True,
+                    error       = errors.get('S_Price', ''),
+                    placeholder = '0.00',
+                    step        = '0.01',
+                    min_val     = '0',
+                    help_text   = 'Enter the selling price in Mauritian Rupees.'
+                ) }}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-floppy-disk me-2"></i>
+                {{ 'Save Changes' if is_edit else 'Add Stock Entry' }}
+            </button>
+            <a href="{{ url_for('stock.index') }}" class="btn btn-outline-secondary">
+                Cancel
+            </a>
+        </div>
+
+    </form>
+</div>
+
+<!-- Audit information (Edit only) -->
+{% if is_edit and record %}
+<div class="form-card">
+    <p class="form-section-title">Audit Information</p>
+    <div class="row">
+        <div class="col-md-6">
+            {{ readonly_field('Created By', record.Created_By) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Created',
+                record.Date_Created[:19].replace('T', ' ') if record.Date_Created else '—'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Updated By',
+                record.Updated_By if record.Updated_By else '—'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Updated',
+                record.Date_Updated[:19].replace('T', ' ') if record.Date_Updated else '—'
+            ) }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

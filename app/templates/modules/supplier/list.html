@@ -1,0 +1,89 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/table.html'         import search_bar, data_table %}
+{% from 'components/pagination.html'    import pagination_controls %}
+{% from 'components/modal_confirm.html' import delete_modal %}
+{% from 'components/alert.html'         import info_alert %}
+
+{% block title %}Suppliers{% endblock %}
+{% block page_title %}Suppliers{% endblock %}
+
+{% block content %}
+
+<!-- Page header -->
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            Suppliers
+            <span class="record-count-badge">{{ pagination.total }}</span>
+        </h2>
+        <p class="page-header-subtitle">Manage supplier information</p>
+    </div>
+    <a href="{{ url_for('supplier.create') }}" class="btn btn-accent">
+        <i class="fa-solid fa-plus me-2"></i>Add Supplier
+    </a>
+</div>
+
+<!-- Table card -->
+<div class="admin-card">
+
+    {{ search_bar(
+        url_for('supplier.index'),
+        search_query,
+        'Search by name, email or country...'
+    ) }}
+
+    {% if search_query %}
+        {{ info_alert('Showing results for: <strong>' ~ search_query ~ '</strong>') }}
+    {% endif %}
+
+    {% call data_table(
+        ['ID', 'Supplier Name', 'Phone', 'Email', 'Country', 'Date Created'],
+        total=pagination.total,
+        empty_message='No suppliers found. Add your first supplier to get started.'
+    ) %}
+        {% for row in pagination.records %}
+        <tr>
+            <td class="text-muted" style="width: 60px;">{{ row.SupplierID }}</td>
+            <td><strong>{{ row.SupplierName }}</strong></td>
+            <td>{{ row.Phone }}</td>
+            <td>
+                <a href="mailto:{{ row.Email }}"
+                   class="text-decoration-none supplier-email">
+                    {{ row.Email }}
+                </a>
+            </td>
+            <td>{{ row.Country }}</td>
+            <td>
+                {% if row.Date_Created %}
+                    {{ row.Date_Created[:19].replace('T', ' ') }}
+                {% else %}
+                    &mdash;
+                {% endif %}
+            </td>
+            <td class="text-end">
+                <div class="action-btn-group">
+                    <a href="{{ url_for('supplier.edit', supplier_id=row.SupplierID) }}"
+                       class="btn btn-sm btn-outline-primary">
+                        <i class="fa-solid fa-pen me-1"></i>Edit
+                    </a>
+                    <button type="button"
+                            class="btn btn-sm btn-outline-danger"
+                            data-bs-toggle="modal"
+                            data-bs-target="#deleteModal"
+                            data-delete-url="{{ url_for('supplier.delete', supplier_id=row.SupplierID) }}"
+                            data-record-name="{{ row.SupplierName }}">
+                        <i class="fa-solid fa-trash me-1"></i>Delete
+                    </button>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    {% endcall %}
+
+    {{ pagination_controls(pagination, 'supplier.index', search_query) }}
+
+</div>
+
+{{ delete_modal() }}
+
+{% endblock %}

@@ -1,0 +1,77 @@
+{#
+  components/modal_confirm.html
+  Reusable delete confirmation modal.
+
+  One modal is placed on each list page. Delete buttons pass their
+  target URL and record name via data attributes. JavaScript populates
+  the modal form action and record name dynamically when the modal opens.
+
+  Usage:
+    1. Import the macro:
+       {% from 'components/modal_confirm.html' import delete_modal %}
+
+    2. Place the modal once at the bottom of the page, outside all cards:
+       {{ delete_modal() }}
+
+    3. Add these attributes to each row's Delete button:
+       data-bs-toggle="modal"
+       data-bs-target="#deleteModal"
+       data-delete-url="{{ url_for('module.delete', id=row.ID) }}"
+       data-record-name="{{ row.FieldName }}"
+
+  The modal ID is fixed as 'deleteModal'.
+  The form ID is fixed as 'deleteModalForm'.
+  JavaScript in admin.js handles the rest automatically.
+#}
+
+
+{% macro delete_modal() %}
+<div class="modal fade"
+     id="deleteModal"
+     tabindex="-1"
+     aria-labelledby="deleteModalLabel"
+     aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title d-flex align-items-center gap-2" id="deleteModalLabel">
+                    <span class="modal-warning-icon">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </span>
+                    Confirm Delete
+                </h5>
+                <button type="button"
+                        class="btn-close"
+                        data-bs-dismiss="modal"
+                        aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <p class="modal-body-text">
+                    Are you sure you want to delete this record?
+                    This action <strong>cannot be undone</strong>.
+                </p>
+                <div class="modal-record-display">
+                    <span class="modal-record-label">Record:</span>
+                    <span class="modal-record-name" id="deleteModalRecordName"></span>
+                </div>
+            </div>
+
+            <div class="modal-footer border-0 pt-0">
+                <button type="button"
+                        class="btn btn-outline-secondary"
+                        data-bs-dismiss="modal">
+                    <i class="fa-solid fa-xmark me-1"></i>Cancel
+                </button>
+                <form id="deleteModalForm" method="POST" action="">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fa-solid fa-trash me-1"></i>Delete
+                    </button>
+                </form>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endmacro %}

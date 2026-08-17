@@ -1,0 +1,81 @@
+{#
+  components/pagination.html
+  Reusable pagination controls macro.
+
+  The pagination dict is produced by app/utils/pagination.py and contains:
+    items       — the slice of records for this page
+    page        — current page number (1-indexed)
+    per_page    — records per page
+    total       — total number of records
+    total_pages — total number of pages
+    has_prev    — True if a previous page exists
+    has_next    — True if a next page exists
+
+  Usage:
+    {% from 'components/pagination.html' import pagination_controls %}
+    {{ pagination_controls(pagination, 'color.index', search_query) }}
+
+  Parameters:
+    pagination — the dict returned by utils/pagination.paginate()
+    endpoint   — the Flask endpoint string for this module (e.g. 'color.index')
+    query      — the current search string, preserved in all page links
+#}
+
+
+{% macro pagination_controls(pagination, endpoint, query='') %}
+{% if pagination.total > 0 %}
+
+{% set start_record = ((pagination.page - 1) * pagination.per_page) + 1 %}
+{% set end_record_raw = pagination.page * pagination.per_page %}
+{% if end_record_raw > pagination.total %}
+    {% set end_record = pagination.total %}
+{% else %}
+    {% set end_record = end_record_raw %}
+{% endif %}
+
+<div class="pagination-wrapper">
+
+    <div class="pagination-info">
+        Showing <strong>{{ start_record }}</strong>
+        to <strong>{{ end_record }}</strong>
+        of <strong>{{ pagination.total }}</strong>
+        {{ 'record' if pagination.total == 1 else 'records' }}
+    </div>
+
+    {% if pagination.total_pages > 1 %}
+    <nav aria-label="Page navigation">
+        <ul class="pagination pagination-sm mb-0">
+
+            <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                <a class="page-link"
+                   href="{{ url_for(endpoint, page=pagination.page - 1, q=query) if pagination.has_prev else '#' }}"
+                   aria-label="Previous">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </a>
+            </li>
+
+            {% for p in range(1, pagination.total_pages + 1) %}
+            <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                <a class="page-link"
+                   href="{{ url_for(endpoint, page=p, q=query) }}"
+                   {% if p == pagination.page %}aria-current="page"{% endif %}>
+                    {{ p }}
+                </a>
+            </li>
+            {% endfor %}
+
+            <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                <a class="page-link"
+                   href="{{ url_for(endpoint, page=pagination.page + 1, q=query) if pagination.has_next else '#' }}"
+                   aria-label="Next">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </a>
+            </li>
+
+        </ul>
+    </nav>
+    {% endif %}
+
+</div>
+{% endif %}
+{% endmacro %}

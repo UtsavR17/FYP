@@ -1,0 +1,160 @@
+{#
+  components/form_field.html
+  Reusable form field macros for all CRUD Create and Edit forms.
+
+  Usage example:
+    {% from 'components/form_field.html' import text_field, number_field,
+       select_field, textarea_field, readonly_field %}
+
+    {{ text_field('Color', 'Color Name', form_data.get('Color',''),
+                  required=True, error=errors.get('Color','')) }}
+
+    {{ select_field('Role_Role_ID', 'Role', role_options,
+                    selected=form_data.get('Role_Role_ID',''),
+                    required=True, error=errors.get('Role_Role_ID','')) }}
+
+  options format for select_field:
+    A list of (value, label) tuples, e.g.:
+    [(1, 'Manager'), (2, 'Mechanic')]
+#}
+
+
+{# -----------------------------------------------------------------------
+   text_field
+   Standard single-line text input.
+   ----------------------------------------------------------------------- #}
+{% macro text_field(name, label, value='', required=False, error='',
+                    placeholder='', help_text='') %}
+<div class="mb-3">
+    <label for="{{ name }}" class="form-label">
+        {{ label }}
+        {% if required %}<span class="required-star" aria-hidden="true">*</span>{% endif %}
+    </label>
+    <input
+        type="text"
+        class="form-control {% if error %}is-invalid{% endif %}"
+        id="{{ name }}"
+        name="{{ name }}"
+        value="{{ value }}"
+        placeholder="{{ placeholder }}"
+        {% if required %}required{% endif %}>
+    {% if error %}
+    <div class="invalid-feedback">{{ error }}</div>
+    {% endif %}
+    {% if help_text %}
+    <div class="form-text text-muted">{{ help_text }}</div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+
+{# -----------------------------------------------------------------------
+   number_field
+   Numeric input. Used for prices, rates, quantities, and counts.
+   step='any' allows decimals. Set step='1' for integer-only fields.
+   ----------------------------------------------------------------------- #}
+{% macro number_field(name, label, value='', required=False, error='',
+                      placeholder='0', step='any', min_val='0', help_text='') %}
+<div class="mb-3">
+    <label for="{{ name }}" class="form-label">
+        {{ label }}
+        {% if required %}<span class="required-star" aria-hidden="true">*</span>{% endif %}
+    </label>
+    <input
+        type="number"
+        class="form-control {% if error %}is-invalid{% endif %}"
+        id="{{ name }}"
+        name="{{ name }}"
+        value="{{ value }}"
+        placeholder="{{ placeholder }}"
+        step="{{ step }}"
+        min="{{ min_val }}"
+        {% if required %}required{% endif %}>
+    {% if error %}
+    <div class="invalid-feedback">{{ error }}</div>
+    {% endif %}
+    {% if help_text %}
+    <div class="form-text text-muted">{{ help_text }}</div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+
+{# -----------------------------------------------------------------------
+   select_field
+   Dropdown select input. Options is a list of (value, label) tuples.
+   selected is compared using |string to handle both int and str PKs.
+   ----------------------------------------------------------------------- #}
+{% macro select_field(name, label, options, selected='', required=False,
+                      error='', help_text='', empty_label='-- Select --') %}
+<div class="mb-3">
+    <label for="{{ name }}" class="form-label">
+        {{ label }}
+        {% if required %}<span class="required-star" aria-hidden="true">*</span>{% endif %}
+    </label>
+    <select
+        class="form-select {% if error %}is-invalid{% endif %}"
+        id="{{ name }}"
+        name="{{ name }}"
+        {% if required %}required{% endif %}>
+        <option value="">{{ empty_label }}</option>
+        {% for opt_value, opt_label in options %}
+        <option
+            value="{{ opt_value }}"
+            {% if opt_value|string == selected|string %}selected{% endif %}>
+            {{ opt_label }}
+        </option>
+        {% endfor %}
+    </select>
+    {% if error %}
+    <div class="invalid-feedback">{{ error }}</div>
+    {% endif %}
+    {% if help_text %}
+    <div class="form-text text-muted">{{ help_text }}</div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+
+{# -----------------------------------------------------------------------
+   textarea_field
+   Multi-line text area. Used for description fields.
+   ----------------------------------------------------------------------- #}
+{% macro textarea_field(name, label, value='', required=False, error='',
+                        placeholder='', rows=3, help_text='') %}
+<div class="mb-3">
+    <label for="{{ name }}" class="form-label">
+        {{ label }}
+        {% if required %}<span class="required-star" aria-hidden="true">*</span>{% endif %}
+    </label>
+    <textarea
+        class="form-control {% if error %}is-invalid{% endif %}"
+        id="{{ name }}"
+        name="{{ name }}"
+        rows="{{ rows }}"
+        placeholder="{{ placeholder }}"
+        {% if required %}required{% endif %}>{{ value }}</textarea>
+    {% if error %}
+    <div class="invalid-feedback">{{ error }}</div>
+    {% endif %}
+    {% if help_text %}
+    <div class="form-text text-muted">{{ help_text }}</div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+
+{# -----------------------------------------------------------------------
+   readonly_field
+   Displays an audit or non-editable value as a read-only plain-text field.
+   Used in Edit forms for Date_Created, Created_By, Date_Updated, Updated_By.
+   ----------------------------------------------------------------------- #}
+{% macro readonly_field(label, value, help_text='') %}
+<div class="mb-3">
+    <label class="form-label readonly-label">{{ label }}</label>
+    <div class="readonly-value">{{ value if value else '—' }}</div>
+    {% if help_text %}
+    <div class="form-text text-muted">{{ help_text }}</div>
+    {% endif %}
+</div>
+{% endmacro %}

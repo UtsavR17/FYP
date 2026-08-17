@@ -1,0 +1,83 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/form_field.html' import text_field, readonly_field %}
+
+{% block title %}{{ 'Edit Category' if is_edit else 'Add Category' }}{% endblock %}
+{% block page_title %}{{ 'Edit Category' if is_edit else 'Add Category' }}{% endblock %}
+
+{% block content %}
+
+<!-- Page header -->
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            {{ 'Edit Category' if is_edit else 'Add Category' }}
+        </h2>
+        <p class="page-header-subtitle">
+            {{ 'Update the category record.' if is_edit else 'Add a new spare part category.' }}
+        </p>
+    </div>
+    <a href="{{ url_for('category.index') }}" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to Categories
+    </a>
+</div>
+
+<!-- Form card -->
+<div class="form-card">
+    <p class="form-section-title">Category Details</p>
+
+    <form method="POST" novalidate>
+
+        {{ text_field(
+            name        = 'CAT_desc',
+            label       = 'Category Description',
+            value       = form_data.get('CAT_desc', ''),
+            required    = True,
+            error       = errors.get('CAT_desc', ''),
+            placeholder = 'e.g. Engine Parts',
+            help_text   = 'Maximum 20 characters.'
+        ) }}
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-floppy-disk me-2"></i>
+                {{ 'Save Changes' if is_edit else 'Add Category' }}
+            </button>
+            <a href="{{ url_for('category.index') }}" class="btn btn-outline-secondary">
+                Cancel
+            </a>
+        </div>
+
+    </form>
+</div>
+
+<!-- Audit information (Edit only) -->
+{% if is_edit and record %}
+<div class="form-card">
+    <p class="form-section-title">Audit Information</p>
+    <div class="row">
+        <div class="col-md-6">
+            {{ readonly_field('Created By', record.Created_By) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Created',
+                record.Date_Created[:19].replace('T', ' ') if record.Date_Created else '—'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Updated By',
+                record.Updated_By if record.Updated_By else '—'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Updated',
+                record.Date_Updated[:19].replace('T', ' ') if record.Date_Updated else '—'
+            ) }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

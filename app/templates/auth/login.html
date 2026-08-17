@@ -1,0 +1,81 @@
+{% extends 'layout/base.html' %}
+
+{% block title %}Sign In{% endblock %}
+
+{% block body %}
+<div class="login-wrapper">
+    <div class="login-card">
+
+        <!-- Brand -->
+        <div class="login-brand">
+            <div class="login-brand-icon">
+                <i class="fa-solid fa-motorcycle"></i>
+            </div>
+            <h1 class="login-title">MotoAdmin</h1>
+            <p class="login-subtitle">
+                Motorbike Sales &amp; Servicing Management System
+            </p>
+        </div>
+
+        <!-- Flash messages (e.g. session expired warning) -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }} mb-3" role="alert">
+                    {% if category == 'warning' %}
+                        <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                    {% elif category == 'info' %}
+                        <i class="fa-solid fa-circle-info me-2"></i>
+                    {% endif %}
+                    {{ message }}
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Inline error -->
+        {% if error %}
+        <div class="alert alert-danger mb-3" role="alert">
+            <i class="fa-solid fa-circle-xmark me-2"></i>{{ error }}
+        </div>
+        {% endif %}
+
+        <!-- Login form -->
+        <form method="POST" novalidate>
+
+            <div class="mb-3">
+                <label for="email" class="form-label">Email Address</label>
+                <input
+                    type="email"
+                    class="form-control"
+                    id="email"
+                    name="email"
+                    placeholder="admin@example.com"
+                    autocomplete="email"
+                    autofocus>
+            </div>
+
+            <div class="mb-4">
+                <label for="password" class="form-label">Password</label>
+                <input
+                    type="password"
+                    class="form-control"
+                    id="password"
+                    name="password"
+                    placeholder="••••••••"
+                    autocomplete="current-password">
+            </div>
+
+            <button type="submit" class="btn btn-accent w-100">
+                <i class="fa-solid fa-right-to-bracket me-2"></i>Sign In
+            </button>
+
+        </form>
+
+        <p class="login-footer-text">
+            Admin Panel &mdash; Authorised Personnel Only
+        </p>
+
+    </div>
+</div>
+{% endblock %}

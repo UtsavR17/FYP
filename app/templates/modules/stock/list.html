@@ -1,0 +1,94 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/table.html'         import search_bar, data_table %}
+{% from 'components/pagination.html'    import pagination_controls %}
+{% from 'components/modal_confirm.html' import delete_modal %}
+{% from 'components/alert.html'         import info_alert %}
+
+{% block title %}Stock{% endblock %}
+{% block page_title %}Stock{% endblock %}
+
+{% block content %}
+
+<!-- Page header -->
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            Stock
+            <span class="record-count-badge">{{ pagination.total }}</span>
+        </h2>
+        <p class="page-header-subtitle">Manage stock inventory levels</p>
+    </div>
+    <a href="{{ url_for('stock.create') }}" class="btn btn-accent">
+        <i class="fa-solid fa-plus me-2"></i>Add Stock Entry
+    </a>
+</div>
+
+<!-- Table card -->
+<div class="admin-card">
+
+    {{ search_bar(
+        url_for('stock.index'),
+        search_query,
+        'Search by spare part, brand or size...'
+    ) }}
+
+    {% if search_query %}
+        {{ info_alert('Showing results for: <strong>' ~ search_query ~ '</strong>') }}
+    {% endif %}
+
+    {% call data_table(
+        ['ID', 'Spare Part', 'Brand', 'Size', 'QOH', 'Price', 'Warranty', 'Date Created'],
+        total=pagination.total,
+        empty_message='No stock entries found. Add your first stock entry to get started.'
+    ) %}
+        {% for row in pagination.records %}
+        <tr>
+            <td class="text-muted" style="width: 60px;">{{ row.Stock_ID }}</td>
+            <td><strong>{{ row._spare_part_name }}</strong></td>
+            <td>
+                <span class="role-badge">{{ row._brand_name }}</span>
+            </td>
+            <td>{{ row.Size }}</td>
+            <td>
+                {% if row.QOH == 0 %}
+                    <span class="stock-zero">{{ row.QOH }}</span>
+                {% else %}
+                    {{ row.QOH }}
+                {% endif %}
+            </td>
+            <td>Rs. {{ '%.2f' | format(row.S_Price | float) }}</td>
+            <td>{{ row.Warranty }} months</td>
+            <td>
+                {% if row.Date_Created %}
+                    {{ row.Date_Created[:19].replace('T', ' ') }}
+                {% else %}
+                    &mdash;
+                {% endif %}
+            </td>
+            <td class="text-end">
+                <div class="action-btn-group">
+                    <a href="{{ url_for('stock.edit', stock_id=row.Stock_ID) }}"
+                       class="btn btn-sm btn-outline-primary">
+                        <i class="fa-solid fa-pen me-1"></i>Edit
+                    </a>
+                    <button type="button"
+                            class="btn btn-sm btn-outline-danger"
+                            data-bs-toggle="modal"
+                            data-bs-target="#deleteModal"
+                            data-delete-url="{{ url_for('stock.delete', stock_id=row.Stock_ID) }}"
+                            data-record-name="{{ row._spare_part_name }} (Size: {{ row.Size }})">
+                        <i class="fa-solid fa-trash me-1"></i>Delete
+                    </button>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    {% endcall %}
+
+    {{ pagination_controls(pagination, 'stock.index', search_query) }}
+
+</div>
+
+{{ delete_modal() }}
+
+{% endblock %}

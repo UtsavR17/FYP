@@ -1,0 +1,45 @@
+{#
+  components/alert.html
+  Reusable inline alert macros for page-level status messages.
+  These are distinct from flash messages (which are post-redirect feedback).
+  Use these for static content-area messages such as search result banners.
+
+  Usage:
+    {% from 'components/alert.html' import info_alert, warning_alert %}
+    {{ info_alert('Showing results for: ' ~ search_query) }}
+    {{ warning_alert('No records match your search. Try a different keyword.') }}
+#}
+
+
+{# -----------------------------------------------------------------------
+   info_alert
+   Blue informational alert. Use for search result banners, tips, or
+   neutral status messages.
+   ----------------------------------------------------------------------- #}
+{% macro info_alert(message, dismissible=False) %}
+<div class="alert alert-info {% if dismissible %}alert-dismissible fade show{% endif %} inline-alert mb-3"
+     role="alert">
+    <i class="fa-solid fa-circle-info me-2"></i>
+    {{ message }}
+    {% if dismissible %}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    {% endif %}
+</div>
+{% endmacro %}
+
+
+{# -----------------------------------------------------------------------
+   warning_alert
+   Yellow warning alert. Use for soft warnings such as no-search-results
+   messages or data integrity notices.
+   ----------------------------------------------------------------------- #}
+{% macro warning_alert(message, dismissible=False) %}
+<div class="alert alert-warning {% if dismissible %}alert-dismissible fade show{% endif %} inline-alert mb-3"
+     role="alert">
+    <i class="fa-solid fa-triangle-exclamation me-2"></i>
+    {{ message }}
+    {% if dismissible %}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    {% endif %}
+</div>
+{% endmacro %}

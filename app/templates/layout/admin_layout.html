@@ -1,0 +1,199 @@
+{# layout/admin_layout.html — Placeholder. Implemented in Task 04. #}{% extends 'layout/base.html' %}
+
+{% block body %}
+<div class="admin-wrapper">
+
+    <!-- ================================================================
+         SIDEBAR
+         ================================================================ -->
+    <aside class="sidebar" id="sidebar">
+
+        <!-- Brand -->
+        <div class="sidebar-brand">
+            <div class="sidebar-brand-icon">
+                <i class="fa-solid fa-motorcycle"></i>
+            </div>
+            <div class="sidebar-brand-text">
+                <span class="brand-name">MotoAdmin</span>
+                <span class="brand-sub">Management System</span>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="sidebar-nav" aria-label="Admin navigation">
+
+            <ul class="nav-list">
+                <li class="nav-item">
+                    <a href="{{ url_for('dashboard.index') }}"
+                       class="nav-link {% if request.blueprint == 'dashboard' %}active{% endif %}"
+                       aria-current="{% if request.blueprint == 'dashboard' %}page{% endif %}">
+                        <i class="fa-solid fa-gauge-high nav-icon"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+            </ul>
+
+            <div class="nav-section-label">Management</div>
+
+            <ul class="nav-list">
+                <li class="nav-item">
+                    <a href="{{ url_for('color.index') }}"
+                       class="nav-link {% if request.blueprint == 'color' %}active{% endif %}">
+                        <i class="fa-solid fa-palette nav-icon"></i>
+                        <span>Colors</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('category.index') }}"
+                       class="nav-link {% if request.blueprint == 'category' %}active{% endif %}">
+                        <i class="fa-solid fa-tags nav-icon"></i>
+                        <span>Categories</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('brand.index') }}"
+                       class="nav-link {% if request.blueprint == 'brand' %}active{% endif %}">
+                        <i class="fa-solid fa-copyright nav-icon"></i>
+                        <span>Brands</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('model.index') }}"
+                       class="nav-link {% if request.blueprint == 'model' %}active{% endif %}">
+                        <i class="fa-solid fa-motorcycle nav-icon"></i>
+                        <span>Models</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('spare_parts.index') }}"
+                       class="nav-link {% if request.blueprint == 'spare_parts' %}active{% endif %}">
+                        <i class="fa-solid fa-gears nav-icon"></i>
+                        <span>Spare Parts</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('stock.index') }}"
+                       class="nav-link {% if request.blueprint == 'stock' %}active{% endif %}">
+                        <i class="fa-solid fa-boxes-stacked nav-icon"></i>
+                        <span>Stock</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('service.index') }}"
+                       class="nav-link {% if request.blueprint == 'service' %}active{% endif %}">
+                        <i class="fa-solid fa-wrench nav-icon"></i>
+                        <span>Services</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('role.index') }}"
+                       class="nav-link {% if request.blueprint == 'role' %}active{% endif %}">
+                        <i class="fa-solid fa-id-badge nav-icon"></i>
+                        <span>Roles</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('employee.index') }}"
+                       class="nav-link {% if request.blueprint == 'employee' %}active{% endif %}">
+                        <i class="fa-solid fa-users nav-icon"></i>
+                        <span>Employees</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('supplier.index') }}"
+                       class="nav-link {% if request.blueprint == 'supplier' %}active{% endif %}">
+                        <i class="fa-solid fa-truck nav-icon"></i>
+                        <span>Suppliers</span>
+                    </a>
+                </li>
+            </ul>
+
+        </nav>
+
+        <!-- Sidebar Footer -->
+        <div class="sidebar-footer">
+            <div class="sidebar-user-info">
+                <i class="fa-solid fa-circle-user sidebar-user-icon"></i>
+                <div class="sidebar-user-details">
+                    <span class="sidebar-user-email">
+                        {{ session.get('user_email', 'Admin') }}
+                    </span>
+                </div>
+            </div>
+            <a href="{{ url_for('auth.logout') }}" class="sidebar-logout-link">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span>Sign Out</span>
+            </a>
+        </div>
+
+    </aside>
+
+    <!-- Mobile overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- ================================================================
+         MAIN WRAPPER
+         ================================================================ -->
+    <div class="main-wrapper">
+
+        <!-- Header -->
+        <header class="admin-header">
+            <div class="header-left">
+                <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle navigation">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <h1 class="page-title">{% block page_title %}Admin Panel{% endblock %}</h1>
+            </div>
+
+            <div class="header-right">
+                <div class="header-user">
+                    <i class="fa-solid fa-circle-user"></i>
+                    <span>{{ session.get('user_email', 'Admin') }}</span>
+                </div>
+                <a href="{{ url_for('auth.logout') }}"
+                   class="btn btn-sm btn-outline-secondary header-logout-btn"
+                   title="Sign Out">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </a>
+            </div>
+            
+        </header>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-container">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show mb-2" role="alert">
+                            {% if category == 'success' %}
+                                <i class="fa-solid fa-circle-check me-2"></i>
+                            {% elif category == 'danger' %}
+                                <i class="fa-solid fa-circle-xmark me-2"></i>
+                            {% elif category == 'warning' %}
+                                <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                            {% else %}
+                                <i class="fa-solid fa-circle-info me-2"></i>
+                            {% endif %}
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- Main Content -->
+        <main class="content-area">
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- Footer -->
+        <footer class="admin-footer">
+            <span>Motorbike Sales &amp; Servicing Management System &mdash; Admin Panel</span>
+            <span>UTM Final Year Project &mdash; Utsav Ramjattan</span>
+        </footer>
+
+    </div><!-- end .main-wrapper -->
+
+</div><!-- end .admin-wrapper -->
+{% endblock %}

@@ -1,0 +1,118 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/form_field.html' import text_field, number_field,
+    textarea_field, readonly_field %}
+
+{% block title %}{{ 'Edit Service' if is_edit else 'Add Service' }}{% endblock %}
+{% block page_title %}{{ 'Edit Service' if is_edit else 'Add Service' }}{% endblock %}
+
+{% block content %}
+
+<!-- Page header -->
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            {{ 'Edit Service' if is_edit else 'Add Service' }}
+        </h2>
+        <p class="page-header-subtitle">
+            {{ 'Update the service record.' if is_edit else 'Add a new workshop service.' }}
+        </p>
+    </div>
+    <a href="{{ url_for('service.index') }}" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to Services
+    </a>
+</div>
+
+<!-- Form card -->
+<div class="form-card">
+    <p class="form-section-title">Service Details</p>
+
+    <form method="POST" novalidate>
+
+        <!-- Row 1: Service Name | Cost -->
+        <div class="row">
+            <div class="col-md-6">
+                {{ text_field(
+                    name        = 'Service_Name',
+                    label       = 'Service Name',
+                    value       = form_data.get('Service_Name', ''),
+                    required    = True,
+                    error       = errors.get('Service_Name', ''),
+                    placeholder = 'e.g. Basic Service A',
+                    help_text   = 'Maximum 50 characters.'
+                ) }}
+            </div>
+            <div class="col-md-6">
+                {{ number_field(
+                    name        = 'Cost',
+                    label       = 'Cost (Rs.)',
+                    value       = form_data.get('Cost', ''),
+                    required    = True,
+                    error       = errors.get('Cost', ''),
+                    placeholder = '0.00',
+                    step        = '0.01',
+                    min_val     = '0',
+                    help_text   = 'Enter the service cost in Mauritian Rupees.'
+                ) }}
+            </div>
+        </div>
+
+        <!-- Row 2: Description (full width) -->
+        <div class="row">
+            <div class="col-12">
+                {{ textarea_field(
+                    name        = 'Description',
+                    label       = 'Description',
+                    value       = form_data.get('Description', ''),
+                    required    = True,
+                    error       = errors.get('Description', ''),
+                    placeholder = 'e.g. Oil change, filter check and chain adjustment',
+                    rows        = 4,
+                    help_text   = 'Maximum 255 characters.'
+                ) }}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-floppy-disk me-2"></i>
+                {{ 'Save Changes' if is_edit else 'Add Service' }}
+            </button>
+            <a href="{{ url_for('service.index') }}" class="btn btn-outline-secondary">
+                Cancel
+            </a>
+        </div>
+
+    </form>
+</div>
+
+<!-- Audit information (Edit only) -->
+{% if is_edit and record %}
+<div class="form-card">
+    <p class="form-section-title">Audit Information</p>
+    <div class="row">
+        <div class="col-md-6">
+            {{ readonly_field('Created By', record.Created_By) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Created',
+                record.Date_Created[:19].replace('T', ' ') if record.Date_Created else '—'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Updated By',
+                record.Updated_By if record.Updated_By else '—'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Updated',
+                record.Date_Updated[:19].replace('T', ' ') if record.Date_Updated else '—'
+            ) }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
