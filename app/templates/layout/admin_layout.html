@@ -5,16 +5,17 @@
 
     <!-- ================================================================
          SIDEBAR
-         ================================================================ -->
+         ================================================ -->
     <aside class="sidebar" id="sidebar">
 
         <!-- Brand -->
         <div class="sidebar-brand">
-            <div class="sidebar-brand-icon">
-                <i class="fa-solid fa-motorcycle"></i>
-            </div>
+            <!-- <div class="sidebar-brand-icon">
+                <i class="fa-solid fa-motorcycle"></i> -->
+            <!-- </div> -->
             <div class="sidebar-brand-text">
-                <span class="brand-name">MotoAdmin</span>
+                <!-- <span class="brand-name">MotoAdmin</span> -->
+                 <span class="brand-name">Admin</span>
                 <span class="brand-sub">Management System</span>
             </div>
         </div>
@@ -27,7 +28,7 @@
                     <a href="{{ url_for('dashboard.index') }}"
                        class="nav-link {% if request.blueprint == 'dashboard' %}active{% endif %}"
                        aria-current="{% if request.blueprint == 'dashboard' %}page{% endif %}">
-                        <i class="fa-solid fa-gauge-high nav-icon"></i>
+                        <!-- <i class="fa-solid fa-gauge-high nav-icon"></i> -->
                         <span>Dashboard</span>
                     </a>
                 </li>
@@ -39,70 +40,70 @@
                 <li class="nav-item">
                     <a href="{{ url_for('color.index') }}"
                        class="nav-link {% if request.blueprint == 'color' %}active{% endif %}">
-                        <i class="fa-solid fa-palette nav-icon"></i>
+                        <!-- <i class="fa-solid fa-palette nav-icon"></i> -->
                         <span>Colors</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="{{ url_for('category.index') }}"
                        class="nav-link {% if request.blueprint == 'category' %}active{% endif %}">
-                        <i class="fa-solid fa-tags nav-icon"></i>
+                        <!-- <i class="fa-solid fa-tags nav-icon"></i> -->
                         <span>Categories</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="{{ url_for('brand.index') }}"
                        class="nav-link {% if request.blueprint == 'brand' %}active{% endif %}">
-                        <i class="fa-solid fa-copyright nav-icon"></i>
+                        <!-- <i class="fa-solid fa-copyright nav-icon"></i> -->
                         <span>Brands</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="{{ url_for('model.index') }}"
                        class="nav-link {% if request.blueprint == 'model' %}active{% endif %}">
-                        <i class="fa-solid fa-motorcycle nav-icon"></i>
+                        <!-- <i class="fa-solid fa-motorcycle nav-icon"></i> -->
                         <span>Models</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="{{ url_for('spare_parts.index') }}"
                        class="nav-link {% if request.blueprint == 'spare_parts' %}active{% endif %}">
-                        <i class="fa-solid fa-gears nav-icon"></i>
+                        <!-- <i class="fa-solid fa-gears nav-icon"></i> -->
                         <span>Spare Parts</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="{{ url_for('stock.index') }}"
                        class="nav-link {% if request.blueprint == 'stock' %}active{% endif %}">
-                        <i class="fa-solid fa-boxes-stacked nav-icon"></i>
+                        <!-- <i class="fa-solid fa-boxes-stacked nav-icon"></i> -->
                         <span>Stock</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="{{ url_for('service.index') }}"
                        class="nav-link {% if request.blueprint == 'service' %}active{% endif %}">
-                        <i class="fa-solid fa-wrench nav-icon"></i>
+                        <!-- <i class="fa-solid fa-wrench nav-icon"></i> -->
                         <span>Services</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="{{ url_for('role.index') }}"
                        class="nav-link {% if request.blueprint == 'role' %}active{% endif %}">
-                        <i class="fa-solid fa-id-badge nav-icon"></i>
+                        <!-- <i class="fa-solid fa-id-badge nav-icon"></i> -->
                         <span>Roles</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="{{ url_for('employee.index') }}"
                        class="nav-link {% if request.blueprint == 'employee' %}active{% endif %}">
-                        <i class="fa-solid fa-users nav-icon"></i>
+                        <!-- <i class="fa-solid fa-users nav-icon"></i> -->
                         <span>Employees</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="{{ url_for('supplier.index') }}"
                        class="nav-link {% if request.blueprint == 'supplier' %}active{% endif %}">
-                        <i class="fa-solid fa-truck nav-icon"></i>
+                        <!-- <i class="fa-solid fa-truck nav-icon"></i> -->
                         <span>Suppliers</span>
                     </a>
                 </li>
@@ -113,7 +114,7 @@
         <!-- Sidebar Footer -->
         <div class="sidebar-footer">
             <div class="sidebar-user-info">
-                <i class="fa-solid fa-circle-user sidebar-user-icon"></i>
+                <!-- <i class="fa-solid fa-circle-user sidebar-user-icon"></i> -->
                 <div class="sidebar-user-details">
                     <span class="sidebar-user-email">
                         {{ session.get('user_email', 'Admin') }}
@@ -121,7 +122,7 @@
                 </div>
             </div>
             <a href="{{ url_for('auth.logout') }}" class="sidebar-logout-link">
-                <i class="fa-solid fa-right-from-bracket"></i>
+                <!-- <i class="fa-solid fa-right-from-bracket"></i> -->
                 <span>Sign Out</span>
             </a>
         </div>
@@ -188,10 +189,10 @@
         </main>
 
         <!-- Footer -->
-        <footer class="admin-footer">
-            <span>Motorbike Sales &amp; Servicing Management System &mdash; Admin Panel</span>
-            <span>UTM Final Year Project &mdash; Utsav Ramjattan</span>
-        </footer>
+        <!-- <footer class="admin-footer">
+            <span>Motorbike Sales &amp; Servicing Management System - Admin Panel</span>
+            <span>UTM Final Year Project - Utsav Ramjattan</span>
+        </footer> -->
 
     </div><!-- end .main-wrapper -->
 
