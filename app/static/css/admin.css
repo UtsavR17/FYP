@@ -748,8 +748,7 @@ label.form-label {
 }
 
 /* ---------------------------------------------------------------------------
-   COMPONENT — Form fields
-   --------------------------------------------------------------------------- */
+   COMPONENT - Form fields */
 .required-star {
     color: #dc3545;
     margin-left: 3px;
@@ -781,8 +780,8 @@ label.form-label {
 }
 
 /* ---------------------------------------------------------------------------
-   COMPONENT — Delete confirmation modal
-   --------------------------------------------------------------------------- */
+   COMPONENT - Delete confirmation modal 
+   */
 .modal-warning-icon {
     width: 30px;
     height: 30px;
@@ -829,8 +828,8 @@ label.form-label {
 }
 
 /* ---------------------------------------------------------------------------
-   COMPONENT — Inline alerts
-   --------------------------------------------------------------------------- */
+   COMPONENT - Inline alerts */
+
 .inline-alert {
     font-size: 0.875rem;
     border-radius: var(--border-radius);
@@ -838,8 +837,7 @@ label.form-label {
 }
 
 /* ---------------------------------------------------------------------------
-   COMPONENT — Pagination
-   --------------------------------------------------------------------------- */
+   COMPONENT - Pagination */
 .pagination-wrapper {
     display: flex;
     align-items: center;
@@ -886,8 +884,8 @@ label.form-label {
 }
 
 /* ---------------------------------------------------------------------------
-   COMPONENT — Form page layout (used by all Create/Edit pages)
-   --------------------------------------------------------------------------- */
+   COMPONENT - Form page layout (used by all Create/Edit pages)
+    */
 .form-card {
     background-color: var(--card-bg);
     border-radius: var(--border-radius-lg);
@@ -919,8 +917,8 @@ label.form-label {
 
 
 /* ---------------------------------------------------------------------------
-   COMPONENT — Record count badge (list page headers)
-   --------------------------------------------------------------------------- */
+   COMPONENT - Record count badge (list page headers) */
+
 .record-count-badge {
     display: inline-flex;
     align-items: center;
@@ -937,8 +935,7 @@ label.form-label {
 }
 
 /* ---------------------------------------------------------------------------
-   MODULE — Supplier email link in table
-   --------------------------------------------------------------------------- */
+   MODULE - Supplier email link in table */
 .supplier-email {
     color: var(--text-secondary);
     font-size: 0.835rem;
@@ -951,8 +948,8 @@ label.form-label {
 
 
 /* ---------------------------------------------------------------------------
-   MODULE — Employee role badge in list table
-   --------------------------------------------------------------------------- */
+   MODULE - Employee role badge in list table
+    */
 .role-badge {
     display: inline-block;
     background-color: var(--accent-soft);
@@ -967,8 +964,7 @@ label.form-label {
 
 
 /* ---------------------------------------------------------------------------
-   MODULE — Stock zero-quantity indicator
-   --------------------------------------------------------------------------- */
+   MODULE - Stock zero-quantity indicator */
 .stock-zero {
     color: #dc3545;
     font-weight: 600;
@@ -1038,8 +1034,8 @@ label.form-label {
 }
 
 /* ---------------------------------------------------------------------------
-   SIDEBAR — Authenticated user section (Task 17)
-   --------------------------------------------------------------------------- */
+   SIDEBAR - Authenticated user section 
+   */
 .sidebar-user-info {
     display: flex;
     align-items: center;
@@ -1088,8 +1084,8 @@ label.form-label {
 }
 
 /* ---------------------------------------------------------------------------
-   HEADER — Logout button (Task 17)
-   --------------------------------------------------------------------------- */
+   HEADER - Logout button */
+
 .header-logout-btn {
     font-size: 0.78rem;
     padding: 4px 8px;

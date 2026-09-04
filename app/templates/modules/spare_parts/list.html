@@ -37,7 +37,7 @@
     {% endif %}
 
     {% call data_table(
-        ['ID', 'Part Name', 'Description', 'Category', 'Model', 'Date Created'],
+        ['ID', 'Part Name', 'Description', 'Category', 'Date Created'],
         total=pagination.total,
         empty_message='No spare parts found. Add your first spare part to get started.'
     ) %}
@@ -55,13 +55,7 @@
             <td>
                 <span class="role-badge">{{ row._category_name }}</span>
             </td>
-            <td>
-                {% if row._model_desc == 'Universal' %}
-                    <span class="text-muted fst-italic">Universal</span>
-                {% else %}
-                    {{ row._model_desc }}
-                {% endif %}
-            </td>
+      
             <td>
                 {% if row.Date_Created %}
                     {{ row.Date_Created[:19].replace('T', ' ') }}

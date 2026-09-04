@@ -11,12 +11,13 @@ def _get_form_options():
     category_options = []
 
     try:
-        cat_result = (
+        cat_result =(
             supabase.table('Category')
             .select('CAT_ID, CAT_desc')
             .order('CAT_desc')
             .execute()
         )
+
         category_options = [
             (r['CAT_ID'], r['CAT_desc'])
             for r in (cat_result.data or [])
@@ -59,30 +60,11 @@ def index():
     except Exception:
         category_lookup = {}
 
-    # Build Model lookup dict
-    try:
-        model_result = (
-            supabase.table('Model')
-            .select('Model_No, Description')
-            .execute()
-        )
-        model_lookup = {
-            m['Model_No']: m['Description']
-            for m in (model_result.data or [])
-        }
-    except Exception:
-        model_lookup = {}
 
     # Enrich each record with resolved display values
     for part in all_records:
         part['_category_name'] = category_lookup.get(
             part.get('Category_CAT_ID'), '—'
-        )
-        model_no = part.get('Model_Model_No')
-        part['_model_desc'] = (
-            model_lookup.get(model_no, '—')
-            if model_no is not None
-            else 'Universal'
         )
 
     # Search across enriched fields
@@ -93,7 +75,6 @@ def index():
             if q in r.get('SP_name', '').lower()
             or q in r.get('SP_desc', '').lower()
             or q in r.get('_category_name', '').lower()
-            or q in r.get('_model_desc', '').lower()
         ]
 
     pagination = paginate(all_records, page, per_page=10)
@@ -110,7 +91,7 @@ def index():
 def create():
     form_data = {}
     errors = {}
-    category_options, model_options = _get_form_options()
+    category_options = _get_form_options()
 
     if request.method == 'POST':
         form_data = request.form.to_dict()
@@ -118,7 +99,6 @@ def create():
         name_value      = form_data.get('SP_name', '').strip()
         desc_value      = form_data.get('SP_desc', '').strip()
         cat_id_raw      = form_data.get('Category_CAT_ID', '').strip()
-        model_no_raw    = form_data.get('Model_Model_No', '').strip()
 
         missing = required_fields(
             form_data, ['SP_name', 'SP_desc', 'Category_CAT_ID']
@@ -143,12 +123,6 @@ def create():
             except ValueError:
                 errors['Category_CAT_ID'] = 'Please select a valid category.'
 
-        model_no = None
-        if model_no_raw:
-            try:
-                model_no = int(model_no_raw)
-            except ValueError:
-                errors['Model_Model_No'] = 'Invalid model selection.'
 
         if not errors:
             try:
@@ -156,7 +130,6 @@ def create():
                     'SP_name':         name_value,
                     'SP_desc':         desc_value,
                     'Category_CAT_ID': cat_id,
-                    'Model_Model_No':  model_no,
                 }).execute()
                 flash_success(f'Spare part "{name_value}" was added successfully.')
                 return redirect(url_for('spare_parts.index'))
@@ -169,7 +142,6 @@ def create():
         errors=errors,
         is_edit=False,
         category_options=category_options,
-        model_options=model_options
     )
 
 
@@ -191,7 +163,7 @@ def edit(sp_id):
 
     errors = {}
     form_data = record.copy()
-    category_options, model_options = _get_form_options()
+    category_options = _get_form_options()
 
     if request.method == 'POST':
         form_data = request.form.to_dict()
@@ -199,7 +171,6 @@ def edit(sp_id):
         name_value   = form_data.get('SP_name', '').strip()
         desc_value   = form_data.get('SP_desc', '').strip()
         cat_id_raw   = form_data.get('Category_CAT_ID', '').strip()
-        model_no_raw = form_data.get('Model_Model_No', '').strip()
 
         missing = required_fields(
             form_data, ['SP_name', 'SP_desc', 'Category_CAT_ID']
@@ -224,20 +195,12 @@ def edit(sp_id):
             except ValueError:
                 errors['Category_CAT_ID'] = 'Please select a valid category.'
 
-        model_no = None
-        if model_no_raw:
-            try:
-                model_no = int(model_no_raw)
-            except ValueError:
-                errors['Model_Model_No'] = 'Invalid model selection.'
-
         if not errors:
             try:
                 supabase.table('Spare_Parts').update({
                     'SP_name':         name_value,
                     'SP_desc':         desc_value,
                     'Category_CAT_ID': cat_id,
-                    'Model_Model_No':  model_no,
                 }).eq('SP_id', sp_id).execute()
                 flash_success(f'Spare part "{name_value}" was updated successfully.')
                 return redirect(url_for('spare_parts.index'))
@@ -251,7 +214,6 @@ def edit(sp_id):
         is_edit=True,
         record=record,
         category_options=category_options,
-        model_options=model_options
     )
 
 

@@ -55,21 +55,6 @@
             </div>
         </div>
 
-        <!-- Row 2: Model Compatibility (optional) -->
-        <div class="row">
-            <div class="col-md-6">
-                {{ select_field(
-                    name        = 'Model_Model_No',
-                    label       = 'Model Compatibility',
-                    options     = model_options,
-                    selected    = form_data.get('Model_Model_No', ''),
-                    required    = False,
-                    error       = errors.get('Model_Model_No', ''),
-                    empty_label = '— Universal / Not model-specific —',
-                    help_text   = 'Leave blank if this part is compatible with all models.'
-                ) }}
-            </div>
-        </div>
 
         <!-- Row 3: Description (full width) -->
         <div class="row">

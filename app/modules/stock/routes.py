@@ -144,8 +144,7 @@ def create():
 
         missing = required_fields(
             form_data,
-            ['Spare_Parts_SP_id', 'Brand_Brand_ID', 'Size', 'QOH',
-             'S_Price', 'Warranty']
+            ['Spare_Parts_SP_id', 'Brand_Brand_ID', 'QOH', 'S_Price', 'Warranty']
         )
 
         sp_id = None
@@ -166,9 +165,7 @@ def create():
             except ValueError:
                 errors['Brand_Brand_ID'] = 'Please select a valid brand.'
 
-        if 'Size' in missing:
-            errors['Size'] = 'Size is required.'
-        elif len(size_value) > 20:
+        if size_value and len(size_value)> 20:
             errors['Size'] = 'Size must not exceed 20 characters.'
 
         if 'QOH' in missing:
@@ -254,8 +251,7 @@ def edit(stock_id):
 
         missing = required_fields(
             form_data,
-            ['Spare_Parts_SP_id', 'Brand_Brand_ID', 'Size', 'QOH',
-             'S_Price', 'Warranty']
+            ['Spare_Parts_SP_id', 'Brand_Brand_ID', 'QOH', 'S_Price', 'Warranty']
         )
 
         sp_id = None
@@ -276,10 +272,8 @@ def edit(stock_id):
             except ValueError:
                 errors['Brand_Brand_ID'] = 'Please select a valid brand.'
 
-        if 'Size' in missing:
-            errors['Size'] = 'Size is required.'
-        elif len(size_value) > 20:
-            errors['Size'] = 'Size must not exceed 20 characters.'
+        if size_value and len(size_value) > 20:
+            errors['Size'] = 'Size must not exceed 20 characters'
 
         if 'QOH' in missing:
             errors['QOH'] = 'Quantity on hand is required.'
