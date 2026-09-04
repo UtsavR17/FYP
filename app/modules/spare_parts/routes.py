@@ -8,15 +8,7 @@ from app.utils.validators import required_fields
 
 
 def _get_form_options():
-    """
-    Fetch dropdown options for the Spare Parts Create and Edit forms.
-
-    Returns:
-        category_options: list of (CAT_ID, CAT_desc) tuples
-        model_options:    list of (Model_No, Description) tuples
-    """
     category_options = []
-    model_options = []
 
     try:
         cat_result = (
@@ -32,21 +24,7 @@ def _get_form_options():
     except Exception:
         pass
 
-    try:
-        model_result = (
-            supabase.table('Model')
-            .select('Model_No, Description')
-            .order('Description')
-            .execute()
-        )
-        model_options = [
-            (r['Model_No'], r['Description'])
-            for r in (model_result.data or [])
-        ]
-    except Exception:
-        pass
-
-    return category_options, model_options
+    return category_options
 
 
 @bp.route('/')
