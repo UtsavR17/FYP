@@ -1,0 +1,100 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/table.html'         import search_bar, data_table %}
+{% from 'components/pagination.html'    import pagination_controls %}
+{% from 'components/modal_confirm.html' import delete_modal %}
+{% from 'components/alert.html'         import info_alert %}
+
+{% block title %}Compatibility{% endblock %}
+{% block page_title %}Compatibility{% endblock %}
+
+{% block content %}
+
+<!-- Page header -->
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            Compatibility
+            <span class="record-count-badge">{{ pagination.total }}</span>
+        </h2>
+        <p class="page-header-subtitle">
+            Manage stock-to-model compatibility records
+        </p>
+    </div>
+    <a href="{{ url_for('compatibility.create') }}" class="btn btn-accent">
+        <i class="fa-solid fa-plus me-2"></i>Add Compatibility
+    </a>
+</div>
+
+<!-- Table card -->
+<div class="admin-card">
+
+    {{ search_bar(
+        url_for('compatibility.index'),
+        search_query,
+        'Search by stock item, model or year...'
+    ) }}
+
+    {% if search_query %}
+        {{ info_alert('Showing results for: <strong>' ~ search_query ~ '</strong>') }}
+    {% endif %}
+
+    {% call data_table(
+        ['ID', 'Stock Item', 'Model', 'Year From', 'Year To', 'Date Created'],
+        total=pagination.total,
+        empty_message='No compatibility records found. Add your first record to get started.'
+    ) %}
+        {% for row in pagination.records %}
+        <tr>
+            <td class="text-muted" style="width: 60px;">{{ row.Com_ID }}</td>
+            <td>{{ row._stock_label }}</td>
+            <td>
+                <span class="role-badge">{{ row._model_label }}</span>
+            </td>
+            <td>
+                {% if row.Year_From %}
+                    {{ row.Year_From }}
+                {% else %}
+                    <span class="text-muted">&mdash;</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if row.Year_To %}
+                    {{ row.Year_To }}
+                {% else %}
+                    <span class="text-muted">&mdash;</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if row.Date_Created %}
+                    {{ row.Date_Created[:19].replace('T', ' ') }}
+                {% else %}
+                    &mdash;
+                {% endif %}
+            </td>
+            <td class="text-end">
+                <div class="action-btn-group">
+                    <a href="{{ url_for('compatibility.edit', com_id=row.Com_ID) }}"
+                       class="btn btn-sm btn-outline-primary">
+                        <i class="fa-solid fa-pen me-1"></i>Edit
+                    </a>
+                    <button type="button"
+                            class="btn btn-sm btn-outline-danger"
+                            data-bs-toggle="modal"
+                            data-bs-target="#deleteModal"
+                            data-delete-url="{{ url_for('compatibility.delete', com_id=row.Com_ID) }}"
+                            data-record-name="{{ row._stock_label }} → {{ row._model_label }}">
+                        <i class="fa-solid fa-trash me-1"></i>Delete
+                    </button>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    {% endcall %}
+
+    {{ pagination_controls(pagination, 'compatibility.index', search_query) }}
+
+</div>
+
+{{ delete_modal() }}
+
+{% endblock %}

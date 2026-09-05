@@ -1,0 +1,135 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/form_field.html' import number_field, select_field, readonly_field %}
+
+{% block title %}
+    {{ 'Edit Compatibility' if is_edit else 'Add Compatibility' }}
+{% endblock %}
+{% block page_title %}
+    {{ 'Edit Compatibility' if is_edit else 'Add Compatibility' }}
+{% endblock %}
+
+{% block content %}
+
+<!-- Page header -->
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            {{ 'Edit Compatibility' if is_edit else 'Add Compatibility' }}
+        </h2>
+        <p class="page-header-subtitle">
+            {{ 'Update the compatibility record.' if is_edit
+               else 'Link a stock item to a motorbike model.' }}
+        </p>
+    </div>
+    <a href="{{ url_for('compatibility.index') }}" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to Compatibility
+    </a>
+</div>
+
+<!-- Form card -->
+<div class="form-card">
+    <p class="form-section-title">Compatibility Details</p>
+
+    <form method="POST" novalidate>
+
+        <!-- Row 1: Stock Item | Model -->
+        <div class="row">
+            <div class="col-md-6">
+                {{ select_field(
+                    name        = 'Stock_Stock_ID',
+                    label       = 'Stock Item',
+                    options     = stock_options,
+                    selected    = form_data.get('Stock_Stock_ID', ''),
+                    required    = True,
+                    error       = errors.get('Stock_Stock_ID', ''),
+                    empty_label = '— Select a Stock Item —'
+                ) }}
+            </div>
+            <div class="col-md-6">
+                {{ select_field(
+                    name        = 'Model_Model_No',
+                    label       = 'Motorbike Model',
+                    options     = model_options,
+                    selected    = form_data.get('Model_Model_No', ''),
+                    required    = True,
+                    error       = errors.get('Model_Model_No', ''),
+                    empty_label = '— Select a Model —'
+                ) }}
+            </div>
+        </div>
+
+        <!-- Row 2: Year From - Year To -->
+        <div class="row">
+            <div class="col-md-3">
+                {{ number_field(
+                    name        = 'Year_From',
+                    label       = 'Year From',
+                    value       = form_data.get('Year_From', ''),
+                    required    = False,
+                    error       = errors.get('Year_From', ''),
+                    placeholder = 'e.g. 2018',
+                    step        = '1',
+                    min_val     = '1900',
+                    help_text   = 'Leave blank if no year restriction.'
+                ) }}
+            </div>
+            <div class="col-md-3">
+                {{ number_field(
+                    name        = 'Year_To',
+                    label       = 'Year To',
+                    value       = form_data.get('Year_To', ''),
+                    required    = False,
+                    error       = errors.get('Year_To', ''),
+                    placeholder = 'e.g. 2022',
+                    step        = '1',
+                    min_val     = '1900',
+                    help_text   = 'Must be equal to or after Year From.'
+                ) }}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-floppy-disk me-2"></i>
+                {{ 'Save Changes' if is_edit else 'Add Compatibility' }}
+            </button>
+            <a href="{{ url_for('compatibility.index') }}"
+               class="btn btn-outline-secondary">
+                Cancel
+            </a>
+        </div>
+
+    </form>
+</div>
+
+<!-- Audit information (Edit only) -->
+{% if is_edit and record %}
+<div class="form-card">
+    <p class="form-section-title">Audit Information</p>
+    <div class="row">
+        <div class="col-md-6">
+            {{ readonly_field('Created By', record.Created_By) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Created',
+                record.Date_Created[:19].replace('T', ' ') if record.Date_Created else '—'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Updated By',
+                record.Updated_By if record.Updated_By else '—'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Updated',
+                record.Date_Updated[:19].replace('T', ' ') if record.Date_Updated else '—'
+            ) }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

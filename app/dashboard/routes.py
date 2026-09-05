@@ -22,6 +22,7 @@ def _get_dashboard_counts():
         ('role',        'Role'),
         ('employee',    'Employee'),
         ('supplier',    'Supplier'),
+        ('compatibility', 'Compatibility'),
     ]
 
     counts = {}
@@ -106,12 +107,20 @@ def index():
             'url':   url_for('employee.index'),
             'desc':  'Manage staff records',
         },
-        {
+               {
             'label': 'Suppliers',
             'count': counts['supplier'],
             'icon':  'fa-truck',
             'url':   url_for('supplier.index'),
             'desc':  'Manage supplier information',
+        },
+        
+        {
+            'label': 'Compatibility',
+            'count': counts['compatibility'],
+            'icon':  'fa-link',
+            'url':   url_for('compatibility.index'),
+            'desc':  'Manage stock-to-model compatibility',
         },
     ]
 

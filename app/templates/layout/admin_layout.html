@@ -79,6 +79,15 @@
                         <span>Stock</span>
                     </a>
                 </li>
+
+                <li class="nav-item">
+                    <a href="{{ url_for('compatibility.index')}}"
+                    class="nav-link {% if request.blueprint == 'compatibility' %}active{% endif %}">
+                    <span>Compatibility</span>
+                </a>
+                </li>
+
+
                 <li class="nav-item">
                     <a href="{{ url_for('service.index') }}"
                        class="nav-link {% if request.blueprint == 'service' %}active{% endif %}">
