@@ -42,19 +42,46 @@
                     selected    = form_data.get('Stock_Stock_ID', ''),
                     required    = True,
                     error       = errors.get('Stock_Stock_ID', ''),
-                    empty_label = '— Select a Stock Item —'
+                    empty_label = 'Select a Stock Item'
                 ) }}
             </div>
             <div class="col-md-6">
-                {{ select_field(
-                    name        = 'Model_Model_No',
-                    label       = 'Motorbike Model',
-                    options     = model_options,
-                    selected    = form_data.get('Model_Model_No', ''),
-                    required    = True,
-                    error       = errors.get('Model_Model_No', ''),
-                    empty_label = '— Select a Model —'
-                ) }}
+                {% if is_edit %}
+                    {{ select_field(
+                        name        = 'Model_Model_No',
+                        label       = 'Motorbike Model',
+                        options     = model_options,
+                        selected    = form_data.get('Model_Model_No', ''),
+                        required    = True,
+                        error       = errors.get('Model_Model_No', ''),
+                        empty_label = 'Select a Model'
+                    ) }}
+                {% else %}
+                    <div class="mb-3">
+                        <label for="Model_Model_No" class="form-label">
+                            Motorbike Model(s)
+                            <span class="required-star" aria-hidden="true">*</span>
+                        </label>
+                        <select name="Model_Model_No"
+                                id="Model_Model_No"
+                                multiple
+                                class="form-select {% if errors.get('Model_Model_No') %}is-invalid{% endif %}"
+                                style="height: 180px;">
+                            {% for opt_value, opt_label in model_options %}
+                            <option value="{{ opt_value }}"
+                                    {% if opt_value|string in selected_model_nos %}selected{% endif %}>
+                                {{ opt_label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        {% if errors.get('Model_Model_No') %}
+                        <div class="invalid-feedback">{{ errors.get('Model_Model_No') }}</div>
+                        {% endif %}
+                        <div class="form-text text-muted">
+                            Hold Ctrl key to select multiple models
+                        </div>
+                    </div>
+                {% endif %}
             </div>
         </div>
 

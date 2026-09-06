@@ -228,20 +228,19 @@ def index():
 def create():
     form_data = {}
     errors = {}
+    selected_model_nos = []
     stock_options, model_options = _get_form_options()
 
     if request.method == 'POST':
-        form_data = request.form.to_dict()
+        form_data       = request.form.to_dict()
+        selected_model_nos = request.form.getlist('Model_Model_No')
 
         stock_id_raw  = form_data.get('Stock_Stock_ID', '').strip()
-        model_no_raw  = form_data.get('Model_Model_No', '').strip()
         year_from_raw = form_data.get('Year_From', '')
         year_to_raw   = form_data.get('Year_To', '')
 
-        missing = required_fields(form_data, ['Stock_Stock_ID', 'Model_Model_No'])
-
         stock_id = None
-        if 'Stock_Stock_ID' in missing:
+        if not stock_id_raw:
             errors['Stock_Stock_ID'] = 'Stock item is required.'
         else:
             try:
@@ -249,14 +248,8 @@ def create():
             except ValueError:
                 errors['Stock_Stock_ID'] = 'Please select a valid stock item.'
 
-        model_no = None
-        if 'Model_Model_No' in missing:
-            errors['Model_Model_No'] = 'Motorbike model is required.'
-        else:
-            try:
-                model_no = int(model_no_raw)
-            except ValueError:
-                errors['Model_Model_No'] = 'Please select a valid model.'
+        if not selected_model_nos:
+            errors['Model_Model_No'] = 'At least one motorbike model must be selected.'
 
         year_from, year_from_err = _validate_year(year_from_raw, 'Year From')
         year_to,   year_to_err   = _validate_year(year_to_raw,   'Year To')
@@ -266,31 +259,53 @@ def create():
         if year_to_err:
             errors['Year_To'] = year_to_err
 
-        # Cross-field: Year_To must be >= Year_From when both are provided
         if (not year_from_err and not year_to_err
                 and year_from is not None and year_to is not None
                 and year_to < year_from):
             errors['Year_To'] = 'Year To must be equal to or after Year From.'
 
         if not errors:
-            try:
-                supabase.table('Compatibility').insert({
-                    'Stock_Stock_ID': stock_id,
-                    'Model_Model_No': model_no,
-                    'Year_From':      year_from,
-                    'Year_To':        year_to,
-                }).execute()
-                flash_success('Compatibility record was added successfully.')
-                return redirect(url_for('compatibility.index'))
-            except Exception as e:
-                error_msg = str(e)
-                if 'duplicate' in error_msg.lower() or 'unique' in error_msg.lower():
-                    flash_error(
-                        'A compatibility record for this stock item, model, '
-                        'and year range already exists.'
+            success_count   = 0
+            duplicate_count = 0
+            fail_count      = 0
+
+            for model_no_str in selected_model_nos:
+                try:
+                    model_no = int(model_no_str)
+                    supabase.table('Compatibility').insert({
+                        'Stock_Stock_ID': stock_id,
+                        'Model_Model_No': model_no,
+                        'Year_From':      year_from,
+                        'Year_To':        year_to,
+                    }).execute()
+                    success_count += 1
+                except Exception as e:
+                    error_msg = str(e)
+                    if 'duplicate' in error_msg.lower() or 'unique' in error_msg.lower():
+                        duplicate_count += 1
+                    else:
+                        fail_count += 1
+
+            if success_count > 0:
+                msg = (
+                    f'{success_count} compatibility '
+                    f'record{"s" if success_count != 1 else ""} added successfully.'
+                )
+                if duplicate_count > 0:
+                    msg += (
+                        f' {duplicate_count} '
+                        f'duplicate{"s" if duplicate_count != 1 else ""} skipped.'
                     )
-                else:
-                    flash_error(f'Could not add compatibility record: {error_msg}')
+                flash_success(msg)
+
+            if fail_count > 0:
+                flash_error(
+                    f'{fail_count} record{"s" if fail_count != 1 else ""} '
+                    f'could not be saved due to an unexpected error.'
+                )
+
+            if success_count > 0:
+                return redirect(url_for('compatibility.index'))
 
     return render_template(
         'modules/compatibility/form.html',
@@ -298,9 +313,9 @@ def create():
         errors=errors,
         is_edit=False,
         stock_options=stock_options,
-        model_options=model_options
+        model_options=model_options,
+        selected_model_nos=selected_model_nos
     )
-
 
 @bp.route('/edit/<int:com_id>', methods=['GET', 'POST'])
 @login_required
@@ -390,7 +405,8 @@ def edit(com_id):
         is_edit=True,
         record=record,
         stock_options=stock_options,
-        model_options=model_options
+        model_options=model_options,
+        selected_model_nos=[]
     )
 
 
