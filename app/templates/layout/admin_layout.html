@@ -86,7 +86,17 @@
                     <span>Compatibility</span>
                 </a>
                 </li>
+            </ul>
 
+            <div class="nav-section-label">Purchasing</div>
+
+            <ul class="nav-list">
+                <li class ="nav-item">
+                    <a href="{{ url_for('purchase_order.index') }}"
+                    class="nav-link {% if request.blueprint == 'purchase_order' %}active {%endif%}">
+                    <span>Purchase Orders</span>
+                </a>
+            </li>
 
                 <li class="nav-item">
                     <a href="{{ url_for('service.index') }}"

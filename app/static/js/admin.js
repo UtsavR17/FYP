@@ -103,6 +103,52 @@ document.addEventListener('DOMContentLoaded', function () {
         console.log('[MotoAdmin] Delete modal listener attached.');
     }
 
+
+
+
+        // -------------------------------------------------------------------------
+    // RECEIVE FORM: Mode toggle between existing stock and new stock
+    // Toggles visibility of the two receiving sections when radio buttons change.
+    // -------------------------------------------------------------------------
+    const modeExisting = document.getElementById('mode-existing');
+    const modeNew      = document.getElementById('mode-new');
+    const secExisting  = document.getElementById('section-existing');
+    const secNew       = document.getElementById('section-new');
+    const labelExisting = document.getElementById('mode-existing-label');
+    const labelNew      = document.getElementById('mode-new-label');
+
+    function applyReceiveMode(mode) {
+        if (!secExisting || !secNew) return;
+        if (mode === 'existing') {
+            secExisting.style.display = '';
+            secNew.style.display      = 'none';
+            if (labelExisting) labelExisting.classList.add('active');
+            if (labelNew)      labelNew.classList.remove('active');
+        } else {
+            secExisting.style.display = 'none';
+            secNew.style.display      = '';
+            if (labelExisting) labelExisting.classList.remove('active');
+            if (labelNew)      labelNew.classList.add('active');
+        }
+        console.log('[MotoAdmin] Receive mode set to:', mode);
+    }
+
+    if (modeExisting && modeNew) {
+        modeExisting.addEventListener('change', function () {
+            applyReceiveMode('existing');
+        });
+        modeNew.addEventListener('change', function () {
+            applyReceiveMode('new');
+        });
+        // Apply initial state
+        if (modeNew.checked) {
+            applyReceiveMode('new');
+        } else {
+            applyReceiveMode('existing');
+        }
+        console.log('[MotoAdmin] Receive form mode toggle initialised.');
+    }
+
 });
 
 

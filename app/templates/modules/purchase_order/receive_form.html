@@ -1,0 +1,199 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/form_field.html' import select_field, text_field,
+    number_field, date_field, readonly_field %}
+
+{% block title %}Receive Item — PO-{{ po_id }}{% endblock %}
+{% block page_title %}Receive Item{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">Receive Item - PO-{{ po_id }}</h2>
+        <p class="page-header-subtitle">
+            Record stock receipt for line item #{{ item_id }}
+        </p>
+    </div>
+    <a href="{{ url_for('purchase_order.view', po_id=po_id) }}"
+       class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to PO-{{ po_id }}
+    </a>
+</div>
+
+<!-- Item summary (read-only) -->
+<div class="form-card">
+    <p class="form-section-title">Item Being Received</p>
+    <div class="row">
+        <div class="col-md-3">
+            {{ readonly_field('Spare Part', sp_name) }}
+        </div>
+        <div class="col-md-2">
+            {{ readonly_field('Qty Ordered', item.Quantity_Ordered | string) }}
+        </div>
+        <div class="col-md-2">
+            {{ readonly_field('Size Expected', item.Size_Expected if item.Size_Expected else '-') }}
+        </div>
+        <div class="col-md-3">
+            {{ readonly_field('Buying Price', 'Rs. ' ~ ('%.2f' | format(item.BuyingPrice | float))) }}
+        </div>
+    </div>
+</div>
+
+<!-- Receiving form -->
+<form method="POST" novalidate id="receiveForm">
+
+    <!-- Mode selection -->
+    <div class="form-card">
+        <p class="form-section-title">Receiving Method</p>
+
+        <div class="receive-mode-selector">
+            <label class="receive-mode-option {% if not form_data.get('receiving_mode') or form_data.get('receiving_mode') == 'existing' %}active{% endif %}"
+                   id="mode-existing-label">
+                <input type="radio"
+                       name="receiving_mode"
+                       value="existing"
+                       id="mode-existing"
+                       {% if not form_data.get('receiving_mode') or form_data.get('receiving_mode') == 'existing' %}checked{% endif %}>
+                <i class="fa-solid fa-boxes-stacked"></i>
+                <span>Add to Existing Stock</span>
+                <small>The received items are added to an existing stock record's quantity.</small>
+            </label>
+            <label class="receive-mode-option {% if form_data.get('receiving_mode') == 'new' %}active{% endif %}"
+                   id="mode-new-label">
+                <input type="radio"
+                       name="receiving_mode"
+                       value="new"
+                       id="mode-new"
+                       {% if form_data.get('receiving_mode') == 'new' %}checked{% endif %}>
+                <i class="fa-solid fa-plus-circle"></i>
+                <span>Create New Stock Entry</span>
+                <small>A new stock record is created for this spare part.</small>
+            </label>
+        </div>
+    </div>
+
+    <!-- Existing stock section -->
+    <div class="form-card" id="section-existing"
+         {% if form_data.get('receiving_mode') == 'new' %}style="display:none;"{% endif %}>
+        <p class="form-section-title">Select Existing Stock Record</p>
+
+        {% if existing_stock_options %}
+            {{ select_field(
+                name        = 'Stock_Stock_ID',
+                label       = 'Stock Record',
+                options     = existing_stock_options,
+                selected    = form_data.get('Stock_Stock_ID', ''),
+                required    = False,
+                error       = errors.get('Stock_Stock_ID', ''),
+                empty_label = 'Select a stock record to update'
+            ) }}
+        {% else %}
+            <div class="alert alert-warning mb-0" role="alert">
+                <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                No existing stock records found for this spare part.
+                Please use <strong>Create New Stock Entry</strong> instead.
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- New stock section -->
+    <div class="form-card" id="section-new"
+         {% if not form_data.get('receiving_mode') or form_data.get('receiving_mode') == 'existing' %}style="display:none;"{% endif %}>
+        <p class="form-section-title">New Stock Record Details</p>
+
+        <div class="row">
+            <div class="col-md-6">
+                {{ select_field(
+                    name        = 'Brand_Brand_ID',
+                    label       = 'Brand',
+                    options     = brand_options,
+                    selected    = form_data.get('Brand_Brand_ID', ''),
+                    required    = False,
+                    error       = errors.get('Brand_Brand_ID', ''),
+                    empty_label = '— Select a Brand —'
+                ) }}
+            </div>
+            <div class="col-md-3">
+                {{ text_field(
+                    name        = 'New_Size',
+                    label       = 'Size',
+                    value       = form_data.get('New_Size', ''),
+                    required    = False,
+                    error       = '',
+                    placeholder = 'e.g. Medium',
+                    help_text   = 'Optional.'
+                ) }}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-3">
+                {{ number_field(
+                    name        = 'S_Price',
+                    label       = 'Selling Price (Rs.)',
+                    value       = form_data.get('S_Price', ''),
+                    required    = False,
+                    error       = errors.get('S_Price', ''),
+                    placeholder = '0.00',
+                    step        = '0.01',
+                    min_val     = '0',
+                    help_text   = 'Retail selling price for this stock.'
+                ) }}
+            </div>
+            <div class="col-md-3">
+                {{ number_field(
+                    name        = 'Warranty',
+                    label       = 'Warranty (Months)',
+                    value       = form_data.get('Warranty', ''),
+                    required    = False,
+                    error       = errors.get('Warranty', ''),
+                    placeholder = '0',
+                    step        = '1',
+                    min_val     = '0',
+                    help_text   = 'Enter 0 if no warranty.'
+                ) }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Shared: Qty Received + Date -->
+    <div class="form-card">
+        <p class="form-section-title">Receipt Details</p>
+        <div class="row">
+            <div class="col-md-3">
+                {{ number_field(
+                    name        = 'Quantity_Received',
+                    label       = 'Quantity Received',
+                    value       = form_data.get('Quantity_Received', ''),
+                    required    = True,
+                    error       = errors.get('Quantity_Received', ''),
+                    placeholder = '1',
+                    step        = '1',
+                    min_val     = '1',
+                    help_text   = 'Max: ' ~ item.Quantity_Ordered ~ ' (quantity ordered).'
+                ) }}
+            </div>
+            <div class="col-md-3">
+                {{ date_field(
+                    name      = 'DateReceived',
+                    label     = 'Date Received',
+                    value     = form_data.get('DateReceived', ''),
+                    required  = True,
+                    error     = errors.get('DateReceived', ''),
+                    help_text = 'The date the stock arrived.'
+                ) }}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-box-open me-2"></i>Confirm Receipt
+            </button>
+            <a href="{{ url_for('purchase_order.view', po_id=po_id) }}"
+               class="btn btn-outline-secondary">Cancel</a>
+        </div>
+    </div>
+
+</form>
+
+{% endblock %}

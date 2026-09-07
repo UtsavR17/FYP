@@ -23,6 +23,7 @@ def _get_dashboard_counts():
         ('employee',    'Employee'),
         ('supplier',    'Supplier'),
         ('compatibility', 'Compatibility'),
+        ('purchase_order', 'Purchase_Order'),
     ]
 
     counts = {}
@@ -122,6 +123,14 @@ def index():
             'url':   url_for('compatibility.index'),
             'desc':  'Manage stock-to-model compatibility',
         },
+
+        {
+            'label': 'Purchase Orders',
+            'count': counts['purchase_order'],
+            'icon': 'fa-file-invoice',
+            'url': url_for('purchase_order.index'),
+            'desc': 'Manage supplier purchase orders',
+        }
     ]
 
     return render_template('dashboard/index.html', cards=cards)

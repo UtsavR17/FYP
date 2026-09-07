@@ -1,0 +1,129 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/form_field.html' import select_field, date_field, readonly_field %}
+
+{% block title %}
+    {{ 'Edit Purchase Order' if is_edit else 'New Purchase Order' }}
+{% endblock %}
+{% block page_title %}
+    {{ 'Edit Purchase Order' if is_edit else 'New Purchase Order' }}
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            {{ 'Edit Purchase Order' if is_edit else 'New Purchase Order' }}
+        </h2>
+        <p class="page-header-subtitle">
+            {% if is_edit %}
+                Update PO-{{ record.PurchaseOrderID }}.
+            {% else %}
+                Create a new supplier purchase order.
+            {% endif %}
+        </p>
+    </div>
+    <a href="{{ url_for('purchase_order.index') }}" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to Purchase Orders
+    </a>
+</div>
+
+<div class="form-card">
+    <p class="form-section-title">Order Details</p>
+
+    <form method="POST" novalidate>
+
+        <!-- Row 1: Supplier (full width) -->
+        <div class="row">
+            <div class="col-md-6">
+                {{ select_field(
+                    name        = 'Supplier_SupplierID',
+                    label       = 'Supplier',
+                    options     = supplier_options,
+                    selected    = form_data.get('Supplier_SupplierID', ''),
+                    required    = True,
+                    error       = errors.get('Supplier_SupplierID', ''),
+                    empty_label = 'Select a Supplier'
+                ) }}
+            </div>
+            <div class="col-md-6">
+                {{ select_field(
+                    name        = 'Status',
+                    label       = 'Status',
+                    options     = status_options,
+                    selected    = form_data.get('Status', 'Pending'),
+                    required    = True,
+                    error       = errors.get('Status', ''),
+                    empty_label = 'Select a Status'
+                ) }}
+            </div>
+        </div>
+
+        <!-- Row 2: Order Date | Expected Date -->
+        <div class="row">
+            <div class="col-md-4">
+                {{ date_field(
+                    name      = 'POrderDate',
+                    label     = 'Order Date',
+                    value     = form_data.get('POrderDate', ''),
+                    required  = True,
+                    error     = errors.get('POrderDate', ''),
+                    help_text = 'The date this order is being placed.'
+                ) }}
+            </div>
+            <div class="col-md-4">
+                {{ date_field(
+                    name      = 'ExpectedDate',
+                    label     = 'Expected Delivery Date',
+                    value     = form_data.get('ExpectedDate', ''),
+                    required  = True,
+                    error     = errors.get('ExpectedDate', ''),
+                    help_text = 'Must be on or after the order date.'
+                ) }}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-floppy-disk me-2"></i>
+                {{ 'Save Changes' if is_edit else 'Create Purchase Order' }}
+            </button>
+            <a href="{{ url_for('purchase_order.index') }}"
+               class="btn btn-outline-secondary">
+                Cancel
+            </a>
+        </div>
+
+    </form>
+</div>
+
+{% if is_edit and record %}
+<div class="form-card">
+    <p class="form-section-title">Audit Information</p>
+    <div class="row">
+        <div class="col-md-6">
+            {{ readonly_field('Created By', record.Created_By) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Created',
+                record.Date_Created[:19].replace('T', ' ') if record.Date_Created else '-'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Updated By',
+                record.Updated_By if record.Updated_By else '-'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Updated',
+                record.Date_Updated[:19].replace('T', ' ') if record.Date_Updated else '-'
+            ) }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

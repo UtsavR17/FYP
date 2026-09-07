@@ -50,6 +50,9 @@ def create_app():
     from app.modules.compatibility import bp as compatibility_bp
     app.register_blueprint(compatibility_bp, url_prefix='/compatibility')
 
+    from app.modules.purchase_order import bp as purchase_order_bp
+    app.register_blueprint(purchase_order_bp, url_prefix='/purchase-order')
+
     # ------------------------------------------------------------------
     # ROOT REDIRECT
     # Sends the browser to /dashboard when the root URL is visited.
