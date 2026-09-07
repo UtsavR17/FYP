@@ -734,9 +734,27 @@ def receive_item(po_id, item_id):
             qty_recv = int(qty_recv_raw)
 
         # Validate DateReceived
-        date_recv, date_err = _validate_date(date_recv_raw, 'Date Received')
+        date_recv, date_err = _validate_date(date_recv_raw, 'DateReceived')
         if date_err:
             errors['DateReceived'] = date_err
+        elif date_recv:
+            # DateReceived should not be  before the PO order date creation
+            try:
+                po_date_result = (
+                    supabase.table('PurchaseOrder')
+                    .select('POrderDate')
+                    .eq('PurchaseOrderID', po_id)
+                    .single()
+                    .execute()
+                )
+                po_order_date = po_date_result.data.get('POrderDate', '')
+                if po_order_date and date_recv < po_order_date:
+                    errors['DateReceived'] = (
+                        'Date received cannot be before the order date'
+                    )
+            except Exception:
+                pass 
+                   
 
         # Mode-specific validation
         stock_id_to_link = None
