@@ -25,6 +25,7 @@ def _get_dashboard_counts():
         ('compatibility', 'Compatibility'),
         ('purchase_order', 'Purchase_Order'),
         ('customer', 'Customer'),
+        ('customer_bike', 'Customer_bike'),
     ]
 
     counts = {}
@@ -140,6 +141,15 @@ def index():
             'url': url_for('customer.index'),
             'desc': 'Manage customer records',
         },
+
+
+        {
+            'label': 'Customer Bikes',
+            'count': counts['customer_bike'],
+            'icon': 'fa-motorcycle',
+            'url': url_for('customer_bike.index'),
+            'desc': 'Manage customer bikes',
+        }
     ]
 
     return render_template('dashboard/index.html', cards=cards)

@@ -59,6 +59,11 @@ def create_app():
     from app.modules.customer import bp as customer_bp
     app.register_blueprint(customer_bp, url_prefix='/customers')
 
+
+
+    from app.modules.customer_bike import bp as customer_bike_bp
+    app.register_blueprint(customer_bike_bp, url_prefix='/customer-bikes')
+
     # ------------------------------------------------------------------
     # ROOT REDIRECT
     # Sends the browser to /dashboard when the root URL is visited.

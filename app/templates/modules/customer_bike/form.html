@@ -1,0 +1,141 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/form_field.html' import text_field, number_field,
+    select_field, readonly_field %}
+
+{% block title %}
+    {{ 'Edit Bike Registration' if is_edit else 'Add Bike Registration' }}
+{% endblock %}
+{% block page_title %}
+    {{ 'Edit Bike Registration' if is_edit else 'Add Bike Registration' }}
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            {{ 'Edit Bike Registration' if is_edit else 'Add Bike Registration' }}
+        </h2>
+        <p class="page-header-subtitle">
+            {{ 'Update the bike registration record.' if is_edit
+               else 'Register a customer motorbike.' }}
+        </p>
+    </div>
+    <a href="{{ url_for('customer_bike.index') }}" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to Customer Bikes
+    </a>
+</div>
+
+<div class="form-card">
+    <p class="form-section-title">Bike Registration Details</p>
+
+    <form method="POST" novalidate>
+
+        <!-- Row 1: Customer | Model -->
+        <div class="row">
+            <div class="col-md-6">
+                {{ select_field(
+                    name        = 'Customer_CustomerID',
+                    label       = 'Customer',
+                    options     = customer_options,
+                    selected    = form_data.get('Customer_CustomerID', ''),
+                    required    = True,
+                    error       = errors.get('Customer_CustomerID', ''),
+                    empty_label = 'Select a Customer'
+                ) }}
+            </div>
+            <div class="col-md-6">
+                {{ select_field(
+                    name        = 'Model_Model_No',
+                    label       = 'Motorbike Model',
+                    options     = model_options,
+                    selected    = form_data.get('Model_Model_No', ''),
+                    required    = True,
+                    error       = errors.get('Model_Model_No', ''),
+                    empty_label = 'Select a Model'
+                ) }}
+            </div>
+        </div>
+
+        <!-- Row 2: Registration Number | Year | VIN -->
+        <div class="row">
+            <div class="col-md-3">
+                {{ text_field(
+                    name        = 'RegistrationNumber',
+                    label       = 'Registration Number',
+                    value       = form_data.get('RegistrationNumber', ''),
+                    required    = True,
+                    error       = errors.get('RegistrationNumber', ''),
+                    placeholder = '',
+                    help_text   = 'Mauritius plate format. Maximum 6 characters.'
+                ) }}
+            </div>
+            <div class="col-md-3">
+                {{ number_field(
+                    name        = 'Year',
+                    label       = 'Year of Manufacture',
+                    value       = form_data.get('Year', ''),
+                    required    = True,
+                    error       = errors.get('Year', ''),
+                    placeholder = 'e.g. 2020',
+                    step        = '1',
+                    min_val     = '1900'
+                ) }}
+            </div>
+            <div class="col-md-6">
+                {{ text_field(
+                    name        = 'VIN',
+                    label       = 'VIN',
+                    value       = form_data.get('VIN', ''),
+                    required    = True,
+                    error       = errors.get('VIN', ''),
+                    placeholder = '',
+                    help_text   = 'Vehicle Identification Number. Maximum 50 characters.'
+                ) }}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-floppy-disk me-2"></i>
+                {{ 'Save Changes' if is_edit else 'Add Registration' }}
+            </button>
+            <a href="{{ url_for('customer_bike.index') }}"
+               class="btn btn-outline-secondary">
+                Cancel
+            </a>
+        </div>
+
+    </form>
+</div>
+
+{% if is_edit and record %}
+<div class="form-card">
+    <p class="form-section-title">Audit Information</p>
+    <div class="row">
+        <div class="col-md-6">
+            {{ readonly_field('Created By', record.Created_By) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Created',
+                record.Date_Created[:19].replace('T', ' ') if record.Date_Created else '-'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Updated By',
+                record.Updated_By if record.Updated_By else '-'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Updated',
+                record.Date_Updated[:19].replace('T', ' ') if record.Date_Updated else '-'
+            ) }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
