@@ -49,9 +49,15 @@ def create_app():
 
     from app.modules.compatibility import bp as compatibility_bp
     app.register_blueprint(compatibility_bp, url_prefix='/compatibility')
+    
+
 
     from app.modules.purchase_order import bp as purchase_order_bp
     app.register_blueprint(purchase_order_bp, url_prefix='/purchase-order')
+
+
+    from app.modules.customer import bp as customer_bp
+    app.register_blueprint(customer_bp, url_prefix='/customers')
 
     # ------------------------------------------------------------------
     # ROOT REDIRECT

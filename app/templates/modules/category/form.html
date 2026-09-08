@@ -61,19 +61,19 @@
         <div class="col-md-6">
             {{ readonly_field(
                 'Date Created',
-                record.Date_Created[:19].replace('T', ' ') if record.Date_Created else '—'
+                record.Date_Created[:19].replace('T', ' ') if record.Date_Created else '-'
             ) }}
         </div>
         <div class="col-md-6">
             {{ readonly_field(
                 'Updated By',
-                record.Updated_By if record.Updated_By else '—'
+                record.Updated_By if record.Updated_By else '-'
             ) }}
         </div>
         <div class="col-md-6">
             {{ readonly_field(
                 'Date Updated',
-                record.Date_Updated[:19].replace('T', ' ') if record.Date_Updated else '—'
+                record.Date_Updated[:19].replace('T', ' ') if record.Date_Updated else '-'
             ) }}
         </div>
     </div>

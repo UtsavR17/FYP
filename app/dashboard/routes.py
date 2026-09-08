@@ -24,6 +24,7 @@ def _get_dashboard_counts():
         ('supplier',    'Supplier'),
         ('compatibility', 'Compatibility'),
         ('purchase_order', 'Purchase_Order'),
+        ('customer', 'Customer'),
     ]
 
     counts = {}
@@ -130,7 +131,15 @@ def index():
             'icon': 'fa-file-invoice',
             'url': url_for('purchase_order.index'),
             'desc': 'Manage supplier purchase orders',
-        }
+        },
+
+        {
+            'label': 'Customers',
+            'count': counts['customer'],
+            'icon': 'fa-users',
+            'url': url_for('customer.index'),
+            'desc': 'Manage customer records',
+        },
     ]
 
     return render_template('dashboard/index.html', cards=cards)

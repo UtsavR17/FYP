@@ -1,0 +1,192 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/form_field.html' import text_field, readonly_field %}
+
+{% block title %}{{ 'Edit Customer' if is_edit else 'Add Customer' }}{% endblock %}
+{% block page_title %}{{ 'Edit Customer' if is_edit else 'Add Customer' }}{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            {{ 'Edit Customer' if is_edit else 'Add Customer' }}
+        </h2>
+        <p class="page-header-subtitle">
+            {{ 'Update the customer record.' if is_edit else 'Add a new customer record.' }}
+        </p>
+    </div>
+    <a href="{{ url_for('customer.index') }}" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to Customers
+    </a>
+</div>
+
+<!-- Personal Information -->
+<div class="form-card">
+    <p class="form-section-title">Personal Information</p>
+
+    <form method="POST" novalidate id="customerForm">
+
+        <div class="row">
+            <div class="col-md-6">
+                {{ text_field(
+                    name        = 'FirstName',
+                    label       = 'First Name',
+                    value       = form_data.get('FirstName', ''),
+                    required    = True,
+                    error       = errors.get('FirstName', ''),
+                    placeholder = '',
+                    help_text   = 'Maximum 50 characters.'
+                ) }}
+            </div>
+            <div class="col-md-6">
+                {{ text_field(
+                    name        = 'LastName',
+                    label       = 'Last Name',
+                    value       = form_data.get('LastName', ''),
+                    required    = True,
+                    error       = errors.get('LastName', ''),
+                    placeholder = '',
+                    help_text   = 'Maximum 50 characters.'
+                ) }}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-4">
+                {{ text_field(
+                    name        = 'PhoneNumber',
+                    label       = 'Phone Number',
+                    value       = form_data.get('PhoneNumber', ''),
+                    required    = True,
+                    error       = errors.get('PhoneNumber', ''),
+                    placeholder = '',
+                    help_text   = 'Maximum 20 characters.'
+                ) }}
+            </div>
+            <div class="col-md-4">
+                {{ text_field(
+                    name        = 'HomeNumber',
+                    label       = 'Home Number',
+                    value       = form_data.get('HomeNumber', ''),
+                    required    = False,
+                    error       = errors.get('HomeNumber', ''),
+                    placeholder = '',
+                    help_text   = 'Optional. Maximum 20 characters.'
+                ) }}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                {{ text_field(
+                    name        = 'Email',
+                    label       = 'Email Address',
+                    value       = form_data.get('Email', ''),
+                    required    = True,
+                    error       = errors.get('Email', ''),
+                    placeholder = '',
+                    help_text   = 'Maximum 100 characters.'
+                ) }}
+            </div>
+            <div class="col-md-4">
+                {{ text_field(
+                    name        = 'NIC',
+                    label       = 'NIC Number',
+                    value       = form_data.get('NIC', ''),
+                    required    = True,
+                    error       = errors.get('NIC', ''),
+                    placeholder = '',
+                    help_text   = 'National Identity Card number. Maximum 20 characters.'
+                ) }}
+            </div>
+        </div>
+
+</div>
+
+<!-- Address Information - same form, second card -->
+<div class="form-card">
+    <p class="form-section-title">Address</p>
+
+        <div class="row">
+            <div class="col-12">
+                {{ text_field(
+                    name        = 'Street',
+                    label       = 'Street',
+                    value       = form_data.get('Street', ''),
+                    required    = True,
+                    error       = errors.get('Street', ''),
+                    placeholder = '',
+                    help_text   = 'Maximum 50 characters.'
+                ) }}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                {{ text_field(
+                    name        = 'Town',
+                    label       = 'Town',
+                    value       = form_data.get('Town', ''),
+                    required    = True,
+                    error       = errors.get('Town', ''),
+                    placeholder = '',
+                    help_text   = 'Maximum 60 characters.'
+                ) }}
+            </div>
+            <div class="col-md-3">
+                {{ text_field(
+                    name        = 'PostCode',
+                    label       = 'Post Code',
+                    value       = form_data.get('PostCode', ''),
+                    required    = False,
+                    error       = errors.get('PostCode', ''),
+                    placeholder = 'e.g. 74201',
+                    help_text   = 'Optional.'
+                ) }}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-floppy-disk me-2"></i>
+                {{ 'Save Changes' if is_edit else 'Add Customer' }}
+            </button>
+            <a href="{{ url_for('customer.index') }}" class="btn btn-outline-secondary">
+                Cancel
+            </a>
+        </div>
+
+    </form>
+</div>
+
+<!-- Audit information (Edit only) -->
+{% if is_edit and record %}
+<div class="form-card">
+    <p class="form-section-title">Audit Information</p>
+    <div class="row">
+        <div class="col-md-6">
+            {{ readonly_field('Created By', record.Created_By) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Created',
+                record.Date_Created[:19].replace('T', ' ') if record.Date_Created else '-'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Updated By',
+                record.Updated_By if record.Updated_By else '-'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Updated',
+                record.Date_Updated[:19].replace('T', ' ') if record.Date_Updated else '-'
+            ) }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

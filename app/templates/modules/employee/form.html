@@ -36,7 +36,7 @@
                     value       = form_data.get('FirstName', ''),
                     required    = True,
                     error       = errors.get('FirstName', ''),
-                    placeholder = 'e.g. Arun',
+                    placeholder = '',
                     help_text   = 'Maximum 50 characters.'
                 ) }}
             </div>
@@ -47,7 +47,7 @@
                     value       = form_data.get('LastName', ''),
                     required    = True,
                     error       = errors.get('LastName', ''),
-                    placeholder = 'e.g. Lallah',
+                    placeholder = '',
                     help_text   = 'Maximum 50 characters.'
                 ) }}
             </div>
@@ -62,7 +62,7 @@
                     value       = form_data.get('Phone', ''),
                     required    = True,
                     error       = errors.get('Phone', ''),
-                    placeholder = 'e.g. 57001234',
+                    placeholder = '',
                     help_text   = 'Maximum 20 characters.'
                 ) }}
             </div>
@@ -89,7 +89,7 @@
                     selected    = form_data.get('SupervisorID', ''),
                     required    = False,
                     error       = errors.get('SupervisorID', ''),
-                    empty_label = '— No Supervisor (Senior Staff) —',
+                    empty_label = '- No Supervisor (Senior Staff) -',
                     help_text   = 'Leave blank if this employee has no supervisor.'
                 ) }}
             </div>
