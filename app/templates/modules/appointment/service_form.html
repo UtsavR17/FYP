@@ -1,0 +1,91 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/form_field.html' import select_field, number_field %}
+
+{% block title %}
+    {% if is_edit %}Edit Service{% else %}Add Service to Appointment #{{ appt_id }}{% endif %}
+{% endblock %}
+{% block page_title %}
+    {% if is_edit %}Edit Service Quantity{% else %}Add Service{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            {% if is_edit %}
+                Edit Service on Appointment #{{ appt_id }}
+            {% else %}
+                Add Service to Appointment #{{ appt_id }}
+            {% endif %}
+        </h2>
+        <p class="page-header-subtitle">
+            {% if is_edit %}
+                Update the quantity for {{ service_name }}.
+            {% else %}
+                Add a service performed during this appointment.
+            {% endif %}
+        </p>
+    </div>
+    <a href="{{ url_for('appointment.view', appt_id=appt_id) }}"
+       class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to Appointment #{{ appt_id }}
+    </a>
+</div>
+
+<div class="form-card">
+    <p class="form-section-title">
+        {% if is_edit %}Update Quantity{% else %}Service Details{% endif %}
+    </p>
+
+    <form method="POST" novalidate>
+
+        <div class="row">
+            {% if not is_edit %}
+            <div class="col-md-6">
+                {{ select_field(
+                    name        = 'Service_ServiceID',
+                    label       = 'Service',
+                    options     = service_options,
+                    selected    = form_data.get('Service_ServiceID', ''),
+                    required    = True,
+                    error       = errors.get('Service_ServiceID', ''),
+                    empty_label = 'Select a Service -'
+                ) }}
+            </div>
+            {% else %}
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label class="form-label readonly-label">Service</label>
+                    <div class="readonly-value">{{ service_name }}</div>
+                </div>
+            </div>
+            {% endif %}
+            <div class="col-md-3">
+                {{ number_field(
+                    name        = 'Quantity',
+                    label       = 'Quantity',
+                    value       = form_data.get('Quantity', ''),
+                    required    = False,
+                    error       = errors.get('Quantity', ''),
+                    placeholder = '1',
+                    step        = '1',
+                    min_val     = '1',
+                    help_text   = 'Optional. Leave blank if not applicable.'
+                ) }}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-floppy-disk me-2"></i>
+                {{ 'Save Changes' if is_edit else 'Add Service' }}
+            </button>
+            <a href="{{ url_for('appointment.view', appt_id=appt_id) }}"
+               class="btn btn-outline-secondary">Cancel</a>
+        </div>
+
+    </form>
+</div>
+
+{% endblock %}

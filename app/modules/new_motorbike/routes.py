@@ -206,7 +206,7 @@ def _validate_form(form_data):
     else:
         parsed['Transmission'] = transmission_value
 
-    # FuelTankCapacity — must be > 0
+    # FuelTankCapacity - must be > 0
     tank_raw = form_data.get('FuelTankCapacity', '').strip()
     if not tank_raw:
         errors['FuelTankCapacity'] = 'Fuel tank capacity is required.'

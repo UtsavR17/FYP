@@ -1,0 +1,91 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/form_field.html' import select_field, number_field %}
+
+{% block title %}
+    {% if is_edit %}Edit Stock{% else %}Add Stock to Appointment #{{ appt_id }}{% endif %}
+{% endblock %}
+{% block page_title %}
+    {% if is_edit %}Edit Stock Quantity{% else %}Add Stock Item{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            {% if is_edit %}
+                Edit Stock on Appointment #{{ appt_id }}
+            {% else %}
+                Add Stock to Appointment #{{ appt_id }}
+            {% endif %}
+        </h2>
+        <p class="page-header-subtitle">
+            {% if is_edit %}
+                Update the quantity for {{ stock_label }}.
+            {% else %}
+                Add a stock item used during this appointment.
+            {% endif %}
+        </p>
+    </div>
+    <a href="{{ url_for('appointment.view', appt_id=appt_id) }}"
+       class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to Appointment #{{ appt_id }}
+    </a>
+</div>
+
+<div class="form-card">
+    <p class="form-section-title">
+        {% if is_edit %}Update Quantity{% else %}Stock Item Details{% endif %}
+    </p>
+
+    <form method="POST" novalidate>
+
+        <div class="row">
+            {% if not is_edit %}
+            <div class="col-md-6">
+                {{ select_field(
+                    name        = 'Stock_Stock_ID',
+                    label       = 'Stock Item',
+                    options     = stock_options,
+                    selected    = form_data.get('Stock_Stock_ID', ''),
+                    required    = True,
+                    error       = errors.get('Stock_Stock_ID', ''),
+                    empty_label = '— Select a Stock Item —'
+                ) }}
+            </div>
+            {% else %}
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label class="form-label readonly-label">Stock Item</label>
+                    <div class="readonly-value">{{ stock_label }}</div>
+                </div>
+            </div>
+            {% endif %}
+            <div class="col-md-3">
+                {{ number_field(
+                    name        = 'Quantity',
+                    label       = 'Quantity Used',
+                    value       = form_data.get('Quantity', ''),
+                    required    = True,
+                    error       = errors.get('Quantity', ''),
+                    placeholder = '1',
+                    step        = '1',
+                    min_val     = '1',
+                    help_text   = 'Number of units used in this appointment.'
+                ) }}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-floppy-disk me-2"></i>
+                {{ 'Save Changes' if is_edit else 'Add Stock Item' }}
+            </button>
+            <a href="{{ url_for('appointment.view', appt_id=appt_id) }}"
+               class="btn btn-outline-secondary">Cancel</a>
+        </div>
+
+    </form>
+</div>
+
+{% endblock %}

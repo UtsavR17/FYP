@@ -1,0 +1,148 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/form_field.html' import select_field, date_field,
+    time_field, readonly_field %}
+
+{% block title %}
+    {{ 'Edit Appointment' if is_edit else 'New Appointment' }}
+{% endblock %}
+{% block page_title %}
+    {{ 'Edit Appointment' if is_edit else 'New Appointment' }}
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            {{ 'Edit Appointment' if is_edit else 'New Appointment' }}
+        </h2>
+        <p class="page-header-subtitle">
+            {% if is_edit %}
+                Update Appointment #{{ record.AppointmentID }}.
+            {% else %}
+                Schedule a new service or repair appointment.
+            {% endif %}
+        </p>
+    </div>
+    <a href="{{ url_for('appointment.index') }}" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to Appointments
+    </a>
+</div>
+
+<div class="form-card">
+    <p class="form-section-title">Appointment Details</p>
+
+    <form method="POST" novalidate>
+
+        <!-- Row 1: Bike | Employee -->
+        <div class="row">
+            <div class="col-md-6">
+                {{ select_field(
+                    name        = 'Customer_bike_BikeID',
+                    label       = 'Customer Bike',
+                    options     = bike_options,
+                    selected    = form_data.get('Customer_bike_BikeID', ''),
+                    required    = True,
+                    error       = errors.get('Customer_bike_BikeID', ''),
+                    empty_label = 'Select a Customer Bike'
+                ) }}
+            </div>
+            <div class="col-md-6">
+                {{ select_field(
+                    name        = 'Employee_EmployeeID',
+                    label       = 'Assigned Employee',
+                    options     = employee_options,
+                    selected    = form_data.get('Employee_EmployeeID', ''),
+                    required    = True,
+                    error       = errors.get('Employee_EmployeeID', ''),
+                    empty_label = 'Select an Employee'
+                ) }}
+            </div>
+        </div>
+
+        <!-- Row 2: Date | Time | Type | Status -->
+        <div class="row">
+            <div class="col-md-3">
+                {{ date_field(
+                    name      = 'Appointment_Date',
+                    label     = 'Appointment Date',
+                    value     = form_data.get('Appointment_Date', ''),
+                    required  = True,
+                    error     = errors.get('Appointment_Date', '')
+                ) }}
+            </div>
+            <div class="col-md-3">
+                {{ time_field(
+                    name      = 'Appointment_time',
+                    label     = 'Appointment Time',
+                    value     = form_data.get('Appointment_time', ''),
+                    required  = True,
+                    error     = errors.get('Appointment_time', '')
+                ) }}
+            </div>
+            <div class="col-md-3">
+                {{ select_field(
+                    name        = 'AppointmentType',
+                    label       = 'Appointment Type',
+                    options     = type_options,
+                    selected    = form_data.get('AppointmentType', ''),
+                    required    = True,
+                    error       = errors.get('AppointmentType', ''),
+                    empty_label = '— Select Type —'
+                ) }}
+            </div>
+            <div class="col-md-3">
+                {{ select_field(
+                    name        = 'Status',
+                    label       = 'Status',
+                    options     = status_options,
+                    selected    = form_data.get('Status', 'Pending'),
+                    required    = True,
+                    error       = errors.get('Status', ''),
+                    empty_label = '— Select Status —'
+                ) }}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-floppy-disk me-2"></i>
+                {{ 'Save Changes' if is_edit else 'Create Appointment' }}
+            </button>
+            <a href="{{ url_for('appointment.index') }}"
+               class="btn btn-outline-secondary">Cancel</a>
+        </div>
+
+    </form>
+</div>
+
+{% if is_edit and record %}
+<div class="form-card">
+    <p class="form-section-title">Audit Information</p>
+    <div class="row">
+        <div class="col-md-6">
+            {{ readonly_field('Created By', record.Created_By) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Created',
+                record.Date_Created[:19].replace('T', ' ') if record.Date_Created else '-'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Updated By',
+                record.Updated_By if record.Updated_By else '-'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Updated',
+                record.Date_Updated[:19].replace('T', ' ') if record.Date_Updated else '-'
+            ) }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

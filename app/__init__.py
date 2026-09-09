@@ -64,9 +64,15 @@ def create_app():
     from app.modules.customer_bike import bp as customer_bike_bp
     app.register_blueprint(customer_bike_bp, url_prefix='/customer-bikes')
 
+    
 
     from app.modules.new_motorbike import bp as new_motorbike_bp
     app.register_blueprint(new_motorbike_bp, url_prefix='/new-motorbikes')
+
+    from app.modules.appointment import bp as appointment_bp
+    app.register_blueprint(appointment_bp, url_prefix='/appointments')
+
+    
 
 
 

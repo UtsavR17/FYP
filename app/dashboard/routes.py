@@ -23,10 +23,11 @@ def _get_dashboard_counts():
         ('employee',    'Employee'),
         ('supplier',    'Supplier'),
         ('compatibility', 'Compatibility'),
-        ('purchase_order', 'Purchase_Order'),
+        ('purchase_order', 'PurchaseOrder'),
         ('customer', 'Customer'),
         ('customer_bike', 'Customer_bike'),
-        ('new_motorbike', 'New_Motorbike'),
+        ('new_motorbike', 'New_MotorBike'),
+        ('appointment', 'Appointment'),
     ]
 
     counts = {}
@@ -130,35 +131,41 @@ def index():
         {
             'label': 'Purchase Orders',
             'count': counts['purchase_order'],
-            'icon': 'fa-file-invoice',
-            'url': url_for('purchase_order.index'),
-            'desc': 'Manage supplier purchase orders',
+            'icon':  'fa-file-invoice',
+            'url':   url_for('purchase_order.index'),
+            'desc':  'Manage supplier purchase orders',
         },
-
         {
             'label': 'Customers',
             'count': counts['customer'],
-            'icon': 'fa-users',
-            'url': url_for('customer.index'),
-            'desc': 'Manage customer records',
+            'icon':  'fa-users',
+            'url':   url_for('customer.index'),
+            'desc':  'Manage customer records',
         },
-
-
         {
             'label': 'Customer Bikes',
             'count': counts['customer_bike'],
-            'icon': 'fa-motorcycle',
-            'url': url_for('customer_bike.index'),
-            'desc': 'Manage customer bikes',
+            'icon':  'fa-motorcycle',
+            'url':   url_for('customer_bike.index'),
+            'desc':  'Manage registered customer motorbikes',
         },
-
         {
             'label': 'New Motorbikes',
             'count': counts['new_motorbike'],
-            'icon': 'fa-motorcycle',
-            'url': url_for('new_motorbike.index'),
-            'desc': 'Manage new motorbikes',
+            'icon':  'fa-motorcycle',
+            'url':   url_for('new_motorbike.index'),
+            'desc':  'Manage new motorbike inventory',
+        },
+
+        {
+            'label': 'Appointments',
+            'count': counts['appointment'],
+            'icon':  'fa-calendar-check',
+            'url':   url_for('appointment.index'),
+            'desc':  'Manage service and repair appointments',
         },
     ]
 
     return render_template('dashboard/index.html', cards=cards)
+
+    

@@ -129,6 +129,17 @@
                         <span>New Motorbikes</span>
                     </a>
                 </li>
+            </ul>
+
+            <div class="nav-section-label">Appointments</div>
+
+            <ul class="nav-list">
+                <li class="nav-item">
+                    <a href="{{ url_for('appointment.index') }}"
+                       class="nav-link {% if request.blueprint == 'appointment' %}active{% endif %}">
+                        <span>Appointments</span>
+                    </a>
+                </li>
 
 
 

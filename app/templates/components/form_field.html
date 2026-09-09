@@ -186,3 +186,34 @@
     {% endif %}
 </div>
 {% endmacro %}
+
+
+{# -----------------------------------------------------------------------
+   time_field
+   Time input using the HTML time picker.
+   Value must be in HH:MM format to pre-populate correctly.
+   Supabase TIME columns return HH:MM:SS — truncate to HH:MM in the route
+   before passing to the template.
+   ----------------------------------------------------------------------- #}
+{% macro time_field(name, label, value='', required=False, error='',
+                    help_text='') %}
+<div class="mb-3">
+    <label for="{{ name }}" class="form-label">
+        {{ label }}
+        {% if required %}<span class="required-star" aria-hidden="true">*</span>{% endif %}
+    </label>
+    <input
+        type="time"
+        class="form-control {% if error %}is-invalid{% endif %}"
+        id="{{ name }}"
+        name="{{ name }}"
+        value="{{ value }}"
+        {% if required %}required{% endif %}>
+    {% if error %}
+    <div class="invalid-feedback">{{ error }}</div>
+    {% endif %}
+    {% if help_text %}
+    <div class="form-text text-muted">{{ help_text }}</div>
+    {% endif %}
+</div>
+{% endmacro %}
