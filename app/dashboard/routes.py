@@ -28,6 +28,7 @@ def _get_dashboard_counts():
         ('customer_bike', 'Customer_bike'),
         ('new_motorbike', 'New_MotorBike'),
         ('appointment', 'Appointment'),
+        ('sale','Sale'),
     ]
 
     counts = {}
@@ -163,6 +164,14 @@ def index():
             'icon':  'fa-calendar-check',
             'url':   url_for('appointment.index'),
             'desc':  'Manage service and repair appointments',
+        },
+
+         {
+            'label': 'Sales',
+            'count': counts['sale'],
+            'icon':  'fa-handshake',
+            'url':   url_for('sale.index'),
+            'desc':  'Manage motorbike sales records',
         },
     ]
 

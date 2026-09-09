@@ -73,6 +73,8 @@ def create_app():
     app.register_blueprint(appointment_bp, url_prefix='/appointments')
 
     
+    from app.modules.sale import bp as sale_bp
+    app.register_blueprint(sale_bp, url_prefix='/sales')
 
 
 

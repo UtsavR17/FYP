@@ -1,0 +1,149 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/form_field.html' import select_field, date_field,
+    number_field, readonly_field %}
+{% from 'components/alert.html' import warning_alert %}
+
+{% block title %}{{ 'Edit Sale' if is_edit else 'Record Sale' }}{% endblock %}
+{% block page_title %}{{ 'Edit Sale' if is_edit else 'Record Sale' }}{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            {% if is_edit %}
+                Edit Sale - SALE-{{ record.SaleID }}
+            {% else %}
+                Record Sale
+            {% endif %}
+        </h2>
+        <p class="page-header-subtitle">
+            {{ 'Update sale record details.' if is_edit
+               else 'Record a new motorbike sale.' }}
+        </p>
+    </div>
+    <a href="{{ url_for('sale.index') }}" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to Sales
+    </a>
+</div>
+
+{% if not is_edit and not has_available_bikes %}
+    {{ warning_alert('No available motorbikes in inventory. Add motorbikes via the New Motorbikes module before recording a sale.') }}
+{% endif %}
+
+<div class="form-card">
+    <p class="form-section-title">Sale Details</p>
+
+    <form method="POST" novalidate>
+
+        <!-- Row 1: Customer | Bike -->
+        <div class="row">
+            <div class="col-md-6">
+                {{ select_field(
+                    name        = 'Customer_CustomerID',
+                    label       = 'Customer',
+                    options     = customer_options,
+                    selected    = form_data.get('Customer_CustomerID', ''),
+                    required    = True,
+                    error       = errors.get('Customer_CustomerID', ''),
+                    empty_label = '— Select a Customer —'
+                ) }}
+            </div>
+            <div class="col-md-6">
+                {{ select_field(
+                    name        = 'New_MotorBike_NB_ID',
+                    label       = 'Motorbike (Available Only)',
+                    options     = bike_options,
+                    selected    = form_data.get('New_MotorBike_NB_ID', ''),
+                    required    = True,
+                    error       = errors.get('New_MotorBike_NB_ID', ''),
+                    empty_label = '— Select an Available Motorbike —'
+                ) }}
+            </div>
+        </div>
+
+        <!-- Row 2: Sale Date | Total Amount -->
+        <div class="row">
+            <div class="col-md-4">
+                {{ date_field(
+                    name      = 'SaleDate',
+                    label     = 'Sale Date',
+                    value     = form_data.get('SaleDate', ''),
+                    required  = True,
+                    error     = errors.get('SaleDate', ''),
+                    help_text = 'The date the sale was completed.'
+                ) }}
+            </div>
+            <div class="col-md-4">
+                {{ number_field(
+                    name        = 'TotalAmount',
+                    label       = 'Total Amount (Rs.)',
+                    value       = form_data.get('TotalAmount', ''),
+                    required    = True,
+                    error       = errors.get('TotalAmount', ''),
+                    placeholder = '',
+                    step        = '0.01',
+                    min_val     = '0',
+                    help_text   = 'Total selling price in Mauritian Rupees.'
+                ) }}
+            </div>
+        </div>
+
+        <!-- Row 3: Salesperson (optional) -->
+        <div class="row">
+            <div class="col-md-6">
+                {{ select_field(
+                    name        = 'Employee_EmployeeID',
+                    label       = 'Salesperson (Optional)',
+                    options     = employee_options,
+                    selected    = form_data.get('Employee_EmployeeID', ''),
+                    required    = False,
+                    error       = errors.get('Employee_EmployeeID', ''),
+                    empty_label = '- None / Not recorded',
+                    help_text   = 'The employee who processed this sale.'
+                ) }}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-floppy-disk me-2"></i>
+                {{ 'Save Changes' if is_edit else 'Record Sale' }}
+            </button>
+            <a href="{{ url_for('sale.index') }}"
+               class="btn btn-outline-secondary">Cancel</a>
+        </div>
+
+    </form>
+</div>
+
+{% if is_edit and record %}
+<div class="form-card">
+    <p class="form-section-title">Audit Information</p>
+    <div class="row">
+        <div class="col-md-6">
+            {{ readonly_field('Created By', record.Created_By) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Created',
+                record.Date_Created[:19].replace('T', ' ') if record.Date_Created else '-'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Updated By',
+                record.Updated_By if record.Updated_By else '-'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Updated',
+                record.Date_Updated[:19].replace('T', ' ') if record.Date_Updated else '-'
+            ) }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1304,3 +1304,14 @@ label.form-label {
     background-color: rgba(107, 114, 128, 0.12);
     color: #4b5563;
 }
+
+
+
+
+/* ---------------------------------------------------------------------------
+   MODULE: Sale total amount emphasis
+   --------------------------------------------------------------------------- */
+.sale-amount {
+    font-weight: 700;
+    color: var(--text-primary);
+}

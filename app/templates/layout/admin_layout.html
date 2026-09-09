@@ -140,6 +140,19 @@
                         <span>Appointments</span>
                     </a>
                 </li>
+            </ul>
+
+            <div class="nav-section-label">Transactions</div>
+
+            <ul class="nav-list">
+                <li class="nav-item">
+                    <a href="{{ url_for('sale.index') }}"
+                       class="nav-link {% if request.blueprint == 'sale' %}active{% endif %}">
+                        <span>Sales</span>
+                    </a>
+                </li>
+
+
 
 
 

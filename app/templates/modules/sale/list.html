@@ -1,0 +1,95 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/table.html'         import search_bar, data_table %}
+{% from 'components/pagination.html'    import pagination_controls %}
+{% from 'components/modal_confirm.html' import delete_modal %}
+{% from 'components/alert.html'         import info_alert %}
+
+{% block title %}Sales{% endblock %}
+{% block page_title %}Sales{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            Sales
+            <span class="record-count-badge">{{ pagination.total }}</span>
+        </h2>
+        <p class="page-header-subtitle">Manage motorbike sales records</p>
+    </div>
+    <a href="{{ url_for('sale.create') }}" class="btn btn-accent">
+        <i class="fa-solid fa-plus me-2"></i>Record Sale
+    </a>
+</div>
+
+<div class="admin-card">
+
+    {{ search_bar(
+        url_for('sale.index'),
+        search_query,
+        'Search by customer, bike or employee...'
+    ) }}
+
+    {% if search_query %}
+        {{ info_alert('Showing results for: <strong>' ~ search_query ~ '</strong>') }}
+    {% endif %}
+
+    {% call data_table(
+        ['Sale ID', 'Customer', 'Bike', 'Salesperson', 'Sale Date', 'Total Amount', 'Date Created'],
+        total=pagination.total,
+        empty_message='No sales recorded yet. Use Record Sale to add a new sale.'
+    ) %}
+        {% for row in pagination.records %}
+        <tr>
+            <td style="width:100px;">
+                <strong>SALE-{{ row.SaleID }}</strong>
+            </td>
+            <td>{{ row._customer_name }}</td>
+            <td>
+                <span class="role-badge">{{ row._bike_label }}</span>
+            </td>
+            <td class="text-secondary">
+                {{ row._employee_name }}
+            </td>
+            <td>{{ row.SaleDate if row.SaleDate else '-' }}</td>
+            <td>
+                <strong>Rs. {{ '%.2f' | format(row.TotalAmount | float) }}</strong>
+            </td>
+            <td>
+                {% if row.Date_Created %}
+                    {{ row.Date_Created[:19].replace('T', ' ') }}
+                {% else %}
+
+                {% endif %}
+            </td>
+            <td class="text-end">
+                <div class="action-btn-group">
+                    <a href="{{ url_for('sale.view', sale_id=row.SaleID) }}"
+                       class="btn btn-sm btn-outline-secondary">
+                        <i class="fa-solid fa-eye me-1"></i>View
+                    </a>
+                    <a href="{{ url_for('sale.edit', sale_id=row.SaleID) }}"
+                       class="btn btn-sm btn-outline-primary">
+                        <i class="fa-solid fa-pen me-1"></i>Edit
+                    </a>
+                    <button type="button"
+                            class="btn btn-sm btn-outline-danger"
+                            data-bs-toggle="modal"
+                            data-bs-target="#deleteModal"
+                            data-delete-url="{{ url_for('sale.delete', sale_id=row.SaleID) }}"
+                            data-record-name="SALE-{{ row.SaleID }} - {{ row._customer_name }}">
+                        <i class="fa-solid fa-trash me-1"></i>Delete
+                    </button>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    {% endcall %}
+
+    {{ pagination_controls(pagination, 'sale.index', search_query) }}
+
+</div>
+
+{{ delete_modal() }}
+
+{% endblock %}
