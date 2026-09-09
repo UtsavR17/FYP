@@ -1,0 +1,241 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/form_field.html' import text_field, number_field,
+    select_field, readonly_field %}
+
+{% block title %}
+    {{ 'Edit Motorbike' if is_edit else 'Add Motorbike' }}
+{% endblock %}
+{% block page_title %}
+    {{ 'Edit Motorbike' if is_edit else 'Add Motorbike' }}
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            {{ 'Edit Motorbike' if is_edit else 'Add Motorbike' }}
+        </h2>
+        <p class="page-header-subtitle">
+            {{ 'Update the motorbike record.' if is_edit
+               else 'Add a new motorbike to the inventory.' }}
+        </p>
+    </div>
+    <a href="{{ url_for('new_motorbike.index') }}"
+       class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to New Motorbikes
+    </a>
+</div>
+
+{% if is_edit and record and record.Status == 'Sold' %}
+<div class="alert alert-warning mb-0" role="alert"
+     style="border-radius: var(--border-radius); margin-bottom: 16px;">
+    <i class="fa-solid fa-triangle-exclamation me-2"></i>
+    <strong>This motorbike has been sold.</strong>
+    Edit with caution: changes may affect associated sales records.
+</div>
+{% endif %}
+
+<form method="POST" novalidate>
+
+    <!-- Card 1: Bike Details -->
+    <div class="form-card">
+        <p class="form-section-title">Bike Details</p>
+
+        <!-- Row 1: Model | Color | Status -->
+        <div class="row">
+            <div class="col-md-6">
+                {{ select_field(
+                    name        = 'Model_Model_No',
+                    label       = 'Motorbike Model',
+                    options     = model_options,
+                    selected    = form_data.get('Model_Model_No', ''),
+                    required    = True,
+                    error       = errors.get('Model_Model_No', ''),
+                    empty_label = 'Select a Model'
+                ) }}
+            </div>
+            <div class="col-md-3">
+                {{ select_field(
+                    name        = 'Color_Color',
+                    label       = 'Color',
+                    options     = color_options,
+                    selected    = form_data.get('Color_Color', ''),
+                    required    = True,
+                    error       = errors.get('Color_Color', ''),
+                    empty_label = 'Select a Color'
+                ) }}
+            </div>
+            <div class="col-md-3">
+                {{ select_field(
+                    name        = 'Status',
+                    label       = 'Status',
+                    options     = status_options,
+                    selected    = form_data.get('Status', 'Available'),
+                    required    = True,
+                    error       = errors.get('Status', ''),
+                    empty_label = 'Select Status'
+                ) }}
+            </div>
+        </div>
+
+        <!-- Row 2: Year | VIN | Price -->
+        <div class="row">
+            <div class="col-md-3">
+                {{ number_field(
+                    name        = 'Year',
+                    label       = 'Year',
+                    value       = form_data.get('Year', ''),
+                    required    = True,
+                    error       = errors.get('Year', ''),
+                    placeholder = '',
+                    step        = '1',
+                    min_val     = '1900',
+                    help_text   = '1900 to 2100.'
+                ) }}
+            </div>
+            <div class="col-md-6">
+                {{ text_field(
+                    name        = 'VIN',
+                    label       = 'VIN',
+                    value       = form_data.get('VIN', ''),
+                    required    = True,
+                    error       = errors.get('VIN', ''),
+                    placeholder = '',
+                    help_text   = 'Vehicle Identification Number. Must be unique. Maximum 50 characters.'
+                ) }}
+            </div>
+            <div class="col-md-3">
+                {{ number_field(
+                    name        = 'Price',
+                    label       = 'Price (Rs.)',
+                    value       = form_data.get('Price', ''),
+                    required    = True,
+                    error       = errors.get('Price', ''),
+                    placeholder = '',
+                    step        = '0.01',
+                    min_val     = '0',
+                    help_text   = 'Selling price in Mauritian Rupees.'
+                ) }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 2: Technical Specifications -->
+    <div class="form-card">
+        <p class="form-section-title">Technical Specifications</p>
+
+        <!-- Row 1: EngineCC | FuelType | Transmission | FuelTankCapacity -->
+        <div class="row">
+            <div class="col-md-3">
+                {{ number_field(
+                    name        = 'EngineCC',
+                    label       = 'Engine CC',
+                    value       = form_data.get('EngineCC', ''),
+                    required    = True,
+                    error       = errors.get('EngineCC', ''),
+                    placeholder = '',
+                    step        = '1',
+                    min_val     = '1',
+                    help_text   = 'Engine displacement in cubic centimetres.'
+                ) }}
+            </div>
+            <div class="col-md-3">
+                {{ select_field(
+                    name        = 'FuelType',
+                    label       = 'Fuel Type',
+                    options     = fuel_type_options,
+                    selected    = form_data.get('FuelType', ''),
+                    required    = True,
+                    error       = errors.get('FuelType', ''),
+                    empty_label = 'Select Fuel Type'
+                ) }}
+            </div>
+            <div class="col-md-3">
+                {{ select_field(
+                    name        = 'Transmission',
+                    label       = 'Transmission',
+                    options     = transmission_options,
+                    selected    = form_data.get('Transmission', ''),
+                    required    = True,
+                    error       = errors.get('Transmission', ''),
+                    empty_label = 'Select Transmission'
+                ) }}
+            </div>
+            <div class="col-md-3">
+                {{ number_field(
+                    name        = 'FuelTankCapacity',
+                    label       = 'Fuel Tank Capacity (L)',
+                    value       = form_data.get('FuelTankCapacity', ''),
+                    required    = True,
+                    error       = errors.get('FuelTankCapacity', ''),
+                    placeholder = '',
+                    step        = '0.01',
+                    min_val     = '0.01',
+                    help_text   = 'Tank capacity in litres.'
+                ) }}
+            </div>
+        </div>
+
+        <!-- Row 2: Warranty -->
+        <div class="row">
+            <div class="col-md-3">
+                {{ number_field(
+                    name        = 'Warranty_Months',
+                    label       = 'Warranty (Months)',
+                    value       = form_data.get('Warranty_Months', ''),
+                    required    = True,
+                    error       = errors.get('Warranty_Months', ''),
+                    placeholder = '',
+                    step        = '1',
+                    min_val     = '0',
+                    help_text   = 'Enter 0 if no warranty.'
+                ) }}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-floppy-disk me-2"></i>
+                {{ 'Save Changes' if is_edit else 'Add Motorbike' }}
+            </button>
+            <a href="{{ url_for('new_motorbike.index') }}"
+               class="btn btn-outline-secondary">
+                Cancel
+            </a>
+        </div>
+
+    </div>
+
+</form>
+
+{% if is_edit and record %}
+<div class="form-card">
+    <p class="form-section-title">Audit Information</p>
+    <div class="row">
+        <div class="col-md-6">
+            {{ readonly_field('Created By', record.Created_By) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Created',
+                record.Date_Created[:19].replace('T', ' ') if record.Date_Created else '—'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Updated By',
+                record.Updated_By if record.Updated_By else '—'
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Updated',
+                record.Date_Updated[:19].replace('T', ' ') if record.Date_Updated else '—'
+            ) }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

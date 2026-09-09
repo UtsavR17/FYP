@@ -241,8 +241,29 @@ def create():
                     f'Bike registration "{reg_value}" was added successfully.'
                 )
                 return redirect(url_for('customer_bike.index'))
+                
+            # except Exception as e:
+            #     flash_error(f'Could not add bike registration: {str(e)}')
+                        
             except Exception as e:
-                flash_error(f'Could not add bike registration: {str(e)}')
+                error_msg = str(e)
+                if 'duplicate' in error_msg.lower() or 'unique' in error_msg.lower():
+                    if 'vin' in error_msg.lower():
+                        flash_error(
+                            'A bike with this VIN already exists in the system. '
+                            'If ownership has changed, edit the existing record et update Customer field to new owner.'
+                        )
+                    elif 'registration' in error_msg.lower():
+                        flash_error(
+                            'A bike with this registration number already exists. '
+                            'If ownership has changed, edit the existing record et update Customer field to new owner.'
+                        )
+                    else:
+                        flash_error(
+                            'A duplicate VIN or registration number was detected.'
+                        )
+                else:
+                    flash_error(f'Could not add bike registration: {error_msg}')
 
     return render_template(
         'modules/customer_bike/form.html',
@@ -330,8 +351,30 @@ def edit(bike_id):
                     f'Bike registration "{reg_value}" was updated successfully.'
                 )
                 return redirect(url_for('customer_bike.index'))
+
+
+            # except Exception as e:
+            #     flash_error(f'Could not update bike registration: {str(e)}')
+
             except Exception as e:
-                flash_error(f'Could not update bike registration: {str(e)}')
+                error_msg = str(e)
+                if 'duplicate' in error_msg.lower() or 'unique' in error_msg.lower():
+                    if 'vin' in error_msg.lower():
+                        flash_error(
+                            'A bike with this VIN already exists in the system.'
+                        )
+                    elif 'registration' in error_msg.lower():
+                        flash_error(
+                            'A bike with this registration number already exists.'
+                        )
+                    else:
+                        flash_error(
+                            'A duplicate VIN or registration number was detected.'
+                        )
+                else:
+                    flash_error(f'Could not update bike registration: {error_msg}')
+
+                    
 
     return render_template(
         'modules/customer_bike/form.html',

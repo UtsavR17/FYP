@@ -131,8 +131,30 @@ def create():
                     f'Customer "{first_name} {last_name}" was added successfully.'
                 )
                 return redirect(url_for('customer.index'))
+
+
+            # except Exception as e:
+            #     flash_error(f'Could not add customer: {str(e)}')
+
             except Exception as e:
-                flash_error(f'Could not add customer: {str(e)}')
+                error_msg = str(e)
+                if 'duplicate' in error_msg.lower() or 'unique' in error_msg.lower():
+                    if 'nic' in error_msg.lower():
+                        flash_error(
+                            'A customer with this NIC number already exists.'
+                        )
+                    elif 'phone' in error_msg.lower():
+                        flash_error(
+                            'A customer with this phone number already exists.'
+                        )
+                    else:
+                        flash_error(
+                            'A duplicate value was detected. '
+                            'Please check the NIC and phone number.'
+                        )
+                else:
+                    flash_error(f'Could not add customer: {error_msg}')
+
 
     return render_template(
         'modules/customer/form.html',
@@ -239,8 +261,31 @@ def edit(customer_id):
                     f'Customer "{first_name} {last_name}" was updated successfully.'
                 )
                 return redirect(url_for('customer.index'))
+
+
+            # except Exception as e:
+            #     flash_error(f'Could not update customer: {str(e)}')
+
             except Exception as e:
-                flash_error(f'Could not update customer: {str(e)}')
+                error_msg = str(e)
+                if 'duplicate' in error_msg.lower() or 'unique' in error_msg.lower():
+                    if 'nic' in error_msg.lower():
+                        flash_error(
+                            'A customer with this NIC number already exists.'
+                        )
+                    elif 'phone' in error_msg.lower():
+                        flash_error(
+                            'A customer with this phone number already exists.'
+                        )
+                    else:
+                        flash_error(
+                            'A duplicate value was detected. '
+                            'Please check the NIC and phone number.'
+                        )
+                else:
+                    flash_error(f'Could not update customer: {error_msg}')
+
+                    
 
     return render_template(
         'modules/customer/form.html',

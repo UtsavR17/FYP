@@ -117,7 +117,18 @@
                         <span>Customer Bikes</span>
                     </a>
                 </li>
+            </ul>
 
+
+            <div class="nav-section-label">Inventory</div>
+
+            <ul class="nav-list">
+                <li class="nav-item">
+                    <a href="{{ url_for('new_motorbike.index') }}"
+                       class="nav-link {% if request.blueprint == 'new_motorbike' %}active{% endif %}">
+                        <span>New Motorbikes</span>
+                    </a>
+                </li>
 
 
 

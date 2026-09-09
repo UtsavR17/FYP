@@ -1,0 +1,104 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/table.html'         import search_bar, data_table %}
+{% from 'components/pagination.html'    import pagination_controls %}
+{% from 'components/modal_confirm.html' import delete_modal %}
+{% from 'components/alert.html'         import info_alert %}
+
+{% block title %}New Motorbikes{% endblock %}
+{% block page_title %}New Motorbikes{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            New Motorbikes
+            <span class="record-count-badge">{{ pagination.total }}</span>
+        </h2>
+        <p class="page-header-subtitle">Manage new motorbike inventory</p>
+    </div>
+    <a href="{{ url_for('new_motorbike.create') }}" class="btn btn-accent">
+        Add Motorbike
+    </a>
+</div>
+
+<div class="admin-card">
+
+    {{ search_bar(
+        url_for('new_motorbike.index'),
+        search_query,
+        'Search by model, color, year, VIN or status...'
+    ) }}
+
+    {% if search_query %}
+        {{ info_alert('Showing results for: <strong>' ~ search_query ~ '</strong>') }}
+    {% endif %}
+
+    {% call data_table(
+        ['ID', 'Model', 'Color', 'Year', 'VIN', 'Price', 'Status', 'Date Created'],
+        total=pagination.total,
+        empty_message='No motorbikes found. Add your first motorbike to inventory.'
+    ) %}
+        {% for row in pagination.records %}
+        <tr>
+            <td class="text-muted" style="width:60px;">
+                <strong>NB-{{ row.NB_ID }}</strong>
+            </td>
+            <td>
+                <span class="role-badge">{{ row._model_label }}</span>
+            </td>
+            <td>{{ row.Color_Color }}</td>
+            <td>{{ row.Year }}</td>
+            <td class="text-muted" style="font-size:0.8rem;">
+                {% if row.VIN and row.VIN | length > 20 %}
+                    {{ row.VIN[:20] }}...
+                {% else %}
+                    {{ row.VIN }}
+                {% endif %}
+            </td>
+            <td>Rs. {{ '%.2f' | format(row.Price | float) }}</td>
+            <td>
+                {% if row.Status == 'Available' %}
+                    <span class="bike-status-badge bike-status-available">
+                        Available
+                    </span>
+                {% else %}
+                    <span class="bike-status-badge bike-status-sold">
+                        Sold
+                    </span>
+                {% endif %}
+            </td>
+            <td>
+                {% if row.Date_Created %}
+                    {{ row.Date_Created[:19].replace('T', ' ') }}
+                {% else %}
+                    <!-- &mdash; -->
+                {% endif %}
+            </td>
+            <td class="text-end">
+                <div class="action-btn-group">
+                    <a href="{{ url_for('new_motorbike.edit', nb_id=row.NB_ID) }}"
+                       class="btn btn-sm btn-outline-primary">
+                        Edit
+                    </a>
+                    <button type="button"
+                            class="btn btn-sm btn-outline-danger"
+                            data-bs-toggle="modal"
+                            data-bs-target="#deleteModal"
+                            data-delete-url="{{ url_for('new_motorbike.delete', nb_id=row.NB_ID) }}"
+                            data-record-name="{{ row.VIN }}">
+                        Delete
+                    </button>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    {% endcall %}
+
+    {{ pagination_controls(pagination, 'new_motorbike.index', search_query) }}
+
+</div>
+
+{{ delete_modal() }}
+
+{% endblock %}
