@@ -73,7 +73,7 @@ body {
    --------------------------------------------------------------------------- */
 .sidebar {
     width: var(--sidebar-width);
-    min-height: 100vh;
+    height: 100vh;
     background-color: var(--sidebar-bg);
     display: flex;
     flex-direction: column;

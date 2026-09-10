@@ -1,3 +1,4 @@
+from pydantic_core.core_schema import ExpectedSerializationTypes
 from flask import render_template, request, redirect, url_for
 from app.modules.sale import bp
 from app.auth.decorators import login_required
@@ -88,11 +89,35 @@ def _get_form_options(current_nb_id=None):
 
     _, model_lookup = _get_brand_model_lookups()
 
+    # # Fetch Available bikes
+    # try:
+    #     available_bikes = (
+    #         supabase.table('New_MotorBike')
+    #         .select('NB_ID, Year, Model_Model_No, Status')
+    #         .eq('Status', 'Available')
+    #         .order('NB_ID')
+    #         .execute()
+    #     )
+    #     for b in (available_bikes.data or []):
+    #         m_info = model_lookup.get(b.get('Model_Model_No'), {})
+    #         label  = _build_bike_label(
+    #             b['NB_ID'],
+    #             b.get('Year', '?'),
+    #             m_info.get('description', 'Unknown Model'),
+    #             m_info.get('brand_name', 'Unknown Brand')
+    #         )
+    #         bike_options.append((b['NB_ID'], label))
+    # except Exception:
+    #     pass
+
+
+
     # Fetch Available bikes
+    bike_prices = {}
     try:
         available_bikes = (
             supabase.table('New_MotorBike')
-            .select('NB_ID, Year, Model_Model_No, Status')
+            .select('NB_ID, Year, Model_Model_No, Status, Price')
             .eq('Status', 'Available')
             .order('NB_ID')
             .execute()
@@ -106,17 +131,18 @@ def _get_form_options(current_nb_id=None):
                 m_info.get('brand_name', 'Unknown Brand')
             )
             bike_options.append((b['NB_ID'], label))
+            bike_prices[b['NB_ID']] = float(b.get('Price') or 0)
     except Exception:
         pass
 
-    # On Edit, include the currently linked bike if it is not already in the list
+        # On Edit, include the currently linked bike if it is not already in the list
     if current_nb_id is not None:
         ids_in_options = {bid for bid, _ in bike_options}
         if current_nb_id not in ids_in_options:
             try:
                 curr = (
                     supabase.table('New_MotorBike')
-                    .select('NB_ID, Year, Model_Model_No')
+                    .select('NB_ID, Year, Model_Model_No, Price')
                     .eq('NB_ID', current_nb_id)
                     .single()
                     .execute()
@@ -131,6 +157,7 @@ def _get_form_options(current_nb_id=None):
                 )
                 # Insert at the beginning so it is pre-selected easily
                 bike_options.insert(0, (b['NB_ID'], label))
+                bike_prices[b['NB_ID']] = float(b.get('Price') or 0)
             except Exception:
                 pass
 
@@ -150,7 +177,7 @@ def _get_form_options(current_nb_id=None):
     except Exception:
         pass
 
-    return customer_options, bike_options, employee_options, has_available_bikes
+    return customer_options, bike_options, employee_options, has_available_bikes, bike_prices
 
 
 def _set_bike_status(nb_id, status):
@@ -276,7 +303,9 @@ def index():
 def create():
     form_data = {}
     errors    = {}
-    customer_options, bike_options, employee_options, has_available_bikes = (
+
+
+    customer_options, bike_options, employee_options, has_available_bikes, bike_prices = (
         _get_form_options()
     )
 
@@ -359,7 +388,8 @@ def create():
         customer_options=customer_options,
         bike_options=bike_options,
         employee_options=employee_options,
-        has_available_bikes=has_available_bikes
+        has_available_bikes=has_available_bikes,
+        bike_prices=bike_prices
     )
 
 
@@ -383,7 +413,7 @@ def edit(sale_id):
     errors         = {}
     form_data      = record.copy()
 
-    customer_options, bike_options, employee_options, has_available_bikes = (
+    customer_options, bike_options, employee_options, has_available_bikes, bike_prices = (
         _get_form_options(current_nb_id=original_nb_id)
     )
 
@@ -471,7 +501,8 @@ def edit(sale_id):
         customer_options=customer_options,
         bike_options=bike_options,
         employee_options=employee_options,
-        has_available_bikes=True  # Always True on Edit - current bike is included
+        has_available_bikes=True,  
+        bike_prices=bike_prices
     )
 
 

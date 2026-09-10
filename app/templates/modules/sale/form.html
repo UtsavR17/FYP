@@ -124,18 +124,21 @@
         <div class="col-md-6">
             {{ readonly_field('Created By', record.Created_By) }}
         </div>
+
         <div class="col-md-6">
             {{ readonly_field(
                 'Date Created',
                 record.Date_Created[:19].replace('T', ' ') if record.Date_Created else '-'
             ) }}
         </div>
+
         <div class="col-md-6">
             {{ readonly_field(
                 'Updated By',
                 record.Updated_By if record.Updated_By else '-'
             ) }}
         </div>
+
         <div class="col-md-6">
             {{ readonly_field(
                 'Date Updated',
@@ -145,5 +148,25 @@
     </div>
 </div>
 {% endif %}
+
+<input type="hidden" id="bike-prices-data" value='{{ bike_prices | tojson }}'>
+
+<script>
+(function () {
+    var pricesEl    = document.getElementById('bike-prices-data');
+    var bikePrices  = pricesEl ? JSON.parse(pricesEl.value || '{}') : {};
+    var bikeSelect  = document.getElementById('New_MotorBike_NB_ID');
+    var amountField = document.getElementById('TotalAmount');
+
+    if (!bikeSelect || !amountField) return;
+
+    bikeSelect.addEventListener('change', function () {
+        var selectedId = this.value;
+        if (selectedId && bikePrices[selectedId] !== undefined) {
+            amountField.value = Number(bikePrices[selectedId]).toFixed(2);
+        }
+    });
+})();
+</script>
 
 {% endblock %}
