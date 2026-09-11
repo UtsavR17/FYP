@@ -11,7 +11,7 @@
     <div>
         <h2 class="page-header-title">Appointment #{{ appt_id }}</h2>
         <p class="page-header-subtitle">
-            Appointment details, services, and stock usage
+            Appointment details, services, stock usage and payment
         </p>
     </div>
     <div class="d-flex gap-2">
@@ -45,7 +45,7 @@
         <div class="col-md-3">
             {{ readonly_field(
                 'Time',
-                record.Appointment_time[:5] if record.Appointment_time else '-'
+                record.Appointment_time[:5] if record.Appointment_time else '—-'
             ) }}
         </div>
         <div class="col-md-3">
@@ -81,19 +81,19 @@
         <div class="col-md-6">
             {{ readonly_field(
                 'Date Created',
-                record.Date_Created[:19].replace('T', ' ') if record.Date_Created else '-'
+                record.Date_Created[:19].replace('T', ' ') if record.Date_Created else '—'
             ) }}
         </div>
         <div class="col-md-6">
             {{ readonly_field(
                 'Updated By',
-                record.Updated_By if record.Updated_By else '-'
+                record.Updated_By if record.Updated_By else '—'
             ) }}
         </div>
         <div class="col-md-6">
             {{ readonly_field(
                 'Date Updated',
-                record.Date_Updated[:19].replace('T', ' ') if record.Date_Updated else '-'
+                record.Date_Updated[:19].replace('T', ' ') if record.Date_Updated else '—'
             ) }}
         </div>
     </div>
@@ -140,7 +140,7 @@
                 <tr>
                     <td><strong>{{ svc._service_name }}</strong></td>
                     <td>Rs. {{ '%.2f' | format(svc._service_cost | float) }}</td>
-                    <td>{{ svc.Quantity if svc.Quantity else '-' }}</td>
+                    <td>{{ svc.Quantity if svc.Quantity else '—' }}</td>
                     <td class="text-end">
                         {% if not is_locked %}
                         <div class="action-btn-group">
@@ -247,6 +247,71 @@
             <i class="fa-solid fa-inbox"></i>
         </div>
         <p class="table-empty-text">No stock items recorded for this appointment yet.</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Payment -->
+<div class="admin-card">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <div>
+            <h3 style="font-size:1rem;font-weight:600;margin:0;">Payment</h3>
+            <p style="font-size:0.8rem;color:var(--text-muted);margin:4px 0 0;">
+                Payment record associated with this appointment
+            </p>
+        </div>
+        {% if not appt_payment %}
+        <a href="{{ url_for('payment.create') }}"
+           class="btn btn-sm btn-outline-secondary">
+            <i class="fa-solid fa-plus me-1"></i>Add Payment
+        </a>
+        {% endif %}
+    </div>
+
+    {% if appt_payment %}
+    <div class="table-responsive">
+        <table class="table admin-table">
+            <thead>
+                <tr>
+                    <th>Payment ID</th>
+                    <th>Date</th>
+                    <th>Amount Paid</th>
+                    <th>Method</th>
+                    <th>Type</th>
+                    <th class="text-end" style="width:80px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>PAY-{{ appt_payment.PaymentID }}</strong></td>
+                    <td>{{ appt_payment.PaymentDate if appt_payment.PaymentDate else '-' }}</td>
+                    <td>
+                        <strong>
+                            Rs. {{ '%.2f' | format(appt_payment.AmountPaid | float) }}
+                        </strong>
+                    </td>
+                    <td>{{ appt_payment.PaymentMethod }}</td>
+                    <td>
+                        <span class="pay-type-badge pay-type-{{ appt_payment.PaymentType | lower | replace(' ', '-') }}">
+                            {{ appt_payment.PaymentType }}
+                        </span>
+                    </td>
+                    <td class="text-end">
+                        <a href="{{ url_for('payment.edit', payment_id=appt_payment.PaymentID) }}"
+                           class="btn btn-sm btn-outline-primary">
+                            <i class="fa-solid fa-pen"></i>
+                        </a>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="table-empty-state">
+        <div class="table-empty-icon-wrap">
+            <i class="fa-solid fa-credit-card"></i>
+        </div>
+        <p>No payment recorded for this appointment yet. </p></p>
     </div>
     {% endif %}
 </div>

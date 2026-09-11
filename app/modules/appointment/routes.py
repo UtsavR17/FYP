@@ -555,6 +555,34 @@ def view(appt_id):
     appt_status = record.get('Status', '')
     is_locked   = appt_status in LOCKED_STATUSES
 
+    # return render_template(
+    #     'modules/appointment/view.html',
+    #     record=record,
+    #     appt_id=appt_id,
+    #     bike_label=bike_label,
+    #     employee_name=employee_name,
+    #     appt_services=appt_services,
+    #     appt_stock=appt_stock,
+    #     appt_status=appt_status,
+    #     is_locked=is_locked
+    # )
+
+
+        # Fetch linked payment (at most one per appointment due to UNIQUE constraint)
+    appt_payment = None
+    try:
+        pay_result = (
+            supabase.table('Payment')
+            .select('*')
+            .eq('Appointment_AppointmentID', appt_id)
+            .execute()
+        )
+        pay_list = pay_result.data or []
+        if pay_list:
+            appt_payment = pay_list[0]
+    except Exception:
+        pass
+
     return render_template(
         'modules/appointment/view.html',
         record=record,
@@ -564,7 +592,8 @@ def view(appt_id):
         appt_services=appt_services,
         appt_stock=appt_stock,
         appt_status=appt_status,
-        is_locked=is_locked
+        is_locked=is_locked,
+        appt_payment=appt_payment
     )
 
 

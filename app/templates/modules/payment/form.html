@@ -1,0 +1,202 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/form_field.html' import select_field, date_field,
+    number_field, readonly_field %}
+
+{% block title %}
+    {{ 'Edit Payment' if is_edit else 'Record Payment' }}
+{% endblock %}
+{% block page_title %}
+    {{ 'Edit Payment' if is_edit else 'Record Payment' }}
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            {% if is_edit %}Edit Payment — PAY-{{ record.PaymentID }}
+            {% else %}Record Payment{% endif %}
+        </h2>
+        <p class="page-header-subtitle">
+            {{ 'Update payment details.' if is_edit
+               else 'Record a payment for a sale or appointment.' }}
+        </p>
+    </div>
+    <a href="{{ url_for('payment.index') }}" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to Payments
+    </a>
+</div>
+
+<form method="POST" novalidate id="paymentForm">
+
+    <!-- Card 1: Payment Reference -->
+    <div class="form-card">
+        <p class="form-section-title">Payment Reference</p>
+
+        <!-- Reference type toggle -->
+        <div class="receive-mode-selector mb-3">
+            <label class="receive-mode-option {% if form_data.get('reference_type', 'sale') == 'sale' %}active{% endif %}"
+                   id="ref-label-sale">
+                <input type="radio"
+                       name="reference_type"
+                       value="sale"
+                       id="ref-type-sale"
+                       {% if form_data.get('reference_type', 'sale') == 'sale' %}checked{% endif %}>
+                <i class="fa-solid fa-handshake"></i>
+                <span>For a Sale</span>
+                <small>Payment linked to a motorbike sale record.</small>
+            </label>
+            <label class="receive-mode-option {% if form_data.get('reference_type') == 'appointment' %}active{% endif %}"
+                   id="ref-label-appt">
+                <input type="radio"
+                       name="reference_type"
+                       value="appointment"
+                       id="ref-type-appt"
+                       {% if form_data.get('reference_type') == 'appointment' %}checked{% endif %}>
+                <i class="fa-solid fa-calendar-check"></i>
+                <span>For an Appointment</span>
+                <small>Payment linked to a service or repair appointment.</small>
+            </label>
+        </div>
+
+        <!-- Sale dropdown section -->
+        <div id="section-sale"
+             {% if form_data.get('reference_type') == 'appointment' %}style="display:none;"{% endif %}>
+            {{ select_field(
+                name        = 'Sale_SaleID',
+                label       = 'Sale',
+                options     = sale_options,
+                selected    = form_data.get('Sale_SaleID', ''),
+                required    = False,
+                error       = errors.get('Sale_SaleID', ''),
+                empty_label = 'Select a Sale'
+            ) }}
+            {% if not sale_options %}
+            <div class="alert alert-warning" role="alert">
+                <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                No sales found. Record a sale first before adding a payment.
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Appointment dropdown section -->
+        <div id="section-appt"
+             {% if form_data.get('reference_type', 'sale') != 'appointment' %}style="display:none;"{% endif %}>
+            {{ select_field(
+                name        = 'Appointment_AppointmentID',
+                label       = 'Appointment',
+                options     = appt_options,
+                selected    = form_data.get('Appointment_AppointmentID', ''),
+                required    = False,
+                error       = errors.get('Appointment_AppointmentID', ''),
+                empty_label = 'Select an Appointment'
+            ) }}
+            {% if not appt_options %}
+            <div class="alert alert-info" role="alert">
+                <i class="fa-solid fa-circle-info me-2"></i>
+                No unpaid appointments available. All appointments already have a payment, or no appointments exist yet.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Card 2: Payment Details -->
+    <div class="form-card">
+        <p class="form-section-title">Payment Details</p>
+
+        <!-- Row 1: Date | Amount -->
+        <div class="row">
+            <div class="col-md-4">
+                {{ date_field(
+                    name      = 'PaymentDate',
+                    label     = 'Payment Date',
+                    value     = form_data.get('PaymentDate', ''),
+                    required  = True,
+                    error     = errors.get('PaymentDate', ''),
+                    help_text = 'The date the payment was received.'
+                ) }}
+            </div>
+            <div class="col-md-4">
+                {{ number_field(
+                    name        = 'AmountPaid',
+                    label       = 'Amount Paid (Rs.)',
+                    value       = form_data.get('AmountPaid', ''),
+                    required    = True,
+                    error       = errors.get('AmountPaid', ''),
+                    placeholder = '',
+                    step        = '0.01',
+                    min_val     = '0',
+                    help_text   = 'Total amount received in Mauritian Rupees.'
+                ) }}
+            </div>
+        </div>
+
+        <!-- Row 2: Method | Type -->
+        <div class="row">
+            <div class="col-md-4">
+                {{ select_field(
+                    name        = 'PaymentMethod',
+                    label       = 'Payment Method',
+                    options     = method_options,
+                    selected    = form_data.get('PaymentMethod', ''),
+                    required    = True,
+                    error       = errors.get('PaymentMethod', ''),
+                    empty_label = 'Select Method'
+                ) }}
+            </div>
+            <div class="col-md-4">
+                {{ select_field(
+                    name        = 'PaymentType',
+                    label       = 'Payment Type',
+                    options     = type_options,
+                    selected    = form_data.get('PaymentType', ''),
+                    required    = True,
+                    error       = errors.get('PaymentType', ''),
+                    empty_label = '— Select Type —'
+                ) }}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-floppy-disk me-2"></i>
+                {{ 'Save Changes' if is_edit else 'Record Payment' }}
+            </button>
+            <a href="{{ url_for('payment.index') }}"
+               class="btn btn-outline-secondary">Cancel</a>
+        </div>
+
+    </div>
+
+</form>
+
+{% if is_edit and record %}
+<div class="form-card">
+    <p class="form-section-title">Audit Information</p>
+    <div class="row">
+        <div class="col-md-6">
+            {{ readonly_field('Created By', record.Created_By) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Created',
+                record.Date_Created[:19].replace('T', ' ') if record.Date_Created else ''
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Updated By',
+                record.Updated_By if record.Updated_By else ''
+            ) }}
+        </div>
+        <div class="col-md-6">
+            {{ readonly_field(
+                'Date Updated',
+                record.Date_Updated[:19].replace('T', ' ') if record.Date_Updated else ''
+            ) }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

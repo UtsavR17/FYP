@@ -1,0 +1,99 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/table.html'         import search_bar, data_table %}
+{% from 'components/pagination.html'    import pagination_controls %}
+{% from 'components/modal_confirm.html' import delete_modal %}
+{% from 'components/alert.html'         import info_alert %}
+
+{% block title %}Payments{% endblock %}
+{% block page_title %}Payments{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            Payments
+            <span class="record-count-badge">{{ pagination.total }}</span>
+        </h2>
+        <p class="page-header-subtitle">Manage payment records for sales and appointments</p>
+    </div>
+    <a href="{{ url_for('payment.create') }}" class="btn btn-accent">
+        <i class="fa-solid fa-plus me-2"></i>Record Payment
+    </a>
+</div>
+
+<div class="admin-card">
+
+    {{ search_bar(
+        url_for('payment.index'),
+        search_query,
+        'Search by reference, method, type or date...'
+    ) }}
+
+    {% if search_query %}
+        {{ info_alert('Showing results for: <strong>' ~ search_query ~ '</strong>') }}
+    {% endif %}
+
+    {% call data_table(
+        ['Pay ID', 'Reference', 'Type', 'Date', 'Amount Paid', 'Method', 'Payment Type', 'Date Created'],
+        total=pagination.total,
+        empty_message='No payments recorded yet. Use Record Payment to add one.'
+    ) %}
+        {% for row in pagination.records %}
+        <tr>
+            <td style="width:90px;">
+                <strong>PAY-{{ row.PaymentID }}</strong>
+            </td>
+            <td>
+                <span class="payment-ref-type-badge payment-ref-{{ row._reference_type | lower }}">
+                    {{ row._reference_type }}
+                </span>
+                <span class="text-secondary ms-1" style="font-size:0.8rem;">
+                    {{ row._reference_label }}
+                </span>
+            </td>
+            <td>
+                <span class="pay-type-badge pay-type-{{ row.PaymentType | lower | replace(' ', '-') }}">
+                    {{ row.PaymentType }}
+                </span>
+            </td>
+            <td>{{ row.PaymentDate if row.PaymentDate else '-' }}</td>
+            <td>
+                <strong>Rs. {{ '%.2f' | format(row.AmountPaid | float) }}</strong>
+            </td>
+            <td>{{ row.PaymentMethod }}</td>
+            <td>{{ row.PaymentType }}</td>
+            <td>
+                {% if row.Date_Created %}
+                    {{ row.Date_Created[:19].replace('T', ' ') }}
+                {% else %}
+                    &mdash;
+                {% endif %}
+            </td>
+            <td class="text-end">
+                <div class="action-btn-group">
+                    <a href="{{ url_for('payment.edit', payment_id=row.PaymentID) }}"
+                       class="btn btn-sm btn-outline-primary">
+                        <i class="fa-solid fa-pen me-1"></i>Edit
+                    </a>
+                    <button type="button"
+                            class="btn btn-sm btn-outline-danger"
+                            data-bs-toggle="modal"
+                            data-bs-target="#deleteModal"
+                            data-delete-url="{{ url_for('payment.delete', payment_id=row.PaymentID) }}"
+                            data-record-name="PAY-{{ row.PaymentID }} ({{ row._reference_label }})">
+                        <i class="fa-solid fa-trash me-1"></i>Delete
+                    </button>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    {% endcall %}
+
+    {{ pagination_controls(pagination, 'payment.index', search_query) }}
+
+</div>
+
+{{ delete_modal() }}
+
+{% endblock %}

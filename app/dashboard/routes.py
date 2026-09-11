@@ -29,6 +29,7 @@ def _get_dashboard_counts():
         ('new_motorbike', 'New_MotorBike'),
         ('appointment', 'Appointment'),
         ('sale','Sale'),
+        ('payment', 'Payment'),
     ]
 
     counts = {}
@@ -172,6 +173,15 @@ def index():
             'icon':  'fa-handshake',
             'url':   url_for('sale.index'),
             'desc':  'Manage motorbike sales records',
+        },
+
+        {
+
+            'label': 'Payments',
+            'count': counts['payment'],
+            'icon':  'fa-credit-card',
+            'url':   url_for('payment.index'),
+            'desc':  'Manage payment records',
         },
     ]
 

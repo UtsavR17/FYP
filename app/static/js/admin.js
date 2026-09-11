@@ -149,6 +149,46 @@ document.addEventListener('DOMContentLoaded', function () {
         console.log('[MotoAdmin] Receive form mode toggle initialised.');
     }
 
+
+
+    // -------------------------------------------------------------------------
+    // PAYMENT FORM — Reference type toggle (Sale / Appointment)
+    // -------------------------------------------------------------------------
+    const refTypeSale  = document.getElementById('ref-type-sale');
+    const refTypeAppt  = document.getElementById('ref-type-appt');
+    const refLabelSale = document.getElementById('ref-label-sale');
+    const refLabelAppt = document.getElementById('ref-label-appt');
+    const sectionPaySale = document.getElementById('section-sale');
+    const sectionPayAppt = document.getElementById('section-appt');
+
+    function applyPaymentRefMode(mode) {
+        if (!sectionPaySale || !sectionPayAppt) return;
+        if (mode === 'sale') {
+            sectionPaySale.style.display = '';
+            sectionPayAppt.style.display = 'none';
+            if (refLabelSale) refLabelSale.classList.add('active');
+            if (refLabelAppt) refLabelAppt.classList.remove('active');
+        } else {
+            sectionPaySale.style.display = 'none';
+            sectionPayAppt.style.display = '';
+            if (refLabelSale) refLabelSale.classList.remove('active');
+            if (refLabelAppt) refLabelAppt.classList.add('active');
+        }
+        console.log('[MotoAdmin] Payment reference mode set to:', mode);
+    }
+
+    if (refTypeSale && refTypeAppt) {
+        refTypeSale.addEventListener('change', function () {
+            applyPaymentRefMode('sale');
+        });
+        refTypeAppt.addEventListener('change', function () {
+            applyPaymentRefMode('appointment');
+        });
+        applyPaymentRefMode(refTypeSale.checked ? 'sale' : 'appointment');
+        console.log('[MotoAdmin] Payment reference toggle initialised.');
+    }
+
+
 });
 
 

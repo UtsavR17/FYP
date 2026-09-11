@@ -77,6 +77,9 @@ def create_app():
     app.register_blueprint(sale_bp, url_prefix='/sales')
 
 
+    from app.modules.payment import bp as payment_bp
+    app.register_blueprint(payment_bp, url_prefix='/payments')
+
 
     # ------------------------------------------------------------------
     # ROOT REDIRECT
