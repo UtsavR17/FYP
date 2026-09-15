@@ -45,7 +45,7 @@
         <div class="col-md-3">
             {{ readonly_field(
                 'Time',
-                record.Appointment_time[:5] if record.Appointment_time else '—-'
+                record.Appointment_time[:5] if record.Appointment_time else '-'
             ) }}
         </div>
         <div class="col-md-3">
@@ -81,19 +81,19 @@
         <div class="col-md-6">
             {{ readonly_field(
                 'Date Created',
-                record.Date_Created[:19].replace('T', ' ') if record.Date_Created else '—'
+                record.Date_Created[:19].replace('T', ' ') if record.Date_Created else '-'
             ) }}
         </div>
         <div class="col-md-6">
             {{ readonly_field(
                 'Updated By',
-                record.Updated_By if record.Updated_By else '—'
+                record.Updated_By if record.Updated_By else '-'
             ) }}
         </div>
         <div class="col-md-6">
             {{ readonly_field(
                 'Date Updated',
-                record.Date_Updated[:19].replace('T', ' ') if record.Date_Updated else '—'
+                record.Date_Updated[:19].replace('T', ' ') if record.Date_Updated else '-'
             ) }}
         </div>
     </div>
@@ -251,6 +251,57 @@
     {% endif %}
 </div>
 
+<!-- Cost Summary -->
+{% if appt_services or appt_stock %}
+<div class="admin-card">
+    <p style="font-size:0.72rem;font-weight:600;text-transform:uppercase;
+              letter-spacing:0.5px;color:var(--text-muted);
+              margin-bottom:16px;padding-bottom:10px;
+              border-bottom:1px solid var(--border-color);">
+        Estimated Cost Summary
+    </p>
+    <div class="row g-3">
+        <div class="col-md-4">
+            <div class="p-3 rounded"
+                 style="background:var(--content-bg);border:1px solid var(--border-color);">
+                <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;
+                            letter-spacing:0.4px;color:var(--text-muted);margin-bottom:4px;">
+                    Services Total
+                </div>
+                <div style="font-size:1rem;font-weight:700;color:var(--text-primary);">
+                    Rs. {{ '%.2f' | format(service_total | float) }}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="p-3 rounded"
+                 style="background:var(--content-bg);border:1px solid var(--border-color);">
+                <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;
+                            letter-spacing:0.4px;color:var(--text-muted);margin-bottom:4px;">
+                    Stock Used Total
+                </div>
+                <div style="font-size:1rem;font-weight:700;color:var(--text-primary);">
+                    Rs. {{ '%.2f' | format(stock_total | float) }}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="p-3 rounded"
+                 style="background:var(--accent-soft);
+                        border:1px solid rgba(230,126,34,0.2);">
+                <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;
+                            letter-spacing:0.4px;color:var(--text-muted);margin-bottom:4px;">
+                    Grand Total
+                </div>
+                <div style="font-size:1rem;font-weight:700;color:var(--accent);">
+                    Rs. {{ '%.2f' | format(appt_total | float) }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Payment -->
 <div class="admin-card">
     <div class="d-flex align-items-center justify-content-between mb-3">
@@ -260,11 +311,20 @@
                 Payment record associated with this appointment
             </p>
         </div>
-        {% if not appt_payment %}
-        <a href="{{ url_for('payment.create') }}"
-           class="btn btn-sm btn-outline-secondary">
-            <i class="fa-solid fa-plus me-1"></i>Add Payment
-        </a>
+
+        {% if appt_payment %}
+            {# Payment already exists — button not shown #}
+        {% elif is_locked %}
+            <span class="btn btn-sm btn-outline-secondary disabled"
+                  title="Cannot add payment to a {{ appt_status }} appointment"
+                  style="pointer-events:none;opacity:0.65;">
+                <i class="fa-solid fa-plus me-1"></i>Add Payment
+            </span>
+        {% else %}
+            <a href="{{ url_for('payment.create', prefill_appt=appt_id) }}"
+               class="btn btn-sm btn-outline-secondary">
+                <i class="fa-solid fa-plus me-1"></i>Add Payment
+            </a>
         {% endif %}
     </div>
 
@@ -311,7 +371,7 @@
         <div class="table-empty-icon-wrap">
             <i class="fa-solid fa-credit-card"></i>
         </div>
-        <p>No payment recorded for this appointment yet. </p></p>
+        <p class="table-empty-text">No payment recorded for this appointment yet.</p>
     </div>
     {% endif %}
 </div>

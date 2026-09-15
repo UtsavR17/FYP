@@ -528,7 +528,7 @@ def view(appt_id):
             try:
                 all_stk = (
                     supabase.table('Stock')
-                    .select('Stock_ID, Spare_Parts_SP_id, Brand_Brand_ID, Size')
+                    .select('Stock_ID, Spare_Parts_SP_id, Brand_Brand_ID, Size, S_Price')
                     .execute()
                 )
                 for s in (all_stk.data or []):
@@ -539,15 +539,23 @@ def view(appt_id):
                         label = f"{sp_name} [{size}] \u2014 {brand_name}"
                     else:
                         label = f"{sp_name} \u2014 {brand_name}"
-                    stk_lookup[s['Stock_ID']] = label
+                    stk_lookup[s['Stock_ID']] = {
+                        'label': label,
+                        'price': float(s.get('S_Price') or 0),
+                    }
             except Exception:
                 pass
 
             for s in raw_stock:
-                s['_stock_label'] = stk_lookup.get(
-                    s.get('Stock_Stock_ID'),
-                    f"Stock #{s.get('Stock_Stock_ID')}"
-                )
+                info = stk_lookup.get(s.get('Stock_Stock_ID'), {})
+                if isinstance(info, dict):
+                    s['_stock_label'] = info.get(
+                        'label', f"Stock #{s.get('Stock_Stock_ID')}"
+                    )
+                    s['_stock_price'] = info.get('price', 0.0)
+                else:
+                    s['_stock_label'] = f"Stock #{s.get('Stock_Stock_ID')}"
+                    s['_stock_price'] = 0.0
         appt_stock = raw_stock
     except Exception:
         pass
@@ -568,8 +576,32 @@ def view(appt_id):
     # )
 
 
-        # Fetch linked payment (at most one per appointment due to UNIQUE constraint)
+    # Calculate appointment estimated total from saved services and stock
+    service_total = sum(
+        float(svc.get('_service_cost') or 0) * int(svc.get('Quantity') or 1)
+        for svc in appt_services
+    )
+    stock_total = sum(
+        float(stk.get('_stock_price') or 0) * int(stk.get('Quantity') or 0)
+        for stk in appt_stock
+    )
+    appt_total = service_total + stock_total
+
+    # Calculate appointment estimated total from saved services and stock
+    service_total = sum(
+        float(svc.get('_service_cost') or 0) * int(svc.get('Quantity') or 1)
+        for svc in appt_services
+    )
+    stock_total = sum(
+        float(stk.get('_stock_price') or 0) * int(stk.get('Quantity') or 0)
+        for stk in appt_stock
+    )
+    appt_total = service_total + stock_total
+
+    # Fetch linked payment (at most one per appointment due to UNIQUE constraint)
     appt_payment = None
+
+
     try:
         pay_result = (
             supabase.table('Payment')
@@ -593,7 +625,10 @@ def view(appt_id):
         appt_stock=appt_stock,
         appt_status=appt_status,
         is_locked=is_locked,
-        appt_payment=appt_payment
+        appt_payment=appt_payment,
+        service_total=service_total,
+        stock_total=stock_total,
+        appt_total=appt_total
     )
 
 

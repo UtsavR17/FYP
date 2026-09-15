@@ -1368,3 +1368,35 @@ label.form-label {
     background-color: rgba(59, 130, 246, 0.12);
     color: #1d4ed8;
 }
+
+
+/* ---------------------------------------------------------------------------
+   MODULE — Payment form sale balance info panel
+   --------------------------------------------------------------------------- */
+.sale-info-card {
+    background-color: var(--accent-soft);
+    border: 1px solid rgba(230, 126, 34, 0.2);
+    border-radius: var(--border-radius);
+    padding: 14px 16px;
+    margin-bottom: 4px;
+}
+
+.sale-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.sale-info-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-muted);
+}
+
+.sale-info-value {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}

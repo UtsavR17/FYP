@@ -861,4 +861,3 @@ def receive_item(po_id, item_id):
         po_id=po_id,
         item_id=item_id
     )
-
