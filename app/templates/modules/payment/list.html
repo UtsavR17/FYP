@@ -35,7 +35,7 @@
     {% endif %}
 
     {% call data_table(
-        ['Pay ID', 'Reference', 'Type', 'Date', 'Amount Paid', 'Method', 'Payment Type', 'Date Created'],
+        ['Pay ID', 'Reference', 'Type', 'Date', 'Amount Paid', 'Method', 'Date Created'],
         total=pagination.total,
         empty_message='No payments recorded yet. Use Record Payment to add one.'
     ) %}
@@ -62,7 +62,6 @@
                 <strong>Rs. {{ '%.2f' | format(row.AmountPaid | float) }}</strong>
             </td>
             <td>{{ row.PaymentMethod }}</td>
-            <td>{{ row.PaymentType }}</td>
             <td>
                 {% if row.Date_Created %}
                     {{ row.Date_Created[:19].replace('T', ' ') }}
