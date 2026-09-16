@@ -383,6 +383,8 @@ def edit(appt_id):
 
         if not errors:
             try:
+                previous_status = record.get('Status')
+
                 supabase.table('Appointment').update({
                     'Customer_bike_BikeID': bike_id,
                     'Employee_EmployeeID':  emp_id,
@@ -391,9 +393,20 @@ def edit(appt_id):
                     'AppointmentType':      appt_type,
                     'Status':               status_value,
                 }).eq('AppointmentID', appt_id).execute()
-                flash_success(
-                    f'Appointment #{appt_id} was updated successfully.'
-                )
+
+                # Deduct used stock exactly once:  only on the transition  into Completed.
+                #  Re-saving an already-Completed appointment  will not trigger this again, since previous_status will  already be 'Completed'.
+                if status_value == 'Completed' and previous_status != 'Completed':
+                    _deduct_stock_for_appointment(appt_id)
+                    flash_success(
+                        f'Appointment #{appt_id} was marked Completed and '
+                        f'stock quantities have been updated.'
+                    )
+                else:
+                    flash_success(
+                        f'Appointment #{appt_id} was updated successfully.'
+                    )
+
                 return redirect(url_for('appointment.index'))
             except Exception as e:
                 flash_error(f'Could not update appointment: {str(e)}')
@@ -957,6 +970,45 @@ def add_stock(appt_id):
         appt_id=appt_id,
         record=record
     )
+
+def _deduct_stock_for_appointment(appt_id):
+    """
+    Decrease Stock.QOH for every stock item used in this appointment.
+    Called exactly once — only at the moment an appointment's Status
+    transitions INTO 'Completed' — so inventory reflects parts actually
+    consumed. Appointment_Stock rows are locked once Completed, so this
+    cannot double-fire on a later re-save of the same appointment.
+    """
+    try:
+        used_rows = (
+            supabase.table('Appointment_Stock')
+            .select('Stock_Stock_ID, Quantity')
+            .eq('Appointment_AppointmentID', appt_id)
+            .execute()
+        )
+        for row in (used_rows.data or []):
+            stock_id = row.get('Stock_Stock_ID')
+            qty_used = int(row.get('Quantity') or 0)
+            if not stock_id or qty_used <= 0:
+                continue
+            try:
+                current = (
+                    supabase.table('Stock')
+                    .select('QOH')
+                    .eq('Stock_ID', stock_id)
+                    .single()
+                    .execute()
+                )
+                current_qoh = int(current.data.get('QOH') or 0)
+                new_qoh = max(0, current_qoh - qty_used)
+                supabase.table('Stock').update(
+                    {'QOH': new_qoh}
+                ).eq('Stock_ID', stock_id).execute()
+            except Exception:
+                continue
+    except Exception:
+        pass
+
 
 
 @bp.route(
