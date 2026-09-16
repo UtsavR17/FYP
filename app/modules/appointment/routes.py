@@ -587,33 +587,24 @@ def view(appt_id):
     )
     appt_total = service_total + stock_total
 
-    # Calculate appointment estimated total from saved services and stock
-    service_total = sum(
-        float(svc.get('_service_cost') or 0) * int(svc.get('Quantity') or 1)
-        for svc in appt_services
-    )
-    stock_total = sum(
-        float(stk.get('_stock_price') or 0) * int(stk.get('Quantity') or 0)
-        for stk in appt_stock
-    )
-    appt_total = service_total + stock_total
-
-    # Fetch linked payment (at most one per appointment due to UNIQUE constraint)
-    appt_payment = None
-
-
+    # Fetch ALL payments linked to this appointment. The uniqueness constraint that previously limited an appointment to one payment
+    # only has been removed so that appointments can be paid in partial/deposit instalments the same
+    # way Sales already work.
+    appt_payments = []
     try:
         pay_result = (
             supabase.table('Payment')
             .select('*')
             .eq('Appointment_AppointmentID', appt_id)
+            .order('PaymentID')
             .execute()
         )
-        pay_list = pay_result.data or []
-        if pay_list:
-            appt_payment = pay_list[0]
+        appt_payments = pay_result.data or []
     except Exception:
         pass
+
+    appt_total_paid = sum(float(p.get('AmountPaid') or 0) for p in appt_payments)
+    appt_remaining  = max(0.0, appt_total - appt_total_paid)
 
     return render_template(
         'modules/appointment/view.html',
@@ -625,7 +616,9 @@ def view(appt_id):
         appt_stock=appt_stock,
         appt_status=appt_status,
         is_locked=is_locked,
-        appt_payment=appt_payment,
+        appt_payments=appt_payments,
+        appt_total_paid=appt_total_paid,
+        appt_remaining=appt_remaining,
         service_total=service_total,
         stock_total=stock_total,
         appt_total=appt_total

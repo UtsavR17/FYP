@@ -306,17 +306,24 @@
 <div class="admin-card">
     <div class="d-flex align-items-center justify-content-between mb-3">
         <div>
-            <h3 style="font-size:1rem;font-weight:600;margin:0;">Payment</h3>
+            <h3 style="font-size:1rem;font-weight:600;margin:0;">
+                Payments
+                <span class="record-count-badge">{{ appt_payments | length }}</span>
+            </h3>
             <p style="font-size:0.8rem;color:var(--text-muted);margin:4px 0 0;">
-                Payment record associated with this appointment
+                Payment records associated with this appointment
             </p>
         </div>
 
-        {% if appt_payment %}
-            {# Payment already exists — button not shown #}
-        {% elif is_locked %}
+        {% if is_locked %}
             <span class="btn btn-sm btn-outline-secondary disabled"
                   title="Cannot add payment to a {{ appt_status }} appointment"
+                  style="pointer-events:none;opacity:0.65;">
+                <i class="fa-solid fa-plus me-1"></i>Add Payment
+            </span>
+        {% elif appt_remaining <= 0.001 %}
+            <span class="btn btn-sm btn-outline-secondary disabled"
+                  title="This appointment has already been fully paid"
                   style="pointer-events:none;opacity:0.65;">
                 <i class="fa-solid fa-plus me-1"></i>Add Payment
             </span>
@@ -328,7 +335,30 @@
         {% endif %}
     </div>
 
-    {% if appt_payment %}
+    {% if appt_total > 0 %}
+    <div class="row g-2 mb-3">
+        <div class="col-md-4">
+            <div class="p-3 rounded" style="background:var(--content-bg);border:1px solid var(--border-color);">
+                <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);margin-bottom:4px;">Appointment Total</div>
+                <div style="font-size:1rem;font-weight:700;color:var(--text-primary);">Rs. {{ '%.2f' | format(appt_total | float) }}</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="p-3 rounded" style="background:var(--content-bg);border:1px solid var(--border-color);">
+                <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);margin-bottom:4px;">Already Paid</div>
+                <div style="font-size:1rem;font-weight:700;color:var(--text-secondary);">Rs. {{ '%.2f' | format(appt_total_paid | float) }}</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="p-3 rounded" style="background:var(--accent-soft);border:1px solid rgba(230,126,34,0.2);">
+                <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);margin-bottom:4px;">Remaining Balance</div>
+                <div style="font-size:1rem;font-weight:700;color:var(--accent);">Rs. {{ '%.2f' | format(appt_remaining | float) }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if appt_payments %}
     <div class="table-responsive">
         <table class="table admin-table">
             <thead>
@@ -342,27 +372,25 @@
                 </tr>
             </thead>
             <tbody>
+                {% for pmt in appt_payments %}
                 <tr>
-                    <td><strong>PAY-{{ appt_payment.PaymentID }}</strong></td>
-                    <td>{{ appt_payment.PaymentDate if appt_payment.PaymentDate else '-' }}</td>
+                    <td><strong>PAY-{{ pmt.PaymentID }}</strong></td>
+                    <td>{{ pmt.PaymentDate if pmt.PaymentDate else '-' }}</td>
+                    <td><strong>Rs. {{ '%.2f' | format(pmt.AmountPaid | float) }}</strong></td>
+                    <td>{{ pmt.PaymentMethod }}</td>
                     <td>
-                        <strong>
-                            Rs. {{ '%.2f' | format(appt_payment.AmountPaid | float) }}
-                        </strong>
-                    </td>
-                    <td>{{ appt_payment.PaymentMethod }}</td>
-                    <td>
-                        <span class="pay-type-badge pay-type-{{ appt_payment.PaymentType | lower | replace(' ', '-') }}">
-                            {{ appt_payment.PaymentType }}
+                        <span class="pay-type-badge pay-type-{{ pmt.PaymentType | lower | replace(' ', '-') }}">
+                            {{ pmt.PaymentType }}
                         </span>
                     </td>
                     <td class="text-end">
-                        <a href="{{ url_for('payment.edit', payment_id=appt_payment.PaymentID) }}"
+                        <a href="{{ url_for('payment.edit', payment_id=pmt.PaymentID) }}"
                            class="btn btn-sm btn-outline-primary">
                             <i class="fa-solid fa-pen"></i>
                         </a>
                     </td>
                 </tr>
+                {% endfor %}
             </tbody>
         </table>
     </div>

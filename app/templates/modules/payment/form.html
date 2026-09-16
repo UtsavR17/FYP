@@ -35,28 +35,24 @@
       data-is-edit="false" data-payment-id="">
 {% endif %}
 
-
     {% if not is_edit and form_token %}
     <input type="hidden" name="form_token" value="{{ form_token }}">
     {% endif %}
 
-    <!-- ── Card 1: Payment Reference ───────────────────────────────────── -->
+    <!-- Card 1: Payment Reference -->
     <div class="form-card">
         <p class="form-section-title">Payment Reference</p>
 
         {% if is_edit %}
-        {# On Edit the reference type is locked — show read-only indicator #}
         <input type="hidden" name="reference_type" value="{{ locked_ref_type }}">
         <div class="mb-3">
             <label class="form-label readonly-label">Reference Type</label>
             <div class="readonly-value">
                 {% if locked_ref_type == 'sale' %}
-                    <i class="fa-solid fa-handshake me-2"
-                       style="color:var(--accent)"></i>
+                    <i class="fa-solid fa-handshake me-2" style="color:var(--accent)"></i>
                     <strong>Sale Payment</strong>
                 {% else %}
-                    <i class="fa-solid fa-calendar-check me-2"
-                       style="color:#1d4ed8"></i>
+                    <i class="fa-solid fa-calendar-check me-2" style="color:#1d4ed8"></i>
                     <strong>Appointment Payment</strong>
                 {% endif %}
                 <span class="text-muted ms-2" style="font-size:0.75rem;">
@@ -73,7 +69,7 @@
                 selected    = form_data.get('Sale_SaleID', ''),
                 required    = True,
                 error       = errors.get('Sale_SaleID', ''),
-                empty_label = '— Select a Sale —'
+                empty_label = 'Select a Sale'
             ) }}
             {% if not sale_options %}
             <div class="alert alert-warning" role="alert">
@@ -89,18 +85,17 @@
                 selected    = form_data.get('Appointment_AppointmentID', ''),
                 required    = True,
                 error       = errors.get('Appointment_AppointmentID', ''),
-                empty_label = '— Select an Appointment —'
+                empty_label = 'Select an Appointment'
             ) }}
             {% if not appt_options %}
             <div class="alert alert-info" role="alert">
                 <i class="fa-solid fa-circle-info me-2"></i>
-                No unpaid appointments available.
+                No appointments with a remaining balance found.
             </div>
             {% endif %}
         {% endif %}
 
         {% else %}
-        {# Create mode — toggle between Sale and Appointment #}
         <div class="receive-mode-selector mb-3">
             <label class="receive-mode-option {% if form_data.get('reference_type', 'sale') == 'sale' %}active{% endif %}"
                    id="ref-label-sale">
@@ -135,7 +130,7 @@
                 selected    = form_data.get('Sale_SaleID', ''),
                 required    = False,
                 error       = errors.get('Sale_SaleID', ''),
-                empty_label = '— Select a Sale —'
+                empty_label = 'Select a Sale'
             ) }}
             {% if not sale_options %}
             <div class="alert alert-warning" role="alert">
@@ -155,41 +150,40 @@
                 selected    = form_data.get('Appointment_AppointmentID', ''),
                 required    = False,
                 error       = errors.get('Appointment_AppointmentID', ''),
-                empty_label = '— Select an Appointment —'
+                empty_label = 'Select an Appointment'
             ) }}
             {% if not appt_options %}
             <div class="alert alert-info" role="alert">
                 <i class="fa-solid fa-circle-info me-2"></i>
-                No unpaid appointments available. All appointments already
-                have a payment, or no appointments exist yet.
+                No appointments with a remaining balance found.
             </div>
             {% endif %}
         </div>
         {% endif %}
 
-        {# Sale balance info panel — populated by JS when a Sale is selected #}
-        <div id="sale-info-display" style="display:none;"
+        <!-- Shared balance panel — populated by JS for whichever reference is active -->
+        <div id="balance-info-display"
              class="mt-2 p-3 rounded"
-             style="background:var(--accent-soft);border:1px solid rgba(230,126,34,0.2);">
+             style="display:none; background:var(--accent-soft); border:1px solid rgba(230,126,34,0.2);">
             <div class="row g-2">
                 <div class="col-md-4">
-                    <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);margin-bottom:4px;">Sale Total</div>
-                    <div id="si-total" style="font-size:1rem;font-weight:700;color:var(--text-primary);">—</div>
+                    <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);margin-bottom:4px;">Total</div>
+                    <div id="bal-total" style="font-size:1rem;font-weight:700;color:var(--text-primary);">—</div>
                 </div>
                 <div class="col-md-4">
                     <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);margin-bottom:4px;">Already Paid</div>
-                    <div id="si-paid" style="font-size:1rem;font-weight:700;color:var(--text-secondary);">—</div>
+                    <div id="bal-paid" style="font-size:1rem;font-weight:700;color:var(--text-secondary);">—</div>
                 </div>
                 <div class="col-md-4">
                     <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);margin-bottom:4px;">Remaining Balance</div>
-                    <div id="si-remaining" style="font-size:1rem;font-weight:700;color:var(--accent);">—</div>
+                    <div id="bal-remaining" style="font-size:1rem;font-weight:700;color:var(--accent);">—</div>
                 </div>
             </div>
         </div>
 
     </div>
 
-    <!-- ── Card 2: Payment Details ──────────────────────────────────────── -->
+    <!-- Card 2: Payment Details -->
     <div class="form-card">
         <p class="form-section-title">Payment Details</p>
 
@@ -211,7 +205,7 @@
                     value       = form_data.get('AmountPaid', ''),
                     required    = True,
                     error       = errors.get('AmountPaid', ''),
-                    placeholder = '0.00',
+                    placeholder = '',
                     step        = '0.01',
                     min_val     = '0.01',
                     help_text   = 'Actual amount received. Cannot exceed remaining balance.'
@@ -228,7 +222,7 @@
                     selected    = form_data.get('PaymentMethod', ''),
                     required    = True,
                     error       = errors.get('PaymentMethod', ''),
-                    empty_label = '— Select Method —'
+                    empty_label = 'Select Method'
                 ) }}
             </div>
             <div class="col-md-4">
@@ -239,7 +233,7 @@
                     selected    = form_data.get('PaymentType', ''),
                     required    = True,
                     error       = errors.get('PaymentType', ''),
-                    empty_label = '— Select Type —'
+                    empty_label = 'Select Type'
                 ) }}
             </div>
         </div>
@@ -267,19 +261,19 @@
         <div class="col-md-6">
             {{ readonly_field(
                 'Date Created',
-                record.Date_Created[:19].replace('T', ' ') if record.Date_Created else '—'
+                record.Date_Created[:19].replace('T', ' ') if record.Date_Created else '-'
             ) }}
         </div>
         <div class="col-md-6">
             {{ readonly_field(
                 'Updated By',
-                record.Updated_By if record.Updated_By else '—'
+                record.Updated_By if record.Updated_By else '-'
             ) }}
         </div>
         <div class="col-md-6">
             {{ readonly_field(
                 'Date Updated',
-                record.Date_Updated[:19].replace('T', ' ') if record.Date_Updated else '—'
+                record.Date_Updated[:19].replace('T', ' ') if record.Date_Updated else '-'
             ) }}
         </div>
     </div>
@@ -294,7 +288,6 @@
 (function () {
     'use strict';
 
-    // ── 1. Duplicate-submission protection ───────────────────────────────
     const payForm   = document.getElementById('paymentForm');
     const submitBtn = document.getElementById('paySubmitBtn');
 
@@ -307,14 +300,66 @@
         });
     }
 
-    // ── 2. Reference type toggle (Create mode only) ──────────────────────
     const refTypeSale    = document.getElementById('ref-type-sale');
     const refTypeAppt    = document.getElementById('ref-type-appt');
     const refLabelSale   = document.getElementById('ref-label-sale');
     const refLabelAppt   = document.getElementById('ref-label-appt');
     const sectionPaySale = document.getElementById('section-sale');
     const sectionPayAppt = document.getElementById('section-appt');
-    const infoPanel      = document.getElementById('sale-info-display');
+    const infoPanel      = document.getElementById('balance-info-display');
+
+    const saleSelect   = document.getElementById('Sale_SaleID');
+    const apptSelect   = document.getElementById('Appointment_AppointmentID');
+    const payDateInput = document.getElementById('PaymentDate');
+    const amountInput  = document.getElementById('AmountPaid');
+
+    const isEdit       = payForm.dataset.isEdit === 'true';
+    const currentPayId = payForm.dataset.paymentId ? Number(payForm.dataset.paymentId) : null;
+
+    function formatRs(num) {
+        return 'Rs.\u00a0' + Number(num).toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    function showBalancePanel(data) {
+        const balTotal     = document.getElementById('bal-total');
+        const balPaid      = document.getElementById('bal-paid');
+        const balRemaining = document.getElementById('bal-remaining');
+        if (balTotal)     balTotal.textContent     = formatRs(data.total_amount);
+        if (balPaid)      balPaid.textContent      = formatRs(data.total_paid);
+        if (balRemaining) balRemaining.textContent = formatRs(data.remaining);
+        if (infoPanel) infoPanel.style.display = '';
+        if (amountInput) {
+            amountInput.setAttribute('max', Number(data.remaining).toFixed(2));
+            if (!amountInput.value) {
+                amountInput.value = Number(data.remaining).toFixed(2);
+            }
+        }
+    }
+
+    function loadBalanceInfo(kind, refId) {
+        if (!refId || !infoPanel) return;
+        let url = kind === 'sale'
+            ? '/payments/sale-info/' + refId
+            : '/payments/appointment-info/' + refId;
+        if (isEdit && currentPayId) {
+            url += '?exclude_payment_id=' + currentPayId;
+        }
+        fetch(url)
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.error) return;
+                if (kind === 'sale' && payDateInput && data.sale_date && !payDateInput.value) {
+                    payDateInput.value = data.sale_date;
+                }
+                showBalancePanel(data);
+            })
+            .catch(function (err) {
+                console.error('[MotoAdmin] Balance info fetch error:', err);
+            });
+    }
 
     function applyPaymentRefMode(mode) {
         if (!sectionPaySale || !sectionPayAppt) return;
@@ -328,79 +373,45 @@
             sectionPayAppt.style.display = '';
             if (refLabelSale) refLabelSale.classList.remove('active');
             if (refLabelAppt) refLabelAppt.classList.add('active');
-            if (infoPanel) infoPanel.style.display = 'none';
+        }
+        if (infoPanel) infoPanel.style.display = 'none';
+
+        if (mode === 'sale' && saleSelect && saleSelect.value) {
+            loadBalanceInfo('sale', saleSelect.value);
+        } else if (mode === 'appointment' && apptSelect && apptSelect.value) {
+            loadBalanceInfo('appointment', apptSelect.value);
         }
     }
 
     if (refTypeSale && refTypeAppt) {
-        refTypeSale.addEventListener('change', function () {
-            applyPaymentRefMode('sale');
-        });
-        refTypeAppt.addEventListener('change', function () {
-            applyPaymentRefMode('appointment');
-        });
-        applyPaymentRefMode(refTypeSale.checked ? 'sale' : 'appointment');
-    }
-
-    // ── 3. Sale auto-fill: date, balance panel, amount ───────────────────
-    const saleSelect   = document.getElementById('Sale_SaleID');
-    const payDateInput = document.getElementById('PaymentDate');
-    const amountInput  = document.getElementById('AmountPaid');
-    const isEdit       = payForm.dataset.isEdit === 'true';
-    const currentPayId = payForm.dataset.paymentId ? Number(payForm.dataset.paymentId) : null;
-
-    function formatRs(num) {
-        return 'Rs.\u00a0' + Number(num).toLocaleString('en-US', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        });
-    }
-
-    function loadSaleInfo(saleId) {
-        if (!saleId || !infoPanel) return;
-        let url = '/payments/sale-info/' + saleId;
-        if (isEdit && currentPayId) {
-            url += '?exclude_payment_id=' + currentPayId;
-        }
-        fetch(url)
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                if (data.error) return;
-                // Auto-fill Payment Date only if currently empty
-                if (payDateInput && data.sale_date && !payDateInput.value) {
-                    payDateInput.value = data.sale_date;
-                }
-                // Auto-fill Amount with remaining balance only if currently empty
-                if (amountInput && !amountInput.value) {
-                    amountInput.value = Number(data.remaining).toFixed(2);
-                }
-                // Show balance panel
-                const siTotal     = document.getElementById('si-total');
-                const siPaid      = document.getElementById('si-paid');
-                const siRemaining = document.getElementById('si-remaining');
-                if (siTotal)     siTotal.textContent     = formatRs(data.total_amount);
-                if (siPaid)      siPaid.textContent      = formatRs(data.total_paid);
-                if (siRemaining) siRemaining.textContent = formatRs(data.remaining);
-                infoPanel.style.display = '';
-            })
-            .catch(function (err) {
-                console.error('[MotoAdmin] Sale info fetch error:', err);
-            });
+        refTypeSale.addEventListener('change', function () { applyPaymentRefMode('sale'); });
+        refTypeAppt.addEventListener('change', function () { applyPaymentRefMode('appointment'); });
     }
 
     if (saleSelect) {
         saleSelect.addEventListener('change', function () {
-            const saleId = this.value;
-            if (!saleId && infoPanel) {
-                infoPanel.style.display = 'none';
-                return;
-            }
-            loadSaleInfo(saleId);
+            if (!this.value) { if (infoPanel) infoPanel.style.display = 'none'; return; }
+            loadBalanceInfo('sale', this.value);
         });
-        // Trigger on load if a sale is already selected
-        if (saleSelect.value) {
-            loadSaleInfo(saleSelect.value);
-        }
+    }
+
+    if (apptSelect) {
+        apptSelect.addEventListener('change', function () {
+            if (!this.value) { if (infoPanel) infoPanel.style.display = 'none'; return; }
+            loadBalanceInfo('appointment', this.value);
+        });
+    }
+
+    // Trigger balance load on initial page render (edit mode, or a
+    // pre-selected value left over from a failed validation resubmit)
+    const initialMode = refTypeSale
+        ? (refTypeSale.checked ? 'sale' : 'appointment')
+        : (saleSelect ? 'sale' : (apptSelect ? 'appointment' : null));
+
+    if (initialMode === 'sale' && saleSelect && saleSelect.value) {
+        loadBalanceInfo('sale', saleSelect.value);
+    } else if (initialMode === 'appointment' && apptSelect && apptSelect.value) {
+        loadBalanceInfo('appointment', apptSelect.value);
     }
 
 })();
