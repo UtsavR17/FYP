@@ -100,6 +100,82 @@
         {% endif %}
     </div>
 
+    <!-- Motorcycles Ordered -->
+<div class="admin-card">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <div>
+            <h3 style="font-size:1rem;font-weight:600;margin:0;">
+                Motorcycles Ordered
+                <span class="record-count-badge">{{ po_motorbikes | length }}</span>
+            </h3>
+            <p style="font-size:0.8rem;color:var(--text-muted);margin:4px 0 0;">
+                New motorbike units procured through this purchase order
+            </p>
+        </div>
+        {% if po_status in ('Received', 'Cancelled') %}
+        <span class="btn btn-accent disabled" title="Cannot add motorcycles to a {{ po_status }} order">
+            <i class="fa-solid fa-plus me-2"></i>Add Motorcycle
+        </span>
+        {% else %}
+        <a href="{{ url_for('purchase_order.add_motorbike', po_id=po_id) }}" class="btn btn-accent">
+            <i class="fa-solid fa-plus me-2"></i>Add Motorcycle
+        </a>
+        {% endif %}
+    </div>
+
+    {% if po_motorbikes %}
+    <div class="table-responsive">
+        <table class="table admin-table">
+            <thead>
+                <tr>
+                    <th>Motorcycle</th><th>VIN</th><th>Status</th>
+                    <th>Buying Price</th><th>Date Received</th>
+                    <th class="text-end" style="width:140px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for mb in po_motorbikes %}
+                <tr>
+                    <td><strong>{{ mb._bike_label }}</strong></td>
+                    <td class="text-muted" style="font-size:0.8rem;">{{ mb._bike_vin }}</td>
+                    <td>
+                        {% if mb._bike_status == 'Available' %}
+                            <span class="bike-status-badge bike-status-available">Available</span>
+                        {% else %}
+                            <span class="bike-status-badge bike-status-sold">Sold</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ 'Rs. %.2f' | format(mb.BuyingPrice | float) if mb.BuyingPrice else '—' }}</td>
+                    <td>{{ mb.DateReceived if mb.DateReceived else '—' }}</td>
+                    <td class="text-end">
+                        {% if po_status not in ('Received', 'Cancelled') %}
+                        <div class="action-btn-group">
+                            <a href="{{ url_for('purchase_order.edit_motorbike', po_id=po_id, nb_id=mb.New_MotorBike_NB_ID) }}"
+                               class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-pen me-1"></i>Edit</a>
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                    data-bs-toggle="modal" data-bs-target="#deleteModal"
+                                    data-delete-url="{{ url_for('purchase_order.delete_motorbike', po_id=po_id, nb_id=mb.New_MotorBike_NB_ID) }}"
+                                    data-record-name="{{ mb._bike_label }}">
+                                <i class="fa-solid fa-trash me-1"></i></button>
+                        </div>
+                        {% else %}
+                            <span class="text-muted" style="font-size:0.78rem;">Locked</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="table-empty-state">
+        <div class="table-empty-icon-wrap"><i class="fa-solid fa-motorcycle"></i></div>
+        <p class="table-empty-text">No motorcycles linked to this purchase order yet.</p>
+    </div>
+    {% endif %}
+</div>
+
+
     {% if po_items %}
     <div class="table-responsive">
         <table class="table admin-table">
