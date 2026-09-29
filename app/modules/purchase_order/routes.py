@@ -167,14 +167,24 @@ def create():
 
         if not errors:
             try:
-                supabase.table('PurchaseOrder').insert({
+                insert_result = supabase.table('PurchaseOrder').insert({
                     'POrderDate':          porder_date,
                     'ExpectedDate':        expected_date,
                     'Status':              status_value,
                     'Supplier_SupplierID': supplier_id,
                 }).execute()
-                flash_success('Purchase order was created successfully.')
-                return redirect(url_for('purchase_order.index'))
+
+                new_po_id = insert_result.data[0]['PurchaseOrderID']
+
+                flash_success(
+                    'Purchase order was created successfully. '
+                    'Add items or motorcycles below.'
+                )
+
+                return redirect(
+                    url_for('purchase_order.view', po_id=new_po_id)
+                )
+
             except Exception as e:
                 flash_error(f'Could not create purchase order: {str(e)}')
 
@@ -1039,26 +1049,33 @@ def add_motorbike(po_id):
             errors.update(nb_errors)
 
         if not errors:
-            try:
-                if mode == 'new':
+            if mode == 'new':
+                try:
                     insert_result = supabase.table('New_MotorBike').insert(new_bike_parsed).execute()
                     nb_id = insert_result.data[0]['NB_ID']
+                except Exception as e:
+                    error_msg = str(e)
+                    if 'duplicate' in error_msg.lower() or 'unique' in error_msg.lower():
+                        errors['VIN'] = 'A motorbike with this VIN already exists.'
+                    else:
+                        flash_error(f'Could not create motorcycle: {error_msg}')
 
-                supabase.table('PO_NewMotorBike').insert({
-                    'PurchaseOrder_PurchaseOrderID': po_id,
-                    'New_MotorBike_NB_ID':           nb_id,
-                    'BuyingPrice':                   buying_price,
-                    'DateReceived':                  date_received,
-                }).execute()
-
-                flash_success('Motorcycle was linked to the purchase order successfully.')
-                return redirect(url_for('purchase_order.view', po_id=po_id))
-            except Exception as e:
-                error_msg = str(e)
-                if 'duplicate' in error_msg.lower() or 'unique' in error_msg.lower():
-                    errors['New_MotorBike_NB_ID'] = 'This motorcycle is already linked to another purchase order.'
-                else:
-                    flash_error(f'Could not link motorcycle: {error_msg}')
+            if not errors and nb_id:
+                try:
+                    supabase.table('PO_NewMotorBike').insert({
+                        'PurchaseOrder_PurchaseOrderID': po_id,
+                        'New_MotorBike_NB_ID':           nb_id,
+                        'BuyingPrice':                   buying_price,
+                        'DateReceived':                  date_received,
+                    }).execute()
+                    flash_success('Motorcycle was linked to the purchase order successfully.')
+                    return redirect(url_for('purchase_order.view', po_id=po_id))
+                except Exception as e:
+                    error_msg = str(e)
+                    if 'duplicate' in error_msg.lower() or 'unique' in error_msg.lower():
+                        errors['New_MotorBike_NB_ID'] = 'This motorcycle is already linked to another purchase order.'
+                    else:
+                        flash_error(f'Could not link motorcycle: {error_msg}')
 
     return render_template(
         'modules/purchase_order/motorbike_form.html',
