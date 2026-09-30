@@ -188,6 +188,26 @@ document.addEventListener('DOMContentLoaded', function () {
         console.log('[MotoAdmin] Payment reference toggle initialised.');
     }
 
+    // -------------------------------------------------------------------------
+    // MARKUP HELPER — fills a selling-price input from base price + chosen %.
+    // Used on the PO receive forms. Config via data attributes:
+    //   #markup-percent  data-base="<buying price>"  data-target="<input id>"
+    // "Custom" (empty value) leaves the target untouched.
+    // -------------------------------------------------------------------------
+    const markupSelect = document.getElementById('markup-percent');
+    if (markupSelect) {
+        const markupTarget = document.getElementById(markupSelect.dataset.target);
+        const markupBase   = parseFloat(markupSelect.dataset.base);
+        if (markupTarget && !isNaN(markupBase)) {
+            markupSelect.addEventListener('change', function () {
+                const pct = parseFloat(this.value);
+                if (isNaN(pct)) return;
+                markupTarget.value = (markupBase * (1 + pct / 100)).toFixed(2);
+            });
+        }
+    }
+
+
 
 });
 

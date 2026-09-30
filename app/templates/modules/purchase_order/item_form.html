@@ -1,5 +1,6 @@
 {% extends 'layout/admin_layout.html' %}
-{% from 'components/form_field.html' import text_field, number_field, select_field %}
+{% from 'components/form_field.html' import text_field, number_field,
+    select_field %}
 
 {% block title %}
     {% if is_edit %}Edit Item #{{ item_id }}{% else %}Add Item to PO-{{ po_id }}{% endif %}
@@ -19,7 +20,7 @@
             {% if is_edit %}
                 Update this line item. Quantity and buying price can be adjusted before receiving.
             {% else %}
-                Add a spare part line item to Purchase Order PO-{{ po_id }}.
+                Select a product from this supplier's catalogue and enter the quantity.
             {% endif %}
         </p>
     </div>
@@ -34,17 +35,31 @@
 
     <form method="POST" novalidate>
 
-        <!-- Row 1: Spare Part | Quantity Ordered -->
+        {% if not is_edit %}
+
+        {# ── Catalog-filtered product selector ──────────────────────────── #}
+        {% if catalog_empty %}
+        <div class="alert alert-warning" role="alert">
+            <i class="fa-solid fa-triangle-exclamation me-2"></i>
+            <strong>No catalogue items found for this supplier.</strong>
+            Go to the Supplier page and add the products this supplier provides before
+            adding items to this Purchase Order.
+        </div>
+        {% else %}
+
+        <div id="catalog-data" hidden
+             data-catalog='{{ catalog_lookup | tojson }}'></div>
+
         <div class="row">
             <div class="col-md-6">
                 {{ select_field(
-                    name        = 'SP_id',
-                    label       = 'Spare Part',
-                    options     = sp_options,
-                    selected    = form_data.get('SP_id', ''),
+                    name        = 'SupplierProduct_ID',
+                    label       = 'Product (Supplier Catalogue)',
+                    options     = item_options,
+                    selected    = form_data.get('SupplierProduct_ID', ''),
                     required    = True,
-                    error       = errors.get('SP_id', ''),
-                    empty_label = '— Select a Spare Part —'
+                    error       = errors.get('SupplierProduct_ID', ''),
+                    empty_label = '— Select a Product —'
                 ) }}
             </div>
             <div class="col-md-3">
@@ -61,7 +76,65 @@
             </div>
         </div>
 
-        <!-- Row 2: Buying Price | Size Expected -->
+        {# Resolved brand + auto-filled price — populated by JS on selection #}
+        <div id="catalog-detail-row" class="row"
+             {% if not form_data.get('SupplierProduct_ID') %}style="display:none;"{% endif %}>
+            <div class="col-md-3">
+                <div class="mb-3">
+                    <label class="form-label readonly-label">Brand</label>
+                    <div class="readonly-value" id="catalog-brand-display">—</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                {{ number_field(
+                    name        = 'BuyingPrice',
+                    label       = 'Buying Price (Rs.)',
+                    value       = form_data.get('BuyingPrice', ''),
+                    required    = True,
+                    error       = errors.get('BuyingPrice', ''),
+                    placeholder = '0.00',
+                    step        = '0.01',
+                    min_val     = '0',
+                    help_text   = 'Supplier\'s catalogue price — update only if agreed differently.'
+                ) }}
+            </div>
+            <div class="col-md-3">
+                {{ text_field(
+                    name        = 'Size_Expected',
+                    label       = 'Expected Size',
+                    value       = form_data.get('Size_Expected', ''),
+                    required    = False,
+                    error       = errors.get('Size_Expected', ''),
+                    placeholder = 'e.g. Medium',
+                    help_text   = 'Optional. Leave blank if not applicable.'
+                ) }}
+            </div>
+        </div>
+
+        {% endif %}
+
+        {% else %}
+        {# ── Edit mode: all fields except price/size hidden as read-only ── #}
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label class="form-label readonly-label">Spare Part</label>
+                    <div class="readonly-value">{{ form_data.get('_sp_name', 'Unknown') }}</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                {{ number_field(
+                    name        = 'Quantity_Ordered',
+                    label       = 'Quantity Ordered',
+                    value       = form_data.get('Quantity_Ordered', ''),
+                    required    = True,
+                    error       = errors.get('Quantity_Ordered', ''),
+                    placeholder = '1',
+                    step        = '1',
+                    min_val     = '1'
+                ) }}
+            </div>
+        </div>
         <div class="row">
             <div class="col-md-3">
                 {{ number_field(
@@ -87,6 +160,7 @@
                 ) }}
             </div>
         </div>
+        {% endif %}
 
         <div class="form-actions">
             <button type="submit" class="btn btn-accent">
@@ -100,4 +174,45 @@
     </form>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+{% if not is_edit and not catalog_empty %}
+<script>
+(function () {
+    'use strict';
+
+    const dataEl = document.getElementById('catalog-data');
+    if (!dataEl) return;
+
+    const catalogLookup = JSON.parse(dataEl.dataset.catalog);
+    const productSelect = document.getElementById('SupplierProduct_ID');
+    const detailRow     = document.getElementById('catalog-detail-row');
+    const brandDisplay  = document.getElementById('catalog-brand-display');
+    const priceInput    = document.getElementById('BuyingPrice');
+
+    if (!productSelect) return;
+
+    function applySelection(spProductId) {
+        const entry = catalogLookup[spProductId];
+        if (!entry) {
+            if (detailRow) detailRow.style.display = 'none';
+            return;
+        }
+        if (brandDisplay) brandDisplay.textContent = entry.brand_name;
+        if (priceInput)   priceInput.value = entry.buying_price.toFixed(2);
+        if (detailRow)    detailRow.style.display = '';
+    }
+
+    productSelect.addEventListener('change', function () {
+        applySelection(this.value);
+    });
+
+    // Restore state after a validation failure
+    if (productSelect.value) {
+        applySelection(productSelect.value);
+    }
+})();
+</script>
+{% endif %}
 {% endblock %}

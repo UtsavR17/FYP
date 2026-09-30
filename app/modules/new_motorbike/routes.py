@@ -409,8 +409,9 @@ def delete(nb_id):
         error_msg = str(e)
         if 'foreign key' in error_msg.lower() or 'violates' in error_msg.lower():
             flash_error(
-                f'Cannot delete motorbike "{vin_value}" because it is linked to a sales record.'
-                f'Remove the associated sale before deleting this motorbike.'
+                f'Cannot delete motorbike "{vin_value}" because it is linked '
+                f'to a sale or purchase order record. '
+                f'Remove the associated sale or purchase order line first.'
             )
         else:
             flash_error(f'Could not delete motorbike: {error_msg}')

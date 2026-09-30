@@ -1,89 +1,111 @@
 {% extends 'layout/admin_layout.html' %}
-{% from 'components/form_field.html' import select_field, text_field, number_field, date_field %}
+{% from 'components/form_field.html' import select_field, number_field %}
 
-{% block title %}{{ 'Edit Motorcycle Purchase' if is_edit else 'Add Motorcycle to PO-' ~ po_id }}{% endblock %}
-{% block page_title %}{{ 'Edit Motorcycle Purchase' if is_edit else 'Add Motorcycle' }}{% endblock %}
+{% block title %}{{ 'Edit Motorcycle Line' if is_edit else 'Add Motorcycle to PO-' ~ po_id }}{% endblock %}
+{% block page_title %}{{ 'Edit Motorcycle Line' if is_edit else 'Add Motorcycle' }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <div>
         <h2 class="page-header-title">
-            {{ 'Edit Motorcycle Purchase — ' ~ bike_label if is_edit else 'Add Motorcycle to PO-' ~ po_id }}
+            {{ 'Edit Motorcycle Line' if is_edit else 'Add Motorcycle to PO-' ~ po_id }}
         </h2>
+        <p class="page-header-subtitle">
+            {% if is_edit %}Update colour or buying price before the unit is received.
+            {% else %}Select a model this supplier provides. VIN and specs are entered when the bike arrives.{% endif %}
+        </p>
     </div>
     <a href="{{ url_for('purchase_order.view', po_id=po_id) }}" class="btn btn-outline-secondary">
         <i class="fa-solid fa-arrow-left me-2"></i>Back to PO-{{ po_id }}
     </a>
 </div>
 
-<form method="POST" novalidate>
+<div class="form-card">
+    <p class="form-section-title">Motorcycle Order Details</p>
+    <form method="POST" novalidate>
 
-    {% if not is_edit %}
-    <div class="form-card">
-        <p class="form-section-title">Which Motorcycle</p>
-        <div class="receive-mode-selector mb-3">
-            <label class="receive-mode-option {% if form_data.get('motorbike_mode','existing')=='existing' %}active{% endif %}" id="mode-existing-label">
-                <input type="radio" name="motorbike_mode" value="existing" id="mode-existing"
-                       {% if form_data.get('motorbike_mode','existing')=='existing' %}checked{% endif %}>
-                <i class="fa-solid fa-motorcycle"></i><span>Existing Motorcycle Record</span>
-                <small>Link a motorbike already created in the New Motorbike module.</small>
-            </label>
-            <label class="receive-mode-option {% if form_data.get('motorbike_mode')=='new' %}active{% endif %}" id="mode-new-label">
-                <input type="radio" name="motorbike_mode" value="new" id="mode-new"
-                       {% if form_data.get('motorbike_mode')=='new' %}checked{% endif %}>
-                <i class="fa-solid fa-plus-circle"></i><span>New Motorcycle Record</span>
-                <small>Create the motorbike unit now, as part of receiving it.</small>
-            </label>
+        {% if not is_edit and catalog_empty %}
+        <div class="alert alert-warning" role="alert">
+            <i class="fa-solid fa-triangle-exclamation me-2"></i>
+            <strong>No models found in this supplier's catalogue.</strong>
+            Open the Supplier's page and add the motorbike models they provide first.
         </div>
+        {% else %}
 
-        <div id="section-existing" {% if form_data.get('motorbike_mode')=='new' %}style="display:none;"{% endif %}>
-            {{ select_field(name='New_MotorBike_NB_ID', label='Motorcycle', options=existing_options,
-                selected=form_data.get('New_MotorBike_NB_ID',''), required=False,
-                error=errors.get('New_MotorBike_NB_ID',''), empty_label='— Select a Motorcycle —') }}
-            {% if not existing_options %}
-            <div class="alert alert-info"><i class="fa-solid fa-circle-info me-2"></i>No unlinked motorcycles found — use "New Motorcycle Record" instead.</div>
-            {% endif %}
-        </div>
-
-        <div id="section-new" {% if form_data.get('motorbike_mode','existing')=='existing' %}style="display:none;"{% endif %}>
-            <div class="row">
-                <div class="col-md-6">{{ select_field(name='Model_Model_No', label='Model', options=model_options, selected=form_data.get('Model_Model_No',''), required=False, error=errors.get('Model_Model_No',''), empty_label='— Select a Model —') }}</div>
-                <div class="col-md-3">{{ select_field(name='Color_Color', label='Color', options=color_options, selected=form_data.get('Color_Color',''), required=False, error=errors.get('Color_Color',''), empty_label='— Select a Color —') }}</div>
-                <div class="col-md-3">{{ select_field(name='Status', label='Status', options=status_options, selected=form_data.get('Status','Available'), required=False, error=errors.get('Status',''), empty_label='') }}</div>
-            </div>
-            <div class="row">
-                <div class="col-md-3">{{ number_field(name='Year', label='Year', value=form_data.get('Year',''), required=False, error=errors.get('Year',''), step='1', min_val='1900') }}</div>
-                <div class="col-md-6">{{ text_field(name='VIN', label='VIN', value=form_data.get('VIN',''), required=False, error=errors.get('VIN',''), help_text='Must be unique.') }}</div>
-                <div class="col-md-3">{{ number_field(name='Price', label='Selling Price (Rs.)', value=form_data.get('Price',''), required=False, error=errors.get('Price',''), step='0.01', min_val='0') }}</div>
-            </div>
-            <div class="row">
-                <div class="col-md-3">{{ number_field(name='EngineCC', label='Engine CC', value=form_data.get('EngineCC',''), required=False, error=errors.get('EngineCC',''), step='1', min_val='1') }}</div>
-                <div class="col-md-3">{{ select_field(name='FuelType', label='Fuel Type', options=fuel_type_options, selected=form_data.get('FuelType',''), required=False, error=errors.get('FuelType',''), empty_label='— Select —') }}</div>
-                <div class="col-md-3">{{ select_field(name='Transmission', label='Transmission', options=transmission_options, selected=form_data.get('Transmission',''), required=False, error=errors.get('Transmission',''), empty_label='— Select —') }}</div>
-                <div class="col-md-3">{{ number_field(name='FuelTankCapacity', label='Tank Capacity (L)', value=form_data.get('FuelTankCapacity',''), required=False, error=errors.get('FuelTankCapacity',''), step='0.01', min_val='0.01') }}</div>
-            </div>
-            <div class="row">
-                <div class="col-md-3">{{ number_field(name='Warranty_Months', label='Warranty (Months)', value=form_data.get('Warranty_Months',''), required=False, error=errors.get('Warranty_Months',''), step='1', min_val='0') }}</div>
-            </div>
-        </div>
-    </div>
-    {% else %}
-    <div class="form-card">
-        <p class="form-section-title">Motorcycle</p>
-        <div class="readonly-value">{{ bike_label }}</div>
-    </div>
-    {% endif %}
-
-    <div class="form-card">
-        <p class="form-section-title">Purchase Details</p>
+        {% if not is_edit %}
+        <div id="catalog-data" hidden data-catalog='{{ catalog_lookup | tojson }}'></div>
         <div class="row">
-            <div class="col-md-3">{{ number_field(name='BuyingPrice', label='Buying Price (Rs.)', value=form_data.get('BuyingPrice',''), required=True, error=errors.get('BuyingPrice',''), step='0.01', min_val='0', help_text='Price paid to the supplier.') }}</div>
-            <div class="col-md-3">{{ date_field(name='DateReceived', label='Date Received', value=form_data.get('DateReceived',''), required=False, error=errors.get('DateReceived',''), help_text='Leave blank if not yet received.') }}</div>
+            <div class="col-md-6">
+                {{ select_field(name='SupplierModel_ID', label='Model (Supplier Catalogue)',
+                    options=model_options, selected=form_data.get('SupplierModel_ID',''),
+                    required=True, error=errors.get('SupplierModel_ID',''),
+                    empty_label='— Select a Model —') }}
+            </div>
+            <div class="col-md-3">
+                {{ select_field(name='Color_Color', label='Colour', options=color_options,
+                    selected=form_data.get('Color_Color',''), required=True,
+                    error=errors.get('Color_Color',''), empty_label='— Select a Colour —') }}
+            </div>
+            <div class="col-md-3">
+                {{ number_field(name='Quantity', label='Quantity', value=form_data.get('Quantity','1'),
+                    required=True, error=errors.get('Quantity',''), step='1', min_val='1',
+                    help_text='One line is created per unit (max 20).') }}
+            </div>
         </div>
+        {% else %}
+        <div class="row">       
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label class="form-label readonly-label">Model</label>
+                    <div class="readonly-value">{{ model_label }}</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                {{ select_field(name='Color_Color', label='Colour', options=color_options,
+                    selected=form_data.get('Color_Color',''), required=True,
+                    error=errors.get('Color_Color',''), empty_label='— Select a Colour —') }}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="row">
+            <div class="col-md-3">
+                {{ number_field(name='BuyingPrice', label='Buying Price (Rs.)',
+                    value=form_data.get('BuyingPrice',''), required=True,
+                    error=errors.get('BuyingPrice',''), placeholder='0.00', step='0.01', min_val='0',
+                    help_text='Auto-filled from the supplier catalogue.') }}
+            </div>
+        </div>
+
         <div class="form-actions">
-            <button type="submit" class="btn btn-accent"><i class="fa-solid fa-floppy-disk me-2"></i>{{ 'Save Changes' if is_edit else 'Link Motorcycle' }}</button>
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-floppy-disk me-2"></i>{{ 'Save Changes' if is_edit else 'Add Motorcycle' }}
+            </button>
             <a href="{{ url_for('purchase_order.view', po_id=po_id) }}" class="btn btn-outline-secondary">Cancel</a>
         </div>
-    </div>
-</form>
+        {% endif %}
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if not is_edit and not catalog_empty %}
+<script>
+(function () {
+    'use strict';
+    const dataEl = document.getElementById('catalog-data');
+    const select = document.getElementById('SupplierModel_ID');
+    const price  = document.getElementById('BuyingPrice');
+    if (!dataEl || !select || !price) return;
+    const lookup = JSON.parse(dataEl.dataset.catalog);
+
+    function apply(id) {
+        const entry = lookup[id];
+        if (entry) price.value = entry.buying_price.toFixed(2);
+    }
+    select.addEventListener('change', function () { apply(this.value); });
+    if (select.value && !price.value) apply(select.value);
+})();
+</script>
+{% endif %}
 {% endblock %}

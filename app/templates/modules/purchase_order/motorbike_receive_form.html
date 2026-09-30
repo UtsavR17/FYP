@@ -1,0 +1,107 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/form_field.html' import text_field, number_field, select_field,
+    date_field, readonly_field %}
+
+{% block title %}Receive Motorcycle — PO-{{ po_id }}{% endblock %}
+{% block page_title %}Receive Motorcycle{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">Receive Motorcycle — PO-{{ po_id }}</h2>
+        <p class="page-header-subtitle">Enter the unit's details. It will be added to inventory as Available.</p>
+    </div>
+    <a href="{{ url_for('purchase_order.view', po_id=po_id) }}" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to PO-{{ po_id }}
+    </a>
+</div>
+
+<div class="form-card">
+    <p class="form-section-title">Ordered Unit</p>
+    <div class="row">
+        <div class="col-md-6">{{ readonly_field('Model', line._model_label) }}</div>
+        <div class="col-md-3">{{ readonly_field('Colour', line.Color_Color) }}</div>
+        <div class="col-md-3">{{ readonly_field('Buying Price', 'Rs. ' ~ ('%.2f' | format(line.BuyingPrice | float))) }}</div>
+    </div>
+</div>
+
+<form method="POST" novalidate>
+
+    <div class="form-card">
+        <p class="form-section-title">Unit Details</p>
+        <div class="row">
+            <div class="col-md-3">
+                {{ number_field(name='Year', label='Year', value=form_data.get('Year',''), required=True,
+                    error=errors.get('Year',''), placeholder='e.g. 2026', step='1', min_val='1900') }}
+            </div>
+            <div class="col-md-6">
+                {{ text_field(name='VIN', label='VIN', value=form_data.get('VIN',''), required=True,
+                    error=errors.get('VIN',''), placeholder='e.g. JHMZD13117S001234',
+                    help_text='Must be unique. Maximum 50 characters.') }}
+            </div>
+            <div class="col-md-3">
+                {{ number_field(name='Warranty_Months', label='Warranty (Months)',
+                    value=form_data.get('Warranty_Months',''), required=True,
+                    error=errors.get('Warranty_Months',''), step='1', min_val='0',
+                    help_text='Enter 0 if no warranty.') }}
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-3">
+                {{ number_field(name='EngineCC', label='Engine CC', value=form_data.get('EngineCC',''),
+                    required=True, error=errors.get('EngineCC',''), step='1', min_val='1') }}
+            </div>
+            <div class="col-md-3">
+                {{ select_field(name='FuelType', label='Fuel Type', options=fuel_type_options,
+                    selected=form_data.get('FuelType',''), required=True,
+                    error=errors.get('FuelType',''), empty_label='— Select —') }}
+            </div>
+            <div class="col-md-3">
+                {{ select_field(name='Transmission', label='Transmission', options=transmission_options,
+                    selected=form_data.get('Transmission',''), required=True,
+                    error=errors.get('Transmission',''), empty_label='— Select —') }}
+            </div>
+            <div class="col-md-3">
+                {{ number_field(name='FuelTankCapacity', label='Tank Capacity (L)',
+                    value=form_data.get('FuelTankCapacity',''), required=True,
+                    error=errors.get('FuelTankCapacity',''), step='0.01', min_val='0.01') }}
+            </div>
+        </div>
+    </div>
+
+    <div class="form-card">
+        <p class="form-section-title">Pricing and Receipt</p>
+        <div class="row">
+            <div class="col-md-3">
+                <div class="mb-3">
+                    <label class="form-label">Markup on Buying Price</label>
+                    <select id="markup-percent" class="form-select"
+                            data-target="Price" data-base="{{ line.BuyingPrice }}">
+                        <option value="">Custom (enter manually)</option>
+                        <option value="10">+10%</option>
+                        <option value="15">+15%</option>
+                        <option value="20">+20%</option>
+                    </select>   
+                    <div class="form-text text-muted">Optional helper. Fills Selling Price; still editable.</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                {{ number_field(name='Price', label='Selling Price (Rs.)', value=form_data.get('Price',''),
+                    required=True, error=errors.get('Price',''), placeholder='0.00', step='0.01', min_val='0') }}
+            </div>
+            <div class="col-md-3">
+                {{ date_field(name='DateReceived', label='Date Received',
+                    value=form_data.get('DateReceived',''), required=True,
+                    error=errors.get('DateReceived',''), help_text='The date the bike arrived.') }}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-box-open me-2"></i>Confirm Receipt
+            </button>
+            <a href="{{ url_for('purchase_order.view', po_id=po_id) }}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+    </div>
+</form>
+{% endblock %}

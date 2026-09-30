@@ -1,0 +1,61 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/form_field.html' import select_field, number_field %}
+
+{% block title %}{{ 'Edit Product' if is_edit else 'Add Product' }} — {{ supplier_name }}{% endblock %}
+{% block page_title %}{{ 'Edit Product' if is_edit else 'Add Product' }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            {{ 'Edit Product Price' if is_edit else 'Add Product' }} — {{ supplier_name }}
+        </h2>
+    </div>
+    <a href="{{ url_for('supplier.view', supplier_id=supplier_id) }}" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to {{ supplier_name }}
+    </a>
+</div>
+
+<div class="form-card">
+    <p class="form-section-title">Product Details</p>
+    <form method="POST" novalidate>
+
+        {% if not is_edit %}
+        <div class="row">
+            <div class="col-md-6">
+                {{ select_field(name='SP_id', label='Spare Part', options=sp_options,
+                    selected=form_data.get('SP_id',''), required=True,
+                    error=errors.get('SP_id',''), empty_label='— Select a Spare Part —') }}
+            </div>
+            <div class="col-md-6">
+                {{ select_field(name='Brand_Brand_ID', label='Brand', options=brand_options,
+                    selected=form_data.get('Brand_Brand_ID',''), required=True,
+                    error=errors.get('Brand_Brand_ID',''), empty_label='— Select a Brand —') }}
+            </div>
+        </div>
+        {% else %}
+        <div class="mb-3">
+            <label class="form-label readonly-label">Product</label>
+            <div class="readonly-value">{{ product_label }}</div>
+        </div>
+        {% endif %}
+
+        <div class="row">
+            <div class="col-md-3">
+                {{ number_field(name='BuyingPrice', label='Buying Price (Rs.)',
+                    value=form_data.get('BuyingPrice',''), required=True,
+                    error=errors.get('BuyingPrice',''), placeholder='0.00',
+                    step='0.01', min_val='0',
+                    help_text='This supplier\'s price for this product.') }}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-floppy-disk me-2"></i>{{ 'Save Changes' if is_edit else 'Add Product' }}
+            </button>
+            <a href="{{ url_for('supplier.view', supplier_id=supplier_id) }}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
