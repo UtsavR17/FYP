@@ -1400,3 +1400,685 @@ label.form-label {
     font-weight: 700;
     color: var(--text-primary);
 }
+
+
+/* =============================================================================
+   DASHBOARD (Task 34)
+   Operational dashboard: welcome row, KPIs, charts, attention tables and the
+   collapsible module overview. Every class here uses the .dash- prefix.
+   ============================================================================= */
+.dash {
+    /* Chart series colours (read by dashboard.js) */
+    --dash-series-moto: #e67e22;   /* --accent */
+    --dash-series-parts: #1d4ed8;  /* existing blue (.appt-status-confirmed) */
+
+    /* Donut slice colours: same as the .appt-status-* badge text colours */
+    --dash-status-pending: #b45309;
+    --dash-status-confirmed: #1d4ed8;
+    --dash-status-in-progress: #c05621;
+    --dash-status-completed: #15803d;
+    --dash-status-cancelled: #b91c1c;
+    --dash-status-no-show: #4b5563;
+}
+
+.dash-row {
+    margin-bottom: 20px;
+}
+
+/* -- Welcome row ------------------------------------------------------------ */
+.dash-welcome {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.dash-welcome-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+    line-height: 1.25;
+}
+
+.dash-welcome-sub {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin: 4px 0 0;
+}
+
+.dash-welcome-date {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin: 6px 0 0;
+}
+
+.dash-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.dash-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-size: 0.825rem;
+    font-weight: 500;
+    padding: 7px 14px 7px 8px;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+    transition: border-color var(--transition), background-color var(--transition);
+}
+
+.dash-action:hover,
+.dash-action:focus-visible {
+    border-color: var(--accent);
+    background-color: var(--card-bg);
+    color: var(--text-primary);
+}
+
+.dash-action-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    background-color: var(--accent-soft);
+    color: var(--accent);
+    font-size: 0.7rem;
+    flex-shrink: 0;
+}
+
+/* -- KPI cards -------------------------------------------------------------- */
+.dash-kpi {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    height: 100%;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--card-shadow);
+    padding: 18px 20px;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.dash-kpi:hover,
+.dash-kpi:focus-visible {
+    border-color: rgba(230, 126, 34, 0.45);
+    box-shadow: 0 4px 12px rgba(26, 35, 50, 0.08);
+    color: inherit;
+}
+
+.dash-kpi-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background-color: var(--accent-soft);
+    color: var(--accent);
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.dash-kpi-body {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.dash-kpi-label {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.dash-kpi-period {
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+.dash-kpi-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* -- Generic dashboard card ------------------------------------------------- */
+.dash-card {
+    display: flex;
+    flex-direction: column;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--card-shadow);
+    padding: 20px;
+    min-width: 0;
+}
+
+.dash-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.dash-card-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.dash-card-sub {
+    font-size: 0.76rem;
+    color: var(--text-muted);
+    margin: 3px 0 0;
+}
+
+.dash-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+}
+
+.dash-footer-note {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-right: auto;
+}
+
+.dash-footer-link {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.dash-footer-link i {
+    font-size: 0.7rem;
+    margin-left: 4px;
+    transition: transform var(--transition);
+}
+
+.dash-footer-link:hover {
+    color: var(--accent-hover);
+}
+
+.dash-footer-link:hover i {
+    transform: translateX(3px);
+}
+
+/* -- Chart legends and wrappers --------------------------------------------- */
+.dash-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin-bottom: 10px;
+}
+
+.dash-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+}
+
+.dash-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.dash-dot-moto        { background-color: var(--dash-series-moto); }
+.dash-dot-parts       { background-color: var(--dash-series-parts); }
+.dash-dot-pending     { background-color: var(--dash-status-pending); }
+.dash-dot-confirmed   { background-color: var(--dash-status-confirmed); }
+.dash-dot-in-progress { background-color: var(--dash-status-in-progress); }
+.dash-dot-completed   { background-color: var(--dash-status-completed); }
+.dash-dot-cancelled   { background-color: var(--dash-status-cancelled); }
+.dash-dot-no-show     { background-color: var(--dash-status-no-show); }
+
+.dash-chart-wrap {
+    position: relative;
+    height: 280px;
+}
+
+.dash-chart-empty {
+    position: absolute;
+    top: 42%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    background-color: var(--card-bg);
+    padding: 4px 10px;
+    border-radius: var(--border-radius);
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.dash-footnote {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin: 10px 0 0;
+}
+
+/* Donut: the legend sits to the right when the card is wide enough and
+   below the donut otherwise (container query, not viewport width). */
+.dash-donut {
+    container-type: inline-size;
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+.dash-donut-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    width: 100%;
+}
+
+.dash-donut-canvas {
+    position: relative;
+    width: 190px;
+    height: 190px;
+    flex-shrink: 0;
+}
+
+.dash-donut-legend {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 20px;
+}
+
+.dash-legend-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+}
+
+.dash-legend-label {
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.dash-legend-count {
+    margin-left: auto;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+@container (max-width: 239px) {
+    .dash-donut-legend {
+        grid-template-columns: 1fr;
+    }
+}
+
+@container (min-width: 380px) {
+    .dash-donut-body {
+        flex-direction: row;
+        justify-content: center;
+        gap: 28px;
+    }
+
+    .dash-donut-legend {
+        grid-template-columns: 1fr;
+        width: auto;
+        min-width: 150px;
+    }
+}
+
+/* -- Attention tables ------------------------------------------------------- */
+.dash-card-table .table-responsive {
+    margin: 0 -20px;
+}
+
+.dash-table {
+    font-size: 0.82rem;
+}
+
+.dash-table thead th {
+    padding: 8px 12px;
+    font-size: 0.68rem;
+    border-bottom-width: 1px;
+}
+
+.dash-table thead th:first-child,
+.dash-table tbody td:first-child {
+    padding-left: 20px;
+}
+
+.dash-table thead th:last-child,
+.dash-table tbody td:last-child {
+    padding-right: 20px;
+}
+
+.dash-table tbody td {
+    padding: 10px 12px;
+    white-space: nowrap;
+}
+
+.dash-row-link {
+    cursor: pointer;
+}
+
+.dash-table tbody tr.dash-row-link:hover > td,
+.dash-table tbody tr.dash-row-link:focus-within > td {
+    background-color: #fdf6ef;
+}
+
+.dash-row-anchor {
+    font-weight: 600;
+    color: var(--text-primary);
+    text-decoration: none;
+}
+
+.dash-row-anchor:hover {
+    color: var(--accent);
+}
+
+.dash-row-anchor:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+.dash-today-tag {
+    font-size: 0.66rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-left: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.dash-overdue-date {
+    color: #b91c1c;
+    font-weight: 700;
+}
+
+.dash-overdue-badge {
+    display: block;
+    width: fit-content;
+    font-size: 0.64rem;
+    font-weight: 600;
+    padding: 0 7px;
+    border-radius: 8px;
+    margin-top: 2px;
+    background-color: rgba(239, 68, 68, 0.1);
+    color: #b91c1c;
+}
+
+.dash-table tbody td.dash-wrap {
+    white-space: normal;
+    min-width: 110px;
+}
+
+.dash-qoh {
+    display: inline-block;
+    min-width: 30px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.78rem;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-variant-numeric: tabular-nums;
+}
+
+.dash-qoh-zero {
+    background-color: rgba(239, 68, 68, 0.1);
+    color: #b91c1c;
+}
+
+.dash-qoh-low {
+    background-color: rgba(251, 191, 36, 0.15);
+    color: #b45309;
+}
+
+.dash-amount {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.dash-empty {
+    padding: 32px 16px;
+}
+
+/* -- Module overview -------------------------------------------------------- */
+.dash-modules {
+    margin-top: 8px;
+}
+
+.dash-modules-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.dash-section-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.dash-section-sub {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: 4px 0 0;
+}
+
+.dash-modules-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-size: 0.825rem;
+    font-weight: 500;
+    padding: 7px 14px;
+    border-radius: var(--border-radius);
+}
+
+.dash-modules-toggle:hover,
+.dash-modules-toggle:focus-visible {
+    border-color: var(--accent);
+    color: var(--accent);
+    background-color: var(--card-bg);
+}
+
+.dash-modules-chevron {
+    font-size: 0.7rem;
+    transition: transform var(--transition);
+}
+
+.dash-modules-toggle[aria-expanded="true"] .dash-modules-chevron {
+    transform: rotate(180deg);
+}
+
+.dash-group {
+    container-type: inline-size;
+}
+
+.dash-group-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.dash-group-icon {
+    color: var(--accent);
+    margin-right: 8px;
+    font-size: 0.85rem;
+}
+
+.dash-group-count {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.dash-tiles {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+}
+
+@container (min-width: 400px) {
+    .dash-tiles {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.dash-tile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    text-decoration: none;
+    color: inherit;
+    min-width: 0;
+    transition: border-color var(--transition), background-color var(--transition);
+}
+
+.dash-tile:hover,
+.dash-tile:focus-visible {
+    border-color: rgba(230, 126, 34, 0.45);
+    background-color: #fdf6ef;
+    color: inherit;
+}
+
+.dash-tile-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background-color: #f4f5f7;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    flex-shrink: 0;
+    transition: background-color var(--transition), color var(--transition);
+}
+
+.dash-tile:hover .dash-tile-icon {
+    background-color: var(--accent-soft);
+    color: var(--accent);
+}
+
+.dash-tile-body {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.dash-tile-name {
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dash-tile-count {
+    font-size: 0.74rem;
+    color: var(--text-muted);
+}
+
+.dash-tile-arrow {
+    margin-left: auto;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    transition: transform var(--transition), color var(--transition);
+}
+
+.dash-tile:hover .dash-tile-arrow {
+    color: var(--accent);
+    transform: translateX(2px);
+}
+
+/* -- Dashboard responsive --------------------------------------------------- */
+@media (max-width: 575.98px) {
+    .dash-welcome {
+        align-items: stretch;
+    }
+
+    .dash-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        width: 100%;
+    }
+
+    .dash-action {
+        justify-content: flex-start;
+    }
+
+    .dash-chart-wrap {
+        height: 240px;
+    }
+
+    .dash-card {
+        padding: 16px;
+    }
+
+    .dash-card-table .table-responsive {
+        margin: 0 -16px;
+    }
+
+    .dash-table thead th:first-child,
+    .dash-table tbody td:first-child {
+        padding-left: 16px;
+    }
+
+    .dash-table thead th:last-child,
+    .dash-table tbody td:last-child {
+        padding-right: 16px;
+    }
+
+    .dash-modules-toggle {
+        width: 100%;
+        justify-content: center;
+    }
+}
