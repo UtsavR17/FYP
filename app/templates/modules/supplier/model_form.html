@@ -1,37 +1,41 @@
 {% extends 'layout/admin_layout.html' %}
 {% from 'components/form_field.html' import select_field, number_field %}
 
-{% block title %}{{ 'Edit Model' if is_edit else 'Add Model' }} — {{ supplier_name }}{% endblock %}
+{% block title %}{{ 'Edit Model' if is_edit else 'Add Model' }} - {{ supplier_name }}{% endblock %}
 {% block page_title %}{{ 'Edit Model' if is_edit else 'Add Model' }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <div>
         <h2 class="page-header-title">
-            {{ 'Edit Model Price' if is_edit else 'Add Model' }} — {{ supplier_name }}
+            {{ 'Edit Model' if is_edit else 'Add Model' }} - {{ supplier_name }}
         </h2>
+        <p class="page-header-subtitle">
+            The specifications entered here are used automatically when a motorcycle of this model is received.
+        </p>
     </div>
     <a href="{{ url_for('supplier.view', supplier_id=supplier_id) }}" class="btn btn-outline-secondary">
         <i class="fa-solid fa-arrow-left me-2"></i>Back to {{ supplier_name }}
     </a>
 </div>
 
-<div class="form-card">
-    <p class="form-section-title">Model Details</p>
-    <form method="POST" novalidate>
+<form method="POST" novalidate>
+
+    <div class="form-card">
+        <p class="form-section-title">Model and Price</p>
 
         {% if not is_edit %}
         <div class="row">
             <div class="col-md-6">
                 {{ select_field(name='Model_Model_No', label='Motorbike Model', options=model_options,
                     selected=form_data.get('Model_Model_No',''), required=True,
-                    error=errors.get('Model_Model_No',''), empty_label='— Select a Model —') }}
+                    error=errors.get('Model_Model_No',''), empty_label='- Select a Model -') }}
             </div>
         </div>
         {% if not model_options %}
         <div class="alert alert-info" role="alert">
             <i class="fa-solid fa-circle-info me-2"></i>
-            No unlisted models available — every model is already listed for this supplier.
+            No unlisted models available. Every model is already listed for this supplier.
         </div>
         {% endif %}
         {% else %}
@@ -47,7 +51,32 @@
                     value=form_data.get('BuyingPrice',''), required=True,
                     error=errors.get('BuyingPrice',''), placeholder='0.00',
                     step='0.01', min_val='0',
-                    help_text='This supplier\'s price for this model.') }}
+                    help_text="This supplier's price for this model.") }}
+            </div>
+        </div>
+    </div>
+
+    <div class="form-card">
+        <p class="form-section-title">Technical Specifications</p>
+        <div class="row">
+            <div class="col-md-3">
+                {{ number_field(name='EngineCC', label='Engine CC', value=form_data.get('EngineCC',''),
+                    required=True, error=errors.get('EngineCC',''), step='1', min_val='1') }}
+            </div>
+            <div class="col-md-3">
+                {{ select_field(name='FuelType', label='Fuel Type', options=fuel_type_options,
+                    selected=form_data.get('FuelType',''), required=True,
+                    error=errors.get('FuelType',''), empty_label='- Select -') }}
+            </div>
+            <div class="col-md-3">
+                {{ select_field(name='Transmission', label='Transmission', options=transmission_options,
+                    selected=form_data.get('Transmission',''), required=True,
+                    error=errors.get('Transmission',''), empty_label='- Select -') }}
+            </div>
+            <div class="col-md-3">
+                {{ number_field(name='FuelTankCapacity', label='Tank Capacity (L)',
+                    value=form_data.get('FuelTankCapacity',''), required=True,
+                    error=errors.get('FuelTankCapacity',''), step='0.01', min_val='0.01') }}
             </div>
         </div>
 
@@ -57,6 +86,6 @@
             </button>
             <a href="{{ url_for('supplier.view', supplier_id=supplier_id) }}" class="btn btn-outline-secondary">Cancel</a>
         </div>
-    </form>
-</div>
+    </div>
+</form>
 {% endblock %}

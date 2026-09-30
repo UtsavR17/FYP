@@ -1271,6 +1271,23 @@ def receive_motorbike(po_id, pobike_id):
         return redirect(url_for('purchase_order.view', po_id=po_id))
 
     line = _enrich_po_motorbikes([dict(line)])[0]
+
+    # Model-level specs come from the supplier catalogue when they are set
+    locked_specs = None
+    if line.get('SupplierModel_ID'):
+        try:
+            sm = (
+                supabase.table('Supplier_Model')
+                .select('EngineCC, FuelType, Transmission, FuelTankCapacity')
+                .eq('SupplierModel_ID', line['SupplierModel_ID'])
+                .single().execute()
+            ).data
+            keys = ('EngineCC', 'FuelType', 'Transmission', 'FuelTankCapacity')
+            if sm and all(sm.get(k) not in (None, '') for k in keys):
+                locked_specs = sm
+        except Exception:
+            locked_specs = None
+
     form_data, errors = {}, {}
 
     if request.method == 'POST':
@@ -1280,6 +1297,13 @@ def receive_motorbike(po_id, pobike_id):
         check['Model_Model_No'] = str(line['Model_Model_No'])
         check['Color_Color']    = line['Color_Color']
         check['Status']         = 'Available'
+        if locked_specs:
+            # Catalogue values win: anything posted for these fields is ignored
+            check['EngineCC']         = str(locked_specs['EngineCC'])
+            check['FuelType']         = locked_specs['FuelType']
+            check['Transmission']     = locked_specs['Transmission']
+            check['FuelTankCapacity'] = str(locked_specs['FuelTankCapacity'])
+
         errors, parsed = _validate_new_motorbike_fields(check)
 
         date_received, date_err = _validate_date(form_data.get('DateReceived', ''), 'Date Received')
@@ -1320,5 +1344,6 @@ def receive_motorbike(po_id, pobike_id):
         'modules/purchase_order/motorbike_receive_form.html',
         form_data=form_data, errors=errors, line=line, po_id=po_id, pobike_id=pobike_id,
         fuel_type_options=NB_FUEL_TYPE_OPTIONS,
-        transmission_options=NB_TRANSMISSION_OPTIONS
+        transmission_options=NB_TRANSMISSION_OPTIONS,
+        locked_specs=locked_specs
     )

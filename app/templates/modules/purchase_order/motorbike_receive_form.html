@@ -46,6 +46,20 @@
                     help_text='Enter 0 if no warranty.') }}
             </div>
         </div>
+
+        {% if locked_specs %}
+        <div class="row">
+            <div class="col-md-3">{{ readonly_field('Engine CC', (locked_specs.EngineCC | string) ~ ' cc') }}</div>
+            <div class="col-md-3">{{ readonly_field('Fuel Type', locked_specs.FuelType) }}</div>
+            <div class="col-md-3">{{ readonly_field('Transmission', locked_specs.Transmission) }}</div>
+            <div class="col-md-3">{{ readonly_field('Tank Capacity', (locked_specs.FuelTankCapacity | string) ~ ' L') }}</div>
+        </div>
+
+        <p class="form-text text-muted mb-3">
+            Specifications are set by the supplier's catalogue for this model.
+        </p>
+        {% else %}
+
         <div class="row">
             <div class="col-md-3">
                 {{ number_field(name='EngineCC', label='Engine CC', value=form_data.get('EngineCC',''),
@@ -67,6 +81,7 @@
                     error=errors.get('FuelTankCapacity',''), step='0.01', min_val='0.01') }}
             </div>
         </div>
+        {% endif %}
     </div>
 
     <div class="form-card">

@@ -7,6 +7,10 @@ from app.utils.pagination import paginate
 from app.utils.flash_messages import flash_success, flash_error
 from app.utils.validators import required_fields, is_valid_email
 
+from app.modules.new_motorbike.routes import (
+    FUEL_TYPE_OPTIONS as NB_FUEL_TYPE_OPTIONS,
+    TRANSMISSION_OPTIONS as NB_TRANSMISSION_OPTIONS,
+)
 
 @bp.route('/')
 @login_required
@@ -547,6 +551,54 @@ def delete_product(supplier_id, product_id):
 
 
 # --- Supplier_Model routes ----------------------------------------------------
+def _option_values(options):
+    """Allowed values from a list of (value, label) tuples or plain strings."""
+    return {o[0] if isinstance(o, (tuple, list)) else o for o in options}
+
+
+def _validate_model_specs(form_data):
+    """Validate the four model-level specs. Returns (errors, parsed_specs)."""
+    errors, specs = {}, {}
+
+    cc_raw = form_data.get('EngineCC', '').strip()
+    if not cc_raw:
+        errors['EngineCC'] = 'Engine CC is required.'
+    elif not cc_raw.isdigit() or int(cc_raw) < 1:
+        errors['EngineCC'] = 'Engine CC must be a whole number of at least 1.'
+    else:
+        specs['EngineCC'] = int(cc_raw)
+
+    fuel = form_data.get('FuelType', '').strip()
+    if not fuel:
+        errors['FuelType'] = 'Fuel type is required.'
+    elif fuel not in _option_values(NB_FUEL_TYPE_OPTIONS):
+        errors['FuelType'] = 'Please select a valid fuel type.'
+    else:
+        specs['FuelType'] = fuel
+
+    trans = form_data.get('Transmission', '').strip()
+    if not trans:
+        errors['Transmission'] = 'Transmission is required.'
+    elif trans not in _option_values(NB_TRANSMISSION_OPTIONS):
+        errors['Transmission'] = 'Please select a valid transmission.'
+    else:
+        specs['Transmission'] = trans
+
+    tank_raw = form_data.get('FuelTankCapacity', '').strip()
+    if not tank_raw:
+        errors['FuelTankCapacity'] = 'Fuel tank capacity is required.'
+    else:
+        try:
+            tank = float(tank_raw)
+            if tank <= 0 or tank > 999.99:
+                errors['FuelTankCapacity'] = 'Tank capacity must be greater than 0 and at most 999.99.'
+            else:
+                specs['FuelTankCapacity'] = tank
+        except ValueError:
+            errors['FuelTankCapacity'] = 'Tank capacity must be a valid number.'
+
+    return errors, specs
+
 
 @bp.route('/<int:supplier_id>/models/add', methods=['GET', 'POST'])
 @login_required
@@ -590,21 +642,23 @@ def add_model(supplier_id):
         else:
             price = float(price_raw)
 
+        spec_errors, specs = _validate_model_specs(form_data)
+        errors.update(spec_errors)
+
         if not errors:
             try:
                 supabase.table('Supplier_Model').insert({
                     'Supplier_SupplierID': supplier_id,
                     'Model_Model_No':      model_no,
                     'BuyingPrice':         price,
+                    **specs,
                 }).execute()
-                flash_success('Model was added to this supplier\'s catalogue.')
+                flash_success("Model was added to this supplier's catalogue.")
                 return redirect(url_for('supplier.view', supplier_id=supplier_id))
             except Exception as e:
                 error_msg = str(e)
                 if 'duplicate' in error_msg.lower() or 'unique' in error_msg.lower():
-                    errors['Model_Model_No'] = (
-                        'This supplier already has a buying price listed for this model.'
-                    )
+                    errors['Model_Model_No'] = 'This supplier already has this model listed.'
                 else:
                     flash_error(f'Could not add model: {error_msg}')
 
@@ -612,7 +666,9 @@ def add_model(supplier_id):
         'modules/supplier/model_form.html',
         form_data=form_data, errors=errors, is_edit=False,
         supplier_id=supplier_id, supplier_name=record.get('SupplierName', ''),
-        model_options=model_options
+        model_options=model_options,
+        fuel_type_options=NB_FUEL_TYPE_OPTIONS,
+        transmission_options=NB_TRANSMISSION_OPTIONS
     )
 
 
@@ -635,7 +691,13 @@ def edit_model(supplier_id, model_id):
         return redirect(url_for('supplier.view', supplier_id=supplier_id))
 
     model_label = _enrich_supplier_models([dict(row)])[0]['_model_label']
-    form_data = {'BuyingPrice': str(row.get('BuyingPrice', '') or '')}
+    form_data = {
+        'BuyingPrice':      str(row.get('BuyingPrice', '') or ''),
+        'EngineCC':         str(row.get('EngineCC') or ''),
+        'FuelType':         row.get('FuelType') or '',
+        'Transmission':     row.get('Transmission') or '',
+        'FuelTankCapacity': str(row.get('FuelTankCapacity') or ''),
+    }
     errors = {}
 
     if request.method == 'POST':
@@ -650,12 +712,15 @@ def edit_model(supplier_id, model_id):
         else:
             price = float(price_raw)
 
+        spec_errors, specs = _validate_model_specs(form_data)
+        errors.update(spec_errors)
+
         if not errors:
             try:
                 supabase.table('Supplier_Model').update(
-                    {'BuyingPrice': price}
+                    {'BuyingPrice': price, **specs}
                 ).eq('SupplierModel_ID', model_id).execute()
-                flash_success('Buying price updated.')
+                flash_success('Model listing updated.')
                 return redirect(url_for('supplier.view', supplier_id=supplier_id))
             except Exception as e:
                 flash_error(f'Could not update model: {str(e)}')
@@ -664,7 +729,9 @@ def edit_model(supplier_id, model_id):
         'modules/supplier/model_form.html',
         form_data=form_data, errors=errors, is_edit=True,
         supplier_id=supplier_id, supplier_name=record.get('SupplierName', ''),
-        model_label=model_label
+        model_label=model_label,
+        fuel_type_options=NB_FUEL_TYPE_OPTIONS,
+        transmission_options=NB_TRANSMISSION_OPTIONS
     )
 
 
