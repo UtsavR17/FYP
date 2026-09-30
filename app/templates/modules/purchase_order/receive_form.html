@@ -36,6 +36,12 @@
         <div class="col-md-3">
             {{ readonly_field('Buying Price', 'Rs. ' ~ ('%.2f' | format(item.BuyingPrice | float))) }}
         </div>
+
+        {% if locked_brand_name %}
+        <div class="col-md-2">
+            {{ readonly_field('Brand', locked_brand_name) }}
+        </div>
+        {% endif %}
     </div>
 </div>
 
@@ -90,7 +96,7 @@
         {% else %}
             <div class="alert alert-warning mb-0" role="alert">
                 <i class="fa-solid fa-triangle-exclamation me-2"></i>
-                No existing stock records found for this spare part.
+                No existing stock records found for this spare part{% if locked_brand_name %} under {{ locked_brand_name }}{% endif %}.
                 Please use <strong>Create New Stock Entry</strong> instead.
             </div>
         {% endif %}
@@ -102,7 +108,28 @@
         <p class="form-section-title">New Stock Record Details</p>
 
         <div class="row">
+            <div class="col-md-3">
+                <div class="mb-3">
+                    <label class="form-label">Markup on Buying Price</label>
+                    <select id="markup-percent" class="form-select"
+                            data-target="S_Price" data-base="{{ item.BuyingPrice }}">
+                        <option value="">Custom (enter manually)</option>
+                        <option value="10">+10%</option>
+                        <option value="15">+15%</option>
+                        <option value="20">+20%</option>
+                    </select>
+                    <div class="form-text text-muted">Optional helper. Fills Selling Price; still editable.</div>
+                </div>
+            </div>
+            
             <div class="col-md-6">
+                {% if locked_brand_name %}
+                <div class="mb-3">
+                    <label class="form-label readonly-label">Brand</label>
+                    <div class="readonly-value">{{ locked_brand_name }}</div>
+                    <div class="form-text text-muted">Set by the supplier's catalogue.</div>
+                </div>
+                {% else %}
                 {{ select_field(
                     name        = 'Brand_Brand_ID',
                     label       = 'Brand',
@@ -110,9 +137,12 @@
                     selected    = form_data.get('Brand_Brand_ID', ''),
                     required    = False,
                     error       = errors.get('Brand_Brand_ID', ''),
-                    empty_label = '— Select a Brand —'
+                    empty_label = 'Select a Brand'
                 ) }}
+                {% endif %}
             </div>
+
+            
             <div class="col-md-3">
                 {{ text_field(
                     name        = 'New_Size',

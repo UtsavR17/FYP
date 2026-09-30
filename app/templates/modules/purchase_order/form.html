@@ -35,80 +35,48 @@
 
     <form method="POST" novalidate>
 
-        {% if is_edit %}
+              {% if is_edit %}
         <div class="row">
             <div class="col-md-6">
-                {{ select_field(
-                    name        = 'Supplier_SupplierID',
-                    label       = 'Supplier',
-                    options     = supplier_options,
-                    selected    = form_data.get('Supplier_SupplierID', ''),
-                    required    = True,
-                    error       = errors.get('Supplier_SupplierID', ''),
-                    empty_label = '— Select a Supplier —'
-                ) }}
+                {{ select_field(name='Supplier_SupplierID', label='Supplier', options=supplier_options,
+                    selected=form_data.get('Supplier_SupplierID',''), required=True,
+                    error=errors.get('Supplier_SupplierID',''), empty_label='— Select a Supplier —') }}
             </div>
             <div class="col-md-6">
-                {{ select_field(
-                    name        = 'Status',
-                    label       = 'Status',
-                    options     = status_options,
-                    selected    = form_data.get('Status', 'Pending'),
-                    required    = True,
-                    error       = errors.get('Status', ''),
-                    empty_label = '— Select a Status —'
-                ) }}
+                {{ select_field(name='Status', label='Status', options=status_options,
+                    selected=form_data.get('Status','Pending'), required=True,
+                    error=errors.get('Status',''), empty_label='— Select a Status —') }}
             </div>
         </div>
         <div class="row">
             <div class="col-md-4">
-                {{ date_field(
-                    name      = 'POrderDate',
-                    label     = 'Order Date',
-                    value     = form_data.get('POrderDate', ''),
-                    required  = True,
-                    error     = errors.get('POrderDate', ''),
-                    help_text = 'The date this order was placed.'
-                ) }}
+                {{ date_field(name='POrderDate', label='Order Date', value=form_data.get('POrderDate',''),
+                    required=True, error=errors.get('POrderDate',''),
+                    help_text='The date this order was placed.') }}
             </div>
             <div class="col-md-4">
-                {{ date_field(
-                    name      = 'ExpectedDate',
-                    label     = 'Expected Delivery Date',
-                    value     = form_data.get('ExpectedDate', ''),
-                    required  = True,
-                    error     = errors.get('ExpectedDate', ''),
-                    help_text = 'Must be on or after the order date.'
-                ) }}
+                {{ date_field(name='ExpectedDate', label='Expected Delivery Date',
+                    value=form_data.get('ExpectedDate',''), required=True,
+                    error=errors.get('ExpectedDate',''), help_text='Must be on or after the order date.') }}
             </div>
         </div>
         {% else %}
         <div class="row">
             <div class="col-md-6">
-                {{ select_field(
-                    name        = 'Supplier_SupplierID',
-                    label       = 'Supplier',
-                    options     = supplier_options,
-                    selected    = form_data.get('Supplier_SupplierID', ''),
-                    required    = True,
-                    error       = errors.get('Supplier_SupplierID', ''),
-                    empty_label = '— Select a Supplier —'
-                ) }}
+                {{ select_field(name='Supplier_SupplierID', label='Supplier', options=supplier_options,
+                    selected=form_data.get('Supplier_SupplierID',''), required=True,
+                    error=errors.get('Supplier_SupplierID',''), empty_label='— Select a Supplier —') }}
             </div>
             <div class="col-md-4">
-                {{ date_field(
-                    name      = 'ExpectedDate',
-                    label     = 'Expected Delivery Date',
-                    value     = form_data.get('ExpectedDate', ''),
-                    required  = True,
-                    error     = errors.get('ExpectedDate', ''),
-                    help_text = 'When you expect the delivery.'
-                ) }}
+                {{ date_field(name='ExpectedDate', label='Expected Delivery Date',
+                    value=form_data.get('ExpectedDate',''), required=True,
+                    error=errors.get('ExpectedDate',''), help_text='When you expect the delivery.') }}
             </div>
         </div>
         <div class="alert alert-info" role="alert">
             <i class="fa-solid fa-circle-info me-2"></i>
             The order date is recorded automatically as today and the status starts as Pending.
+            After saving you can add items directly.
         </div>
         {% endif %}
 

@@ -318,15 +318,25 @@ def view(po_id):
     except Exception:
         pass
 
-    return render_template(
-        'modules/purchase_order/view.html',
-        record=record,
-        supplier_name=supplier_name,
-        po_items=po_items,
-        po_id=po_id,
-        po_status=record.get('Status'),
-        po_motorbikes=po_motorbikes
+    po_items_total = sum(
+        float(i.get('BuyingPrice') or 0) * int(i.get('Quantity_Ordered') or 0)
+        for i in po_items
     )
+    po_bikes_total = sum(float(m.get('BuyingPrice') or 0) for m in po_motorbikes)
+    po_total = po_items_total + po_bikes_total
+
+    return render_template(
+    'modules/purchase_order/view.html',
+    record=record,
+    supplier_name=supplier_name,
+    po_items=po_items,
+    po_id=po_id,
+    po_status=record.get('Status'),
+    po_motorbikes=po_motorbikes,
+    po_items_total=po_items_total,
+    po_bikes_total=po_bikes_total,
+    po_total=po_total
+)
 
 
 @bp.route('/delete/<int:po_id>', methods=['POST'])
@@ -785,6 +795,25 @@ def receive_item(po_id, item_id):
 
     sp_id = item.get('SP_id')
 
+    # Brand is fixed by the supplier catalogue row this item was ordered from
+    locked_brand_id, locked_brand_name = None, None
+    if item.get('SupplierProduct_ID'):
+        try:
+            sp_row = (
+                supabase.table('Supplier_Product')
+                .select('Brand_Brand_ID')
+                .eq('SupplierProduct_ID', item['SupplierProduct_ID'])
+                .single().execute()
+            )
+            locked_brand_id = sp_row.data.get('Brand_Brand_ID')
+            br_row = (
+                supabase.table('Brand').select('Brand_Name')
+                .eq('Brand_ID', locked_brand_id).single().execute()
+            )
+            locked_brand_name = br_row.data.get('Brand_Name')
+        except Exception:
+            locked_brand_id, locked_brand_name = None, None
+
     # Resolve spare part name for display
     sp_name = f'SP-{sp_id}'
     try:
@@ -802,12 +831,14 @@ def receive_item(po_id, item_id):
     # Fetch existing stock records for this spare part (for existing stock dropdown)
     existing_stock_options = []
     try:
-        stock_res = (
+        stock_query = (
             supabase.table('Stock')
             .select('Stock_ID, Size, Brand_Brand_ID, QOH')
             .eq('Spare_Parts_SP_id', sp_id)
-            .execute()
         )
+        if locked_brand_id:
+            stock_query = stock_query.eq('Brand_Brand_ID', locked_brand_id)
+        stock_res = stock_query.execute()
         brand_lookup_recv = {}
         try:
             br = supabase.table('Brand').select('Brand_ID, Brand_Name').execute()
@@ -884,6 +915,9 @@ def receive_item(po_id, item_id):
             else:
                 try:
                     stock_id_to_link = int(stock_id_raw)
+                    allowed_ids = {sid for sid, _ in existing_stock_options}
+                    if stock_id_to_link not in allowed_ids:
+                        errors['Stock_Stock_ID'] = 'That stock record does not match this item.'
                 except ValueError:
                     errors['Stock_Stock_ID'] = 'Invalid stock selection.'
 
@@ -893,7 +927,9 @@ def receive_item(po_id, item_id):
             new_price_raw   = form_data.get('S_Price', '').strip()
             new_warranty_raw = form_data.get('Warranty', '').strip()
 
-            if not brand_id_raw:
+            if locked_brand_id:
+                new_brand_id = locked_brand_id   # anything posted is ignored
+            elif not brand_id_raw:
                 errors['Brand_Brand_ID'] = 'Brand is required for new stock.'
             else:
                 try:
@@ -973,292 +1009,9 @@ def receive_item(po_id, item_id):
         form_data=form_data,
         errors=errors,
         po_id=po_id,
-        item_id=item_id
+        item_id=item_id,
+        locked_brand_name=locked_brand_name
     )
-
-# # =============================================================================
-# # PO_NEWMOTORBIKE ROUTES — motorcycle procurement lines on a Purchase Order
-# # =============================================================================
-
-# def _get_unlinked_motorbike_options():
-#     """New_MotorBike records not yet linked to any PO_NewMotorBike row."""
-#     linked_ids = set()
-#     try:
-#         linked = supabase.table('PO_NewMotorBike').select('New_MotorBike_NB_ID').execute()
-#         linked_ids = {r['New_MotorBike_NB_ID'] for r in (linked.data or [])}
-#     except Exception:
-#         pass
-
-#     brand_lookup, model_lookup = {}, {}
-#     try:
-#         br = supabase.table('Brand').select('Brand_ID, Brand_Name').execute()
-#         brand_lookup = {r['Brand_ID']: r['Brand_Name'] for r in (br.data or [])}
-#         ml = supabase.table('Model').select('Model_No, Brand_Brand_ID, Description').execute()
-#         for m in (ml.data or []):
-#             model_lookup[m['Model_No']] = {
-#                 'description': m['Description'],
-#                 'brand_name': brand_lookup.get(m.get('Brand_Brand_ID'), 'Unknown Brand'),
-#             }
-#     except Exception:
-#         pass
-
-#     options = []
-#     try:
-#         bikes = (
-#             supabase.table('New_MotorBike')
-#             .select('NB_ID, Year, Model_Model_No, VIN, Status')
-#             .order('NB_ID', desc=True)
-#             .execute()
-#         )
-#         for b in (bikes.data or []):
-#             if b['NB_ID'] in linked_ids:
-#                 continue
-#             m_info = model_lookup.get(b.get('Model_Model_No'), {})
-#             label = (
-#                 f"NB-{b['NB_ID']} \u2014 {m_info.get('brand_name', 'Unknown Brand')} "
-#                 f"{m_info.get('description', 'Unknown Model')} ({b.get('Year', '?')}) "
-#                 f"\u2014 VIN {b.get('VIN', '?')} [{b.get('Status', '?')}]"
-#             )
-#             options.append((b['NB_ID'], label))
-#     except Exception:
-#         pass
-
-#     return options
-
-
-# def _enrich_po_motorbikes(rows):
-#     """Attach a display label to each PO_NewMotorBike row for the PO view page."""
-#     brand_lookup, model_lookup = {}, {}
-#     try:
-#         br = supabase.table('Brand').select('Brand_ID, Brand_Name').execute()
-#         brand_lookup = {r['Brand_ID']: r['Brand_Name'] for r in (br.data or [])}
-#         ml = supabase.table('Model').select('Model_No, Brand_Brand_ID, Description').execute()
-#         for m in (ml.data or []):
-#             model_lookup[m['Model_No']] = {
-#                 'description': m['Description'],
-#                 'brand_name': brand_lookup.get(m.get('Brand_Brand_ID'), 'Unknown Brand'),
-#             }
-#     except Exception:
-#         pass
-
-#     nb_ids = [r['New_MotorBike_NB_ID'] for r in rows]
-#     bike_lookup = {}
-#     if nb_ids:
-#         try:
-#             bikes = (
-#                 supabase.table('New_MotorBike')
-#                 .select('NB_ID, Year, Model_Model_No, VIN, Status')
-#                 .in_('NB_ID', nb_ids)
-#                 .execute()
-#             )
-#             for b in (bikes.data or []):
-#                 m_info = model_lookup.get(b.get('Model_Model_No'), {})
-#                 bike_lookup[b['NB_ID']] = {
-#                     'label': f"{m_info.get('brand_name', 'Unknown Brand')} {m_info.get('description', 'Unknown Model')} ({b.get('Year', '?')})",
-#                     'vin': b.get('VIN', '?'),
-#                     'status': b.get('Status', '?'),
-#                 }
-#         except Exception:
-#             pass
-
-#     for r in rows:
-#         info = bike_lookup.get(r['New_MotorBike_NB_ID'], {})
-#         r['_bike_label'] = info.get('label', f"NB-{r['New_MotorBike_NB_ID']}")
-#         r['_bike_vin'] = info.get('vin', '?')
-#         r['_bike_status'] = info.get('status', '?')
-#     return rows
-
-
-# @bp.route('/<int:po_id>/motorbikes/add', methods=['GET', 'POST'])
-# @login_required
-# def add_motorbike(po_id):
-#     try:
-#         po_result = (
-#             supabase.table('PurchaseOrder')
-#             .select('PurchaseOrderID, Status')
-#             .eq('PurchaseOrderID', po_id)
-#             .single()
-#             .execute()
-#         )
-#         po_record = po_result.data
-#     except Exception:
-#         flash_error(f'Purchase order ID {po_id} was not found.')
-#         return redirect(url_for('purchase_order.index'))
-
-#     if po_record.get('Status') in ('Received', 'Cancelled'):
-#         flash_error(
-#             f'Cannot add a motorcycle to PO-{po_id} because its status is '
-#             f'"{po_record.get("Status")}".'
-#         )
-#         return redirect(url_for('purchase_order.view', po_id=po_id))
-
-#     existing_options = _get_unlinked_motorbike_options()
-#     model_options, color_options = _get_new_motorbike_dropdown_options()
-#     form_data, errors = {}, {}
-
-#     if request.method == 'POST':
-#         form_data = request.form.to_dict()
-#         mode = form_data.get('motorbike_mode', 'existing')
-
-#         buying_price_raw = form_data.get('BuyingPrice', '').strip()
-#         date_received_raw = form_data.get('DateReceived', '').strip()
-
-#         buying_price = None
-#         if not buying_price_raw:
-#             errors['BuyingPrice'] = 'Buying price is required.'
-#         elif not is_positive_number(buying_price_raw):
-#             errors['BuyingPrice'] = 'Buying price must be a valid number of 0 or more.'
-#         else:
-#             buying_price = float(buying_price_raw)
-
-#         date_received = None
-#         if date_received_raw:
-#             date_received, date_err = _validate_date(date_received_raw, 'Date Received')
-#             if date_err:
-#                 errors['DateReceived'] = date_err
-
-#         nb_id, new_bike_parsed = None, None
-
-#         if mode == 'existing':
-#             nb_id_raw = form_data.get('New_MotorBike_NB_ID', '').strip()
-#             if not nb_id_raw:
-#                 errors['New_MotorBike_NB_ID'] = 'Please select a motorcycle.'
-#             else:
-#                 try:
-#                     nb_id = int(nb_id_raw)
-#                 except ValueError:
-#                     errors['New_MotorBike_NB_ID'] = 'Please select a valid motorcycle.'
-#         else:
-#             nb_errors, new_bike_parsed = _validate_new_motorbike_fields(form_data)
-#             errors.update(nb_errors)
-
-#         if not errors:
-#             if mode == 'new':
-#                 try:
-#                     insert_result = supabase.table('New_MotorBike').insert(new_bike_parsed).execute()
-#                     nb_id = insert_result.data[0]['NB_ID']
-#                 except Exception as e:
-#                     error_msg = str(e)
-#                     if 'duplicate' in error_msg.lower() or 'unique' in error_msg.lower():
-#                         errors['VIN'] = 'A motorbike with this VIN already exists.'
-#                     else:
-#                         flash_error(f'Could not create motorcycle: {error_msg}')
-
-#             if not errors and nb_id:
-#                 try:
-#                     supabase.table('PO_NewMotorBike').insert({
-#                         'PurchaseOrder_PurchaseOrderID': po_id,
-#                         'New_MotorBike_NB_ID':           nb_id,
-#                         'BuyingPrice':                   buying_price,
-#                         'DateReceived':                  date_received,
-#                     }).execute()
-#                     flash_success('Motorcycle was linked to the purchase order successfully.')
-#                     return redirect(url_for('purchase_order.view', po_id=po_id))
-#                 except Exception as e:
-#                     error_msg = str(e)
-#                     if 'duplicate' in error_msg.lower() or 'unique' in error_msg.lower():
-#                         errors['New_MotorBike_NB_ID'] = 'This motorcycle is already linked to another purchase order.'
-#                     else:
-#                         flash_error(f'Could not link motorcycle: {error_msg}')
-
-#     return render_template(
-#         'modules/purchase_order/motorbike_form.html',
-#         form_data=form_data, errors=errors, is_edit=False, po_id=po_id,
-#         existing_options=existing_options, model_options=model_options, color_options=color_options,
-#         fuel_type_options=NB_FUEL_TYPE_OPTIONS, transmission_options=NB_TRANSMISSION_OPTIONS,
-#         status_options=NB_STATUS_OPTIONS,
-#     )
-
-
-# @bp.route('/<int:po_id>/motorbikes/<int:nb_id>/edit', methods=['GET', 'POST'])
-# @login_required
-# def edit_motorbike(po_id, nb_id):
-#     try:
-#         po_result = (
-#             supabase.table('PurchaseOrder').select('PurchaseOrderID, Status')
-#             .eq('PurchaseOrderID', po_id).single().execute()
-#         )
-#         po_record = po_result.data
-#     except Exception:
-#         flash_error(f'Purchase order ID {po_id} was not found.')
-#         return redirect(url_for('purchase_order.index'))
-
-#     if po_record.get('Status') in ('Received', 'Cancelled'):
-#         flash_error(f'Cannot edit motorcycles on a {po_record.get("Status")} purchase order.')
-#         return redirect(url_for('purchase_order.view', po_id=po_id))
-
-#     try:
-#         row = (
-#             supabase.table('PO_NewMotorBike').select('*')
-#             .eq('PurchaseOrder_PurchaseOrderID', po_id).eq('New_MotorBike_NB_ID', nb_id)
-#             .single().execute()
-#         ).data
-#     except Exception:
-#         flash_error('Linked motorcycle record not found.')
-#         return redirect(url_for('purchase_order.view', po_id=po_id))
-
-#     bike_label = f'NB-{nb_id}'
-#     try:
-#         b = supabase.table('New_MotorBike').select('Year, Model_Model_No, VIN').eq('NB_ID', nb_id).single().execute().data
-#         m = supabase.table('Model').select('Brand_Brand_ID, Description').eq('Model_No', b.get('Model_Model_No')).single().execute().data
-#         brand_name = supabase.table('Brand').select('Brand_Name').eq('Brand_ID', m.get('Brand_Brand_ID')).single().execute().data.get('Brand_Name', 'Unknown Brand')
-#         bike_label = f"NB-{nb_id} \u2014 {brand_name} {m.get('Description', 'Unknown Model')} ({b.get('Year', '?')}) \u2014 VIN {b.get('VIN', '?')}"
-#     except Exception:
-#         pass
-
-#     form_data = {'BuyingPrice': str(row.get('BuyingPrice', '') or ''), 'DateReceived': row.get('DateReceived', '') or ''}
-#     errors = {}
-
-#     if request.method == 'POST':
-#         form_data = request.form.to_dict()
-#         buying_price_raw = form_data.get('BuyingPrice', '').strip()
-#         date_received_raw = form_data.get('DateReceived', '').strip()
-
-#         buying_price = None
-#         if not buying_price_raw:
-#             errors['BuyingPrice'] = 'Buying price is required.'
-#         elif not is_positive_number(buying_price_raw):
-#             errors['BuyingPrice'] = 'Buying price must be a valid number of 0 or more.'
-#         else:
-#             buying_price = float(buying_price_raw)
-
-#         date_received = None
-#         if date_received_raw:
-#             date_received, date_err = _validate_date(date_received_raw, 'Date Received')
-#             if date_err:
-#                 errors['DateReceived'] = date_err
-
-#         if not errors:
-#             try:
-#                 supabase.table('PO_NewMotorBike').update({
-#                     'BuyingPrice': buying_price, 'DateReceived': date_received,
-#                 }).eq('PurchaseOrder_PurchaseOrderID', po_id).eq('New_MotorBike_NB_ID', nb_id).execute()
-#                 flash_success('Motorcycle purchase details updated.')
-#                 return redirect(url_for('purchase_order.view', po_id=po_id))
-#             except Exception as e:
-#                 flash_error(f'Could not update motorcycle purchase details: {str(e)}')
-
-#     return render_template(
-#         'modules/purchase_order/motorbike_form.html',
-#         form_data=form_data, errors=errors, is_edit=True, po_id=po_id, nb_id=nb_id, bike_label=bike_label,
-#     )
-
-
-# @bp.route('/<int:po_id>/motorbikes/<int:nb_id>/delete', methods=['POST'])
-# @login_required
-# def delete_motorbike(po_id, nb_id):
-#     try:
-#         supabase.table('PO_NewMotorBike').delete().eq('PurchaseOrder_PurchaseOrderID', po_id).eq('New_MotorBike_NB_ID', nb_id).execute()
-#         flash_success(f'Motorcycle NB-{nb_id} was unlinked from PO-{po_id}.')
-#     except Exception as e:
-#         flash_error(f'Could not unlink motorcycle: {str(e)}')
-#     return redirect(url_for('purchase_order.view', po_id=po_id))
-
-# =============================================================================
-# PO_NEWMOTORBIKE — motorcycle order lines (Task 29)
-# Ordered by Model from the Supplier_Model catalogue. VIN/specs are entered
-# only when the unit is received, at which point the New_MotorBike is created.
-# =============================================================================
 
 def _get_model_catalog_for_po(po_id):
     """Supplier_Model rows for this PO's supplier, each with a _model_label."""
