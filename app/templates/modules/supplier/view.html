@@ -17,6 +17,23 @@
            class="btn btn-outline-primary">
             <i class="fa-solid fa-pen me-2"></i>Edit Supplier
         </a>
+        {% if record.AuthUserID %}
+        <span class="btn btn-outline-success disabled" aria-disabled="true">
+            <i class="fa-solid fa-circle-check me-2"></i>Portal Login Active
+        </span>
+        <form method="POST" class="d-inline"
+              action="{{ url_for('supplier.reset_portal_password', supplier_id=supplier_id) }}"
+              onsubmit="return confirm('Reset this supplier\'s portal password? The current password will stop working.');">
+            <button type="submit" class="btn btn-outline-secondary">
+                <i class="fa-solid fa-key me-2"></i>Reset Portal Password
+            </button>
+        </form>
+        {% else %}
+        <a href="{{ url_for('supplier.create_login', supplier_id=supplier_id) }}"
+           class="btn btn-accent">
+            <i class="fa-solid fa-user-plus me-2"></i>Create Portal Login
+        </a>
+        {% endif %}
         <a href="{{ url_for('supplier.index') }}" class="btn btn-outline-secondary">
             <i class="fa-solid fa-arrow-left me-2"></i>Back to Suppliers
         </a>
@@ -156,4 +173,24 @@
 
 {{ delete_modal() }}
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Task 35: the one-time temporary password alert must not auto-dismiss
+    // after 5 seconds like other flashes. It closes only when the admin
+    // clicks its close button.
+    document.querySelectorAll('.flash-container .alert').forEach(function (alertEl) {
+        if (!alertEl.querySelector('[data-sp-keep-open]')) return;
+        var closedByUser = false;
+        var closeBtn = alertEl.querySelector('.btn-close');
+        // Window capture runs before Bootstrap's own (document capture) dismiss handler
+        window.addEventListener('click', function (event) {
+            if (closeBtn && closeBtn.contains(event.target)) closedByUser = true;
+        }, true);
+        alertEl.addEventListener('close.bs.alert', function (event) {
+            if (!closedByUser) event.preventDefault();
+        });
+    });
+</script>
 {% endblock %}

@@ -80,6 +80,10 @@ def create_app():
     from app.modules.payment import bp as payment_bp
     app.register_blueprint(payment_bp, url_prefix='/payments')
 
+    # Supplier Portal (Task 35): separate login and session keys from the Admin Panel
+    from app.modules.supplier_portal import bp as supplier_portal_bp
+    app.register_blueprint(supplier_portal_bp, url_prefix='/supplier-portal')
+
 
     # ------------------------------------------------------------------
     # ROOT REDIRECT

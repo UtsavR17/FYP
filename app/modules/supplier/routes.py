@@ -1,10 +1,12 @@
+import secrets
+from markupsafe import Markup
 from app.utils.validators import is_positive_number
 from flask import render_template, request, redirect, url_for
 from app.modules.supplier import bp
 from app.auth.decorators import login_required
 from app.supabase_client import supabase
 from app.utils.pagination import paginate
-from app.utils.flash_messages import flash_success, flash_error
+from app.utils.flash_messages import flash_success, flash_error, flash_warning
 from app.utils.validators import required_fields, is_valid_email
 
 from app.modules.new_motorbike.routes import (
@@ -215,21 +217,26 @@ def edit(supplier_id):
 @bp.route('/delete/<int:supplier_id>', methods=['POST'])
 @login_required
 def delete(supplier_id):
+    auth_user_id = None
     try:
         result = (
             supabase.table('Supplier')
-            .select('SupplierName')
+            .select('SupplierName, AuthUserID')
             .eq('SupplierID', supplier_id)
             .single()
             .execute()
         )
         name_value = result.data.get('SupplierName', f'ID {supplier_id}')
+        auth_user_id = result.data.get('AuthUserID')
     except Exception:
         name_value = f'ID {supplier_id}'
 
     try:
-        supabase.table('Supplier').delete().eq('SupplierID', supplier_id).execute()
+        deleted = supabase.table('Supplier').delete().eq('SupplierID', supplier_id).execute()
         flash_success(f'Supplier "{name_value}" was deleted successfully.')
+        # The supplier row is gone, so its portal login has nothing left to open
+        if auth_user_id and deleted.data:
+            _delete_portal_user(auth_user_id, name_value)
     except Exception as e:
         error_msg = str(e)
         if 'foreign key' in error_msg.lower() or 'violates' in error_msg.lower():
@@ -743,4 +750,186 @@ def delete_model(supplier_id, model_id):
         flash_success('Model removed from this supplier\'s catalogue.')
     except Exception as e:
         flash_error(f'Could not remove model: {str(e)}')
+    return redirect(url_for('supplier.view', supplier_id=supplier_id))
+
+
+# =============================================================================
+# SUPPLIER PORTAL LOGIN (Task 35)
+# The admin creates the supplier's Supabase Auth user and links it through
+# Supplier.AuthUserID. Only these routes use the service-role client.
+# =============================================================================
+
+def _get_service_client():
+    """
+    Lazily import the service-role client so it is only loaded by the portal
+    login routes. Returns (client, None) or (None, error_message).
+    """
+    try:
+        from app.supabase_admin_client import supabase_admin
+        return supabase_admin, None
+    except Exception:
+        return None, (
+            'Portal logins are not configured on this server. '
+            'Add SUPABASE_SERVICE_KEY to the .env file and restart the app.'
+        )
+
+
+def _auth_error_reason(error):
+    """Short, safe reason text from a Supabase Auth API error (never a stack trace)."""
+    message = getattr(error, 'message', None)
+    if getattr(error, 'status', None) and message:
+        return message
+    return 'the authentication service did not respond as expected'
+
+
+def _is_email_taken_error(error):
+    code = str(getattr(error, 'code', '') or '').lower()
+    message = str(getattr(error, 'message', '') or error).lower()
+    return code in ('email_exists', 'user_already_exists') or 'already' in message
+
+
+def _flash_temporary_password(intro, password):
+    """
+    Show the temporary password once. It is never stored or logged; the
+    data-sp-keep-open marker stops this alert from auto-dismissing.
+    """
+    flash_success(Markup(
+        '{intro} Give this temporary password to the supplier now, it will not be '
+        'shown again: <code class="sp-temp-password" data-sp-keep-open>{pw}</code>'
+    ).format(intro=intro, pw=password))
+
+
+def _delete_portal_user(auth_user_id, supplier_name):
+    """Remove the Auth user of a deleted supplier. Failure only produces a warning."""
+    admin_client, config_error = _get_service_client()
+    if not config_error:
+        try:
+            admin_client.auth.admin.delete_user(auth_user_id)
+            return
+        except Exception:
+            pass
+    flash_warning(
+        f'Supplier "{supplier_name}" was deleted, but its portal login could not be '
+        f'removed. Delete that user from Supabase Authentication manually.'
+    )
+
+
+@bp.route('/<int:supplier_id>/create-login', methods=['GET', 'POST'])
+@login_required
+def create_login(supplier_id):
+    record, redir = _get_supplier_or_redirect(supplier_id)
+    if redir:
+        return redir
+
+    if record.get('AuthUserID'):
+        flash_error(f'Supplier "{record.get("SupplierName")}" already has a portal login.')
+        return redirect(url_for('supplier.view', supplier_id=supplier_id))
+
+    form_data = {'Email': record.get('Email') or ''}
+    errors = {}
+
+    if request.method == 'POST':
+        form_data = request.form.to_dict()
+        email_value = form_data.get('Email', '').strip()
+
+        if not email_value:
+            errors['Email'] = 'Email address is required.'
+        elif len(email_value) > 255:
+            errors['Email'] = 'Email address must not exceed 255 characters.'
+        elif not is_valid_email(email_value):
+            errors['Email'] = 'Please enter a valid email address.'
+
+        admin_client = None
+        if not errors:
+            admin_client, config_error = _get_service_client()
+            if config_error:
+                flash_error(config_error)
+
+        if not errors and admin_client:
+            temp_password = secrets.token_urlsafe(10)
+            new_user_id = None
+            try:
+                created = admin_client.auth.admin.create_user({
+                    'email':         email_value,
+                    'password':      temp_password,
+                    'email_confirm': True,
+                })
+                new_user_id = created.user.id
+            except Exception as e:
+                if _is_email_taken_error(e):
+                    errors['Email'] = (
+                        'This email address is already registered. '
+                        'Please use a different email for the portal login.'
+                    )
+                else:
+                    flash_error(f'Could not create the portal login: {_auth_error_reason(e)}.')
+
+            if new_user_id:
+                # Link only while the supplier still has no login (protects
+                # against two admins creating a login at the same time)
+                linked = False
+                try:
+                    result = (
+                        supabase.table('Supplier')
+                        .update({'AuthUserID': new_user_id})
+                        .eq('SupplierID', supplier_id)
+                        .is_('AuthUserID', None)
+                        .execute()
+                    )
+                    linked = bool(result.data)
+                except Exception:
+                    linked = False
+
+                if linked:
+                    _flash_temporary_password(
+                        f'Portal login created for {email_value}.', temp_password
+                    )
+                    return redirect(url_for('supplier.view', supplier_id=supplier_id))
+
+                # Never leave an Auth user that no supplier points to
+                try:
+                    admin_client.auth.admin.delete_user(new_user_id)
+                except Exception:
+                    pass
+                flash_error(
+                    'The login could not be linked to this supplier, so it was removed '
+                    'again. Reload the supplier and try again.'
+                )
+
+    return render_template(
+        'modules/supplier/create_login.html',
+        record=record,
+        supplier_id=supplier_id,
+        form_data=form_data,
+        errors=errors
+    )
+
+
+@bp.route('/<int:supplier_id>/reset-password', methods=['POST'])
+@login_required
+def reset_portal_password(supplier_id):
+    record, redir = _get_supplier_or_redirect(supplier_id)
+    if redir:
+        return redir
+
+    auth_user_id = record.get('AuthUserID')
+    if not auth_user_id:
+        flash_error('This supplier does not have a portal login yet.')
+        return redirect(url_for('supplier.view', supplier_id=supplier_id))
+
+    admin_client, config_error = _get_service_client()
+    if config_error:
+        flash_error(config_error)
+        return redirect(url_for('supplier.view', supplier_id=supplier_id))
+
+    temp_password = secrets.token_urlsafe(10)
+    try:
+        admin_client.auth.admin.update_user_by_id(auth_user_id, {'password': temp_password})
+    except Exception as e:
+        flash_error(f'Could not reset the portal password: {_auth_error_reason(e)}.')
+        return redirect(url_for('supplier.view', supplier_id=supplier_id))
+
+    _flash_temporary_password(
+        f'Portal password reset for "{record.get("SupplierName")}".', temp_password
+    )
     return redirect(url_for('supplier.view', supplier_id=supplier_id))

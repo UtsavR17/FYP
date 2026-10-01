@@ -1,0 +1,64 @@
+{% extends 'supplier_portal/base.html' %}
+
+{% block title %}Purchase Orders{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">Purchase Orders</h2>
+        <p class="page-header-subtitle">Orders the dealership has addressed to you</p>
+    </div>
+</div>
+
+<div class="admin-card">
+    <div class="mb-3">
+        <h3 class="sp-card-title">
+            All Orders <span class="record-count-badge">{{ pos | length }}</span>
+        </h3>
+    </div>
+
+    {% if pos %}
+    <div class="table-responsive">
+        <table class="table admin-table">
+            <thead>
+                <tr>
+                    <th>PO Number</th><th>Order Date</th><th>Expected</th><th>Status</th>
+                    <th>Lines</th><th>Total Value</th><th>Awaiting Shipment</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for po in pos %}
+                <tr>
+                    <td><strong>PO-{{ po.PurchaseOrderID }}</strong></td>
+                    <td>{{ po.POrderDate or '-' }}</td>
+                    <td>{{ po.ExpectedDate or '-' }}</td>
+                    <td>
+                        <span class="po-status-badge po-status-{{ po.Status | lower | replace(' ', '-') }}">{{ po.Status }}</span>
+                    </td>
+                    <td>{{ po._line_count }}</td>
+                    <td>Rs. {{ '{:,.2f}'.format(po._total) }}</td>
+                    <td>
+                        {% if po._awaiting %}
+                        <span class="sp-awaiting-badge">{{ po._awaiting }} to ship</span>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <a href="{{ url_for('supplier_portal.order_detail', po_id=po.PurchaseOrderID) }}"
+                           class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-eye me-1"></i>View</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="table-empty-state">
+        <div class="table-empty-icon-wrap"><i class="fa-solid fa-inbox"></i></div>
+        <p class="table-empty-text">No purchase orders have been addressed to you yet.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

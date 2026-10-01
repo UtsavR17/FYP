@@ -1,0 +1,71 @@
+{% extends 'supplier_portal/base.html' %}
+{% from 'components/modal_confirm.html' import delete_modal %}
+
+{% block title %}My Models{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">My Models</h2>
+        <p class="page-header-subtitle">Motorbike models you supply, with your buying price and specifications</p>
+    </div>
+    <a href="{{ url_for('supplier_portal.add_model') }}" class="btn btn-accent">
+        <i class="fa-solid fa-plus me-2"></i>Add Model
+    </a>
+</div>
+
+<div class="admin-card">
+    <div class="mb-3">
+        <h3 class="sp-card-title">
+            Motorbike Models Supplied <span class="record-count-badge">{{ models | length }}</span>
+        </h3>
+    </div>
+
+    {% if models %}
+    <div class="table-responsive">
+        <table class="table admin-table">
+            <thead>
+                <tr>
+                    <th>Model</th><th>Specifications</th><th>Buying Price</th>
+                    <th class="text-end" style="width:140px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in models %}
+                <tr>
+                    <td><span class="role-badge">{{ m._model_label }}</span></td>
+                    <td style="font-size:0.82rem;">
+                        {% if m.EngineCC %}
+                            {{ m.EngineCC }} cc / {{ m.FuelType }} / {{ m.Transmission }} / {{ m.FuelTankCapacity }} L
+                        {% else %}
+                            <span class="text-muted">Not set</span>
+                        {% endif %}
+                    </td>
+                    <td>Rs. {{ '%.2f' | format(m.BuyingPrice | float) }}</td>
+                    <td class="text-end">
+                        <div class="action-btn-group">
+                            <a href="{{ url_for('supplier_portal.edit_model', model_id=m.SupplierModel_ID) }}"
+                               class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-pen me-1"></i>Edit</a>
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                    data-bs-toggle="modal" data-bs-target="#deleteModal"
+                                    data-delete-url="{{ url_for('supplier_portal.delete_model', model_id=m.SupplierModel_ID) }}"
+                                    data-record-name="{{ m._model_label }}"
+                                    aria-label="Delete {{ m._model_label }}">
+                                <i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="table-empty-state">
+        <div class="table-empty-icon-wrap"><i class="fa-solid fa-motorcycle"></i></div>
+        <p class="table-empty-text">You have not listed any motorbike models yet. Click "Add Model" to add your first one.</p>
+    </div>
+    {% endif %}
+</div>
+
+{{ delete_modal() }}
+{% endblock %}

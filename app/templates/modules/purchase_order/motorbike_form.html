@@ -49,7 +49,7 @@
             <div class="col-md-3">
                 {{ number_field(name='Quantity', label='Quantity', value=form_data.get('Quantity','1'),
                     required=True, error=errors.get('Quantity',''), step='1', min_val='1',
-                    help_text='One line is created per unit (max 20).') }}
+                    help_text='One line is created per unit (max 25).') }}
             </div>
         </div>
         {% else %}
