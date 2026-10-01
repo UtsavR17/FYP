@@ -3,48 +3,419 @@
 {% block title %}Dashboard{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
 
+{% macro empty_state(icon, message) %}
+<div class="table-empty-state dash-empty">
+    <div class="table-empty-icon-wrap">
+        <i class="fa-solid {{ icon }}"></i>
+    </div>
+    <p class="table-empty-text">{{ message }}</p>
+</div>
+{% endmacro %}
+
 {% block content %}
+<div class="dash">
 
-<!-- Welcome Row, bizin re dresser  -->
-<div class="dashboard-welcome">
-    <div>
-        <h2 class="dashboard-welcome-title">Welcome, Admin</h2>
-        <p class="dashboard-welcome-sub">
-            Admin Panel
-        </p>
+    <!-- Chart data for dashboard.js -->
+    <div id="dash-data" hidden data-chart='{{ chart_data | tojson }}'></div>
+
+    <!-- ===================== WELCOME ROW ===================== -->
+    <div class="dash-welcome">
+        <div>
+            <h2 class="dash-welcome-title">Welcome back, {{ welcome_name }}</h2>
+            <p class="dash-welcome-sub">Here's what needs attention today.</p>
+            <p class="dash-welcome-date">
+                <i class="fa-regular fa-calendar me-1"></i>{{ today_label }}
+            </p>
+        </div>
+
+        <div class="dash-actions" aria-label="Quick actions">
+            <a href="{{ url_for('appointment.create') }}" class="btn dash-action">
+                <span class="dash-action-icon"><i class="fa-solid fa-plus"></i></span>Appointment
+            </a>
+            <a href="{{ url_for('sale.create') }}" class="btn dash-action">
+                <span class="dash-action-icon"><i class="fa-solid fa-plus"></i></span>Sale
+            </a>
+            <a href="{{ url_for('payment.create') }}" class="btn dash-action">
+                <span class="dash-action-icon"><i class="fa-solid fa-plus"></i></span>Payment
+            </a>
+            <a href="{{ url_for('purchase_order.create') }}" class="btn dash-action">
+                <span class="dash-action-icon"><i class="fa-solid fa-plus"></i></span>Purchase Order
+            </a>
+        </div>
     </div>
 
-    <!-- <div class="dashboard-phase-badge">
-        <i class="fa-solid fa-circle-check me-1"></i>
-        Phase 2 &mdash; Admin Panel Active
-    </div> -->
-    
-</div>
+    <!-- ===================== KPI CARDS ===================== -->
+    <div class="row g-3 dash-row">
+        {% for kpi in kpis %}
+        <div class="col-12 col-sm-6 col-xl-3">
+            <a href="{{ kpi.url }}" class="dash-kpi">
+                <span class="dash-kpi-icon"><i class="fa-solid {{ kpi.icon }}"></i></span>
+                <span class="dash-kpi-body">
+                    <span class="dash-kpi-label">
+                        {{ kpi.label }}{% if kpi.period %} <span class="dash-kpi-period">&middot; {{ kpi.period }}</span>{% endif %}
+                    </span>
+                    <span class="dash-kpi-value"{% if kpi.title %} title="{{ kpi.title }}"{% endif %}>{{ kpi.value }}</span>
+                </span>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
 
-<!-- Stat Cards Grid -->
-<div class="row g-3">
-    {% for card in cards %}
-    <div class="col-xl-3 col-lg-4 col-sm-6">
-        <a href="{{ card.url }}" class="stat-card">
+    <!-- ===================== CHARTS ===================== -->
+    {% set moto_total = chart_data.motorcycle | sum %}
+    {% set parts_total = chart_data.parts | sum %}
+    <div class="row g-3 dash-row">
 
-            <!-- <div class="stat-card-header">
-                <div class="stat-card-icon">
-                    <i class="fa-solid {{ card.icon }}"></i>
+        <!-- Sales line chart -->
+        <div class="col-12 col-lg-7">
+            <section class="dash-card h-100">
+                <div class="dash-card-head">
+                    <div>
+                        <h3 class="dash-card-title">Sales, last 6 months</h3>
+                        <p class="dash-card-sub">Motorcycle sales vs spare parts sales &middot; MUR</p>
+                    </div>
                 </div>
-            </div> -->
 
-            <div class="stat-card-label">{{ card.label }}</div>
-            <div class="stat-card-count">{{ card.count }}</div>
-            <div class="stat-card-desc">{{ card.desc }}</div>
+                <div class="dash-legend">
+                    <span class="dash-legend-item">
+                        <span class="dash-dot dash-dot-moto"></span>Motorcycle sales
+                    </span>
+                    <span class="dash-legend-item">
+                        <span class="dash-dot dash-dot-parts"></span>Parts sales
+                    </span>
+                </div>
 
-            <div class="stat-card-link">
-                View all
-                <i class="fa-solid fa-arrow-right stat-card-arrow"></i>
-            </div>
+                <div class="dash-chart-wrap">
+                    <canvas id="dashSalesChart" role="img"
+                            aria-label="Line chart of monthly sales from {{ chart_data.months[0] }} to {{ chart_data.months[-1] }}. Motorcycle sales total MUR {{ '{:,.2f}'.format(moto_total) }}; parts sales total MUR {{ '{:,.2f}'.format(parts_total) }}.">
+                        Motorcycle sales total MUR {{ '{:,.2f}'.format(moto_total) }}, parts sales total MUR {{ '{:,.2f}'.format(parts_total) }}.
+                    </canvas>
+                    <div class="dash-chart-empty" id="dashSalesEmpty" hidden>
+                        No sales recorded in this period
+                    </div>
+                </div>
 
-        </a>
+                <p class="dash-footnote">Parts = spare parts used in completed appointments.</p>
+            </section>
+        </div>
+
+        <!-- Appointment status donut -->
+        <div class="col-12 col-lg-5">
+            <section class="dash-card h-100">
+                <div class="dash-card-head">
+                    <div>
+                        <h3 class="dash-card-title">Appointments by status</h3>
+                        <p class="dash-card-sub">All appointments</p>
+                    </div>
+                </div>
+
+                <div class="dash-donut">
+                    <div class="dash-donut-body">
+                        <div class="dash-donut-canvas">
+                            <canvas id="dashStatusChart" role="img"
+                                    aria-label="Donut chart of {{ status_total }} appointments by status: {% for s in chart_data.statuses %}{{ s }} {{ chart_data.statusCounts[loop.index0] }}{{ ', ' if not loop.last }}{% endfor %}.">
+                            </canvas>
+                        </div>
+                        <ul class="dash-donut-legend">
+                            {% for s in chart_data.statuses %}
+                            <li class="dash-legend-row">
+                                <span class="dash-dot dash-dot-{{ s | lower | replace(' ', '-') }}"></span>
+                                <span class="dash-legend-label">{{ s }}</span>
+                                <span class="dash-legend-count">{{ chart_data.statusCounts[loop.index0] }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </section>
+        </div>
     </div>
-    {% endfor %}
-</div>
 
+    <!-- ===================== TABLES ROW 1 ===================== -->
+    <div class="row g-3 dash-row">
+
+        <!-- Upcoming appointments -->
+        <div class="col-12 col-lg-7">
+            <section class="dash-card dash-card-table h-100">
+                <div class="dash-card-head">
+                    <div>
+                        <h3 class="dash-card-title">Upcoming appointments</h3>
+                        <p class="dash-card-sub">Next 5 &middot; click a row to view</p>
+                    </div>
+                </div>
+
+                {% if upcoming %}
+                <div class="table-responsive">
+                    <table class="table admin-table dash-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">When</th>
+                                <th scope="col">Customer</th>
+                                <th scope="col">Bike</th>
+                                <th scope="col">Type</th>
+                                <th scope="col">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for a in upcoming %}
+                            <tr class="dash-row-link">
+                                <td>
+                                    <a href="{{ a.url }}" class="dash-row-anchor">{{ a.when }}</a>
+                                    {% if a.is_today %}<span class="dash-today-tag">Today</span>{% endif %}
+                                </td>
+                                <td>{{ a.customer }}</td>
+                                <td class="text-secondary">{{ a.bike }}</td>
+                                <td class="text-secondary">{{ a.type }}</td>
+                                <td>
+                                    <span class="appt-status-badge appt-status-{{ a.status | lower | replace(' ', '-') }}">
+                                        {{ a.status }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                    {{ empty_state('fa-calendar-check', 'No upcoming appointments. You are all caught up.') }}
+                {% endif %}
+
+                <div class="dash-card-footer">
+                    <a href="{{ url_for('appointment.index') }}" class="dash-footer-link">
+                        View all appointments <i class="fa-solid fa-arrow-right"></i>
+                    </a>
+                </div>
+            </section>
+        </div>
+
+        <!-- Open purchase orders -->
+        <div class="col-12 col-lg-5">
+            <section class="dash-card dash-card-table h-100">
+                <div class="dash-card-head">
+                    <div>
+                        <h3 class="dash-card-title">Open purchase orders</h3>
+                        <p class="dash-card-sub">Pending &amp; partially received</p>
+                    </div>
+                </div>
+
+                {% if open_pos %}
+                <div class="table-responsive">
+                    <table class="table admin-table dash-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">PO</th>
+                                <th scope="col">Supplier</th>
+                                <th scope="col">Expected</th>
+                                <th scope="col">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for po in open_pos %}
+                            <tr class="dash-row-link">
+                                <td>
+                                    <a href="{{ po.url }}" class="dash-row-anchor">PO-{{ po.id }}</a>
+                                </td>
+                                <td class="dash-wrap">{{ po.supplier }}</td>
+                                <td>
+                                    {% if po.overdue %}
+                                        <span class="dash-overdue-date">{{ po.expected }}</span>
+                                        <span class="dash-overdue-badge">Overdue</span>
+                                    {% else %}
+                                        <span class="text-secondary">{{ po.expected }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="po-status-badge po-status-{{ po.status | lower | replace(' ', '-') }}">
+                                        {{ po.status }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                    {{ empty_state('fa-file-invoice', 'No open purchase orders.') }}
+                {% endif %}
+
+                <div class="dash-card-footer">
+                    <a href="{{ url_for('purchase_order.index') }}" class="dash-footer-link">
+                        View all purchase orders <i class="fa-solid fa-arrow-right"></i>
+                    </a>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- ===================== TABLES ROW 2 ===================== -->
+    <div class="row g-3 dash-row">
+
+        <!-- Low-stock items -->
+        <div class="col-12 col-lg-6">
+            <section class="dash-card dash-card-table h-100">
+                <div class="dash-card-head">
+                    <div>
+                        <h3 class="dash-card-title">Low-stock items</h3>
+                        <p class="dash-card-sub">Lowest quantity on hand first</p>
+                    </div>
+                </div>
+
+                {% if low_stock %}
+                <div class="table-responsive">
+                    <table class="table admin-table dash-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Part</th>
+                                <th scope="col">Brand</th>
+                                <th scope="col">Size</th>
+                                <th scope="col" class="text-end">QOH</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for s in low_stock %}
+                            <tr class="dash-row-link">
+                                <td>
+                                    <a href="{{ s.url }}" class="dash-row-anchor">{{ s.part }}</a>
+                                </td>
+                                <td class="text-secondary">{{ s.brand }}</td>
+                                <td class="text-secondary">{{ s.size }}</td>
+                                <td class="text-end">
+                                    <span class="dash-qoh {{ 'dash-qoh-zero' if s.qoh <= 0 else 'dash-qoh-low' }}">
+                                        {{ s.qoh }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                    {{ empty_state('fa-boxes-stacked', 'No low-stock items. Stock levels look healthy.') }}
+                {% endif %}
+
+                <div class="dash-card-footer">
+                    <span class="dash-footer-note">QOH &lt;= {{ low_stock_threshold }}</span>
+                    <a href="{{ url_for('stock.index') }}" class="dash-footer-link">
+                        View stock <i class="fa-solid fa-arrow-right"></i>
+                    </a>
+                </div>
+            </section>
+        </div>
+
+        <!-- Recent payments -->
+        <div class="col-12 col-lg-6">
+            <section class="dash-card dash-card-table h-100">
+                <div class="dash-card-head">
+                    <div>
+                        <h3 class="dash-card-title">Recent payments</h3>
+                        <p class="dash-card-sub">Last 5 transactions</p>
+                    </div>
+                </div>
+
+                {% if recent_payments %}
+                <div class="table-responsive">
+                    <table class="table admin-table dash-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Payment</th>
+                                <th scope="col">Reference</th>
+                                <th scope="col">Type</th>
+                                <th scope="col" class="text-end">Amount</th>
+                                <th scope="col">Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in recent_payments %}
+                            <tr class="dash-row-link">
+                                <td>
+                                    <a href="{{ p.url }}" class="dash-row-anchor">PAY-{{ p.id }}</a>
+                                </td>
+                                <td class="text-secondary">{{ p.reference }}</td>
+                                <td>
+                                    <span class="pay-type-badge pay-type-{{ p.type | lower | replace(' ', '-') }}">
+                                        {{ p.type }}
+                                    </span>
+                                </td>
+                                <td class="text-end dash-amount">{{ p.amount }}</td>
+                                <td class="text-secondary">{{ p.date }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                    {{ empty_state('fa-credit-card', 'No payments recorded yet.') }}
+                {% endif %}
+
+                <div class="dash-card-footer">
+                    <a href="{{ url_for('payment.index') }}" class="dash-footer-link">
+                        View all payments <i class="fa-solid fa-arrow-right"></i>
+                    </a>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- ===================== MODULE OVERVIEW ===================== -->
+    <section class="dash-modules">
+        <div class="dash-modules-head">
+            <div>
+                <h2 class="dash-section-title">
+                    Module overview
+                    <span class="record-count-badge">{{ module_total }}</span>
+                </h2>
+                <p class="dash-section-sub">
+                    Everything else remains available here, grouped by day-to-day function.
+                </p>
+            </div>
+            <button type="button"
+                    class="btn dash-modules-toggle"
+                    id="dashModulesToggle"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#dashModules"
+                    aria-expanded="false"
+                    aria-controls="dashModules">
+                <span class="dash-modules-toggle-label">View all modules</span>
+                <i class="fa-solid fa-chevron-down dash-modules-chevron" aria-hidden="true"></i>
+            </button>
+        </div>
+
+        <div class="collapse" id="dashModules">
+            <div class="row g-3">
+                {% for group in module_groups %}
+                <div class="col-12 col-lg-6">
+                    <div class="dash-card dash-group h-100">
+                        <div class="dash-group-head">
+                            <h3 class="dash-card-title">
+                                <i class="fa-solid {{ group.icon }} dash-group-icon"></i>{{ group.title }}
+                            </h3>
+                            <span class="dash-group-count">{{ group.tiles | length }} modules</span>
+                        </div>
+                        <div class="dash-tiles">
+                            {% for t in group.tiles %}
+                            <a href="{{ t.url }}" class="dash-tile" title="{{ t.desc }}">
+                                <span class="dash-tile-icon"><i class="fa-solid {{ t.icon }}"></i></span>
+                                <span class="dash-tile-body">
+                                    <span class="dash-tile-name">{{ t.label }}</span>
+                                    <span class="dash-tile-count">{{ t.count }} record{{ '' if t.count == 1 else 's' }}</span>
+                                </span>
+                                <i class="fa-solid fa-chevron-right dash-tile-arrow" aria-hidden="true"></i>
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
+        integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4"
+        crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 {% endblock %}
