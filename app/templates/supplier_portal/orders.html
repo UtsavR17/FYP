@@ -6,7 +6,7 @@
 <div class="page-header">
     <div>
         <h2 class="page-header-title">Purchase Orders</h2>
-        <p class="page-header-subtitle">Orders the dealership has addressed to you</p>
+        <p class="page-header-subtitle">Orders the dealership has sent you. Orders awaiting your response are listed first.</p>
     </div>
 </div>
 
@@ -23,7 +23,7 @@
             <thead>
                 <tr>
                     <th>PO Number</th><th>Order Date</th><th>Expected</th><th>Status</th>
-                    <th>Lines</th><th>Total Value</th><th>Awaiting Shipment</th>
+                    <th>Stage</th><th>Lines</th><th>Total Value</th><th>Awaiting Shipment</th>
                     <th class="text-end">Actions</th>
                 </tr>
             </thead>
@@ -35,6 +35,10 @@
                     <td>{{ po.ExpectedDate or '-' }}</td>
                     <td>
                         <span class="po-status-badge po-status-{{ po.Status | lower | replace(' ', '-') }}">{{ po.Status }}</span>
+                    </td>
+                    <td>
+                        {% set po_stage = po.SupplierStage or 'Draft' %}
+                        <span class="po-status-badge po-stage-{{ po_stage | lower }}">{{ 'Awaiting your response' if po_stage == 'Sent' else po_stage }}</span>
                     </td>
                     <td>{{ po._line_count }}</td>
                     <td>Rs. {{ '{:,.2f}'.format(po._total) }}</td>

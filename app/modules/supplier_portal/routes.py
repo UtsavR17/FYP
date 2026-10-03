@@ -152,6 +152,7 @@ def dashboard():
 
     stats = {
         'open_pos':  sum(1 for p in pos if p.get('Status') in svc.OPEN_PO_STATUSES),
+        'awaiting_response': sum(1 for p in pos if svc.po_stage(p) == svc.STAGE_SENT),
         'awaiting':  sum(p['_awaiting'] for p in pos),
         'products':  product_count,
         'models':    model_count,
@@ -160,7 +161,7 @@ def dashboard():
     return render_template(
         'supplier_portal/dashboard.html',
         stats=stats,
-        recent_pos=pos[:5],
+        recent_pos=sorted(pos, key=svc.order_list_key)[:5],
     )
 
 
@@ -509,7 +510,7 @@ def orders():
     except Exception:
         flash_error('Could not load your purchase orders. Please refresh the page.')
     svc.summarise_pos(pos, items, bikes)
-    return render_template('supplier_portal/orders.html', pos=pos)
+    return render_template('supplier_portal/orders.html', pos=sorted(pos, key=svc.order_list_key))
 
 
 @bp.route('/orders/<int:po_id>')
@@ -527,7 +528,7 @@ def order_detail(po_id):
     except Exception:
         flash_error('Could not load the order lines. Please refresh the page.')
 
-    can_ship = po.get('Status') in svc.OPEN_PO_STATUSES
+    can_ship = svc.can_ship_po(po)
     items_total = sum(
         float(i.get('BuyingPrice') or 0) * int(i.get('Quantity_Ordered') or 0) for i in items
     )
@@ -547,6 +548,77 @@ def order_detail(po_id):
         order_total=items_total + bikes_total,
         order_date=svc.format_date(po.get('POrderDate')),
         expected_date=svc.format_date(po.get('ExpectedDate')),
+        stage=svc.po_stage(po),
+        date_sent=svc.format_date(po.get('DateSent')),
+        date_responded=svc.format_date(po.get('DateResponded')),
+        reason_min=svc.REJECTION_REASON_MIN,
+        reason_max=svc.REJECTION_REASON_MAX,
+    )
+
+
+def _respond_to_order(po_id, values, success_message):
+    """
+    Accept or reject: only SupplierStage (and RejectionReason when rejecting)
+    is ever sent. The database trigger sets Status and DateResponded. The
+    update is conditional on the stage still being Sent.
+    """
+    client = get_supplier_client()
+    detail_url = url_for('supplier_portal.order_detail', po_id=po_id)
+    po, redir = _get_owned_po_or_redirect(client, po_id)
+    if redir:
+        return redir
+    if svc.po_stage(po) != svc.STAGE_SENT:
+        flash_error('This order is no longer awaiting your response.')
+        return redirect(detail_url)
+
+    try:
+        result = (
+            client.table('PurchaseOrder')
+            .update(values)
+            .eq('PurchaseOrderID', po_id)
+            .eq('Supplier_SupplierID', _supplier_id())
+            .eq('SupplierStage', svc.STAGE_SENT)
+            .execute()
+        )
+    except Exception as e:
+        flash_error(svc.friendly_response_error(e))
+        return redirect(detail_url)
+
+    if result.data:
+        flash_success(success_message)
+    else:
+        flash_error('This order has changed. Refresh and try again.')
+    return redirect(detail_url)
+
+
+@bp.route('/orders/<int:po_id>/accept', methods=['POST'])
+@supplier_login_required
+def accept_order(po_id):
+    return _respond_to_order(
+        po_id, {'SupplierStage': svc.STAGE_ACCEPTED},
+        'Order accepted. You can now ship its items.'
+    )
+
+
+@bp.route('/orders/<int:po_id>/reject', methods=['POST'])
+@supplier_login_required
+def reject_order(po_id):
+    reason = request.form.get('RejectionReason', '').strip()
+    if not reason:
+        error = 'Please give a reason for rejecting the order.'
+    elif len(reason) < svc.REJECTION_REASON_MIN:
+        error = f'The reason must be at least {svc.REJECTION_REASON_MIN} characters.'
+    elif len(reason) > svc.REJECTION_REASON_MAX:
+        error = f'The reason must not exceed {svc.REJECTION_REASON_MAX} characters.'
+    else:
+        error = None
+    if error:
+        flash_error(f'The order was not rejected. {error}')
+        return redirect(url_for('supplier_portal.order_detail', po_id=po_id))
+
+    return _respond_to_order(
+        po_id, {'SupplierStage': svc.STAGE_REJECTED, 'RejectionReason': reason},
+        'Order rejected.'
     )
 
 
@@ -559,6 +631,9 @@ def ship_items(po_id):
     if redir:
         return redir
 
+    if svc.po_stage(po) != svc.STAGE_ACCEPTED:
+        flash_error('Accept this order before shipping it.')
+        return redirect(url_for('supplier_portal.order_detail', po_id=po_id))
     if po.get('Status') not in svc.OPEN_PO_STATUSES:
         flash_error(f'This purchase order is {po.get("Status")}, so it can no longer be shipped.')
         return redirect(url_for('supplier_portal.order_detail', po_id=po_id))
@@ -597,6 +672,9 @@ def ship_motorbikes(po_id):
         return redir
 
     detail_url = url_for('supplier_portal.order_detail', po_id=po_id)
+    if svc.po_stage(po) != svc.STAGE_ACCEPTED:
+        flash_error('Accept this order before shipping it.')
+        return redirect(url_for('supplier_portal.order_detail', po_id=po_id))
     if po.get('Status') not in svc.OPEN_PO_STATUSES:
         flash_error(f'This purchase order is {po.get("Status")}, so it can no longer be shipped.')
         return redirect(detail_url)

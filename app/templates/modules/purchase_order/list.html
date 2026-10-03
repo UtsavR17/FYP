@@ -35,7 +35,7 @@
     {% endif %}
 
     {% call data_table(
-        ['PO No.', 'Supplier', 'Order Date', 'Expected Date', 'Status', 'Date Created'],
+        ['PO No.', 'Supplier', 'Order Date', 'Expected Date', 'Status', 'Order Stage', 'Date Created'],
         total=pagination.total,
         empty_message='No purchase orders found. Create your first purchase order.'
     ) %}
@@ -51,6 +51,10 @@
                 <span class="po-status-badge po-status-{{ row.Status | lower | replace(' ', '-') }}">
                     {{ row.Status }}
                 </span>
+            </td>
+            <td>
+                {% set row_stage = row.SupplierStage or 'Draft' %}
+                <span class="po-status-badge po-stage-{{ row_stage | lower }}">{{ row_stage }}</span>
             </td>
             <td>
                 {% if row.Date_Created %}

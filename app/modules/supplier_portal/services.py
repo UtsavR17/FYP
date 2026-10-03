@@ -24,6 +24,16 @@ MAURITIUS_TZ = timezone(timedelta(hours=4))
 # A supplier may only ship lines on an order that is still open
 OPEN_PO_STATUSES = ('Pending', 'Partially Received')
 
+# Supplier workflow stage of a Purchase Order (Task 36). Drafts are never
+# shown to a supplier; only Accepted orders can be shipped.
+STAGE_DRAFT    = 'Draft'
+STAGE_SENT     = 'Sent'
+STAGE_ACCEPTED = 'Accepted'
+STAGE_REJECTED = 'Rejected'
+
+REJECTION_REASON_MIN = 5
+REJECTION_REASON_MAX = 255
+
 MAX_PRICE = 99999999.99   # NUMERIC(10,2)
 MIN_SHIPPED_YEAR = 1990
 
@@ -67,6 +77,8 @@ def friendly_shipping_error(error):
     text = error_text(error).lower()
     if 'purchase order is closed' in text:
         return 'This purchase order is closed, so it can no longer be shipped.'
+    if 'has not been accepted' in text:
+        return 'Accept this order before shipping it.'
     if 'can no longer be changed by the supplier' in text:
         return 'This line has already been shipped or received and can no longer be changed.'
     if 'suppliers may only' in text:
@@ -76,6 +88,36 @@ def friendly_shipping_error(error):
     if 'row-level security' in text or str(getattr(error, 'code', '')) == '42501':
         return 'You do not have permission to change this line.'
     return 'The line could not be saved. Please try again.'
+
+
+def friendly_response_error(error):
+    """Translate a guard-trigger error raised while accepting or rejecting an order."""
+    text = error_text(error).lower()
+    if 'no longer awaiting your response' in text:
+        return 'This order is no longer awaiting your response. Refresh the page to see its current state.'
+    if 'reason of at least 5 characters' in text:
+        return 'Please give a reason of at least 5 characters to reject the order.'
+    if 'purchase order is closed' in text:
+        return 'This purchase order is closed.'
+    if 'may only accept or reject' in text:
+        return 'From the portal an order can only be accepted or rejected.'
+    if 'row-level security' in text or str(getattr(error, 'code', '')) == '42501':
+        return 'You do not have permission to respond to this order.'
+    return 'Your response could not be saved. Please try again.'
+
+
+def po_stage(po):
+    return (po or {}).get('SupplierStage') or STAGE_DRAFT
+
+
+def can_ship_po(po):
+    """Shipping needs an accepted order that is still open."""
+    return po_stage(po) == STAGE_ACCEPTED and po.get('Status') in OPEN_PO_STATUSES
+
+
+def order_list_key(po):
+    """Orders awaiting a response first, then newest PO number first."""
+    return (0 if po_stage(po) == STAGE_SENT else 1, -int(po.get('PurchaseOrderID') or 0))
 
 
 # -----------------------------------------------------------------------------
@@ -264,14 +306,18 @@ def get_catalogue_row(client, table, id_column, row_id, supplier_id):
 # -----------------------------------------------------------------------------
 
 def get_supplier_pos(client, supplier_id):
-    """This supplier's purchase orders, newest first."""
+    """
+    This supplier's purchase orders, newest first. Drafts are excluded here as
+    well as by RLS, so counts never depend on the database policy alone.
+    """
     result = (
         client.table('PurchaseOrder').select('*')
         .eq('Supplier_SupplierID', supplier_id)
+        .neq('SupplierStage', STAGE_DRAFT)
         .order('PurchaseOrderID', desc=True)
         .execute()
     )
-    return result.data or []
+    return [po for po in (result.data or []) if po_stage(po) != STAGE_DRAFT]
 
 
 def get_owned_po(client, po_id, supplier_id):
@@ -280,12 +326,15 @@ def get_owned_po(client, po_id, supplier_id):
         client.table('PurchaseOrder').select('*')
         .eq('PurchaseOrderID', po_id)
         .eq('Supplier_SupplierID', supplier_id)
+        .neq('SupplierStage', STAGE_DRAFT)
         .limit(1)
         .execute()
     )
     row = (result.data or [None])[0]
     if row and str(row.get('Supplier_SupplierID')) != str(supplier_id):
         return None
+    if row and po_stage(row) == STAGE_DRAFT:
+        return None     # drafts are never shown to a supplier
     return row
 
 
@@ -322,7 +371,10 @@ def bike_awaits_shipment(bike):
 
 
 def summarise_pos(pos, items, bikes):
-    """Attach _line_count, _total and _awaiting (lines still to ship) to each PO."""
+    """
+    Attach _line_count, _total and _awaiting to each PO. _awaiting counts lines
+    still to ship, only on accepted orders that are still open.
+    """
     by_po = {po['PurchaseOrderID']: po for po in pos}
     for po in pos:
         po['_line_count'] = 0
@@ -335,7 +387,7 @@ def summarise_pos(pos, items, bikes):
             continue
         po['_line_count'] += 1
         po['_total'] += float(item.get('BuyingPrice') or 0) * int(item.get('Quantity_Ordered') or 0)
-        if po.get('Status') in OPEN_PO_STATUSES and item_awaits_shipment(item):
+        if can_ship_po(po) and item_awaits_shipment(item):
             po['_awaiting'] += 1
 
     for bike in bikes:
@@ -344,7 +396,7 @@ def summarise_pos(pos, items, bikes):
             continue
         po['_line_count'] += 1
         po['_total'] += float(bike.get('BuyingPrice') or 0)
-        if po.get('Status') in OPEN_PO_STATUSES and bike_awaits_shipment(bike):
+        if can_ship_po(po) and bike_awaits_shipment(bike):
             po['_awaiting'] += 1
 
     return pos

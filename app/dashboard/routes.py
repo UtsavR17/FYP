@@ -389,7 +389,7 @@ def _get_open_purchase_orders(today):
         # Postgres sorts NULLs last on ascending order by default.
         result = (
             supabase.table('PurchaseOrder')
-            .select('PurchaseOrderID, ExpectedDate, Status, Supplier_SupplierID')
+            .select('PurchaseOrderID, ExpectedDate, Status, Supplier_SupplierID, SupplierStage')
             .in_('Status', OPEN_PO_STATUSES)
             .order('ExpectedDate')
             .order('PurchaseOrderID')
@@ -416,6 +416,7 @@ def _get_open_purchase_orders(today):
             'expected': _format_short_date(expected, today),
             'overdue': bool(expected and expected < today),
             'status': r.get('Status') or '-',
+            'stage': r.get('SupplierStage') or 'Draft',
             'url': url_for('purchase_order.view', po_id=r['PurchaseOrderID']),
         })
     return items

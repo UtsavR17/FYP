@@ -14,6 +14,45 @@
     </a>
 </div>
 
+{% if stage == 'Sent' %}
+<div class="sp-banner sp-banner-sent">
+    <div>
+        <p class="sp-banner-title"><i class="fa-solid fa-hourglass-half me-2"></i>This order is waiting for your response</p>
+        <p class="sp-banner-text">
+            Sent to you{% if date_sent %} on {{ date_sent }}{% endif %}. Accept it to start shipping, or reject it with a reason.
+        </p>
+    </div>
+    <div class="sp-banner-actions">
+        <form method="POST" action="{{ url_for('supplier_portal.accept_order', po_id=po_id) }}"
+              onsubmit="return confirm('Accept PO-{{ po_id }}? You commit to supplying every line on this order.');">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-check me-2"></i>Accept Order
+            </button>
+        </form>
+        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#rejectModal">
+            <i class="fa-solid fa-xmark me-2"></i>Reject Order
+        </button>
+    </div>
+</div>
+{% elif stage == 'Accepted' %}
+<div class="sp-banner sp-banner-accepted">
+    <div>
+        <p class="sp-banner-title"><i class="fa-solid fa-circle-check me-2"></i>You accepted this order{% if date_responded %} on {{ date_responded }}{% endif %}</p>
+        <p class="sp-banner-text">
+            {% if can_ship %}Ship the spare parts and motorcycles below as they leave your warehouse.
+            {% else %}This order is {{ po.Status }}, so nothing more can be shipped on it.{% endif %}
+        </p>
+    </div>
+</div>
+{% elif stage == 'Rejected' %}
+<div class="sp-banner sp-banner-rejected">
+    <div>
+        <p class="sp-banner-title"><i class="fa-solid fa-circle-xmark me-2"></i>You rejected this order{% if date_responded %} on {{ date_responded }}{% endif %}</p>
+        <p class="sp-banner-text">Reason: {{ po.RejectionReason or '-' }}</p>
+    </div>
+</div>
+{% endif %}
+
 <div class="form-card">
     <p class="form-section-title">Order Information</p>
     <div class="row">
@@ -32,11 +71,6 @@
         <div class="col-sm-6 col-lg-3">{{ readonly_field('Motorcycles Value', 'Rs. ' ~ '{:,.2f}'.format(bikes_total)) }}</div>
         <div class="col-sm-6 col-lg-3">{{ readonly_field('Order Total', 'Rs. ' ~ '{:,.2f}'.format(order_total)) }}</div>
     </div>
-    {% if not can_ship %}
-    <p class="form-text text-muted mb-0">
-        <i class="fa-solid fa-lock me-1"></i>This order is {{ po.Status }}, so nothing more can be shipped on it.
-    </p>
-    {% endif %}
 </div>
 
 <!-- Spare-part items -->
@@ -147,4 +181,62 @@
     </div>
     {% endif %}
 </div>
+
+{% if stage == 'Sent' %}
+<!-- Reject order modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-labelledby="rejectModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('supplier_portal.reject_order', po_id=po_id) }}" novalidate>
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title" id="rejectModalLabel">Reject PO-{{ po_id }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <label for="RejectionReason" class="form-label">
+                        Reason for rejecting <span class="required-star" aria-hidden="true">*</span>
+                    </label>
+                    <textarea id="RejectionReason" name="RejectionReason" class="form-control" rows="4"
+                              minlength="{{ reason_min }}" maxlength="{{ reason_max }}" required
+                              placeholder="For example: model discontinued, cannot deliver before the expected date"></textarea>
+                    <div class="d-flex justify-content-between mt-1">
+                        <span class="form-text text-muted">Between {{ reason_min }} and {{ reason_max }} characters. The dealership will see this.</span>
+                        <span class="sp-char-counter" id="rejectCounter">0 / {{ reason_max }}</span>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger" id="rejectSubmit" disabled>
+                        <i class="fa-solid fa-xmark me-1"></i>Reject Order
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if stage == 'Sent' %}
+<script>
+    // Live character counter for the rejection reason (server validates again)
+    (function () {
+        var box = document.getElementById('RejectionReason');
+        var counter = document.getElementById('rejectCounter');
+        var submit = document.getElementById('rejectSubmit');
+        if (!box || !counter || !submit) return;
+        var min = {{ reason_min }}, max = {{ reason_max }};
+        function update() {
+            var len = box.value.trim().length;
+            counter.textContent = len + ' / ' + max;
+            var ok = len >= min && len <= max;
+            counter.classList.toggle('sp-char-invalid', !ok && box.value.length > 0);
+            submit.disabled = !ok;
+        }
+        box.addEventListener('input', update);
+        update();
+    })();
+</script>
+{% endif %}
 {% endblock %}

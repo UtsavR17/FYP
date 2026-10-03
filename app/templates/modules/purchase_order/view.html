@@ -51,6 +51,83 @@
     </div>
 </div>
 
+<!-- Supplier Response (Task 36) -->
+<div class="form-card">
+    <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+        <p class="form-section-title mb-0">Supplier Response</p>
+        <div class="d-flex flex-wrap gap-2">
+            {% if stage == 'Draft' and has_portal_login %}
+                {% if can_send %}
+                <form method="POST" action="{{ url_for('purchase_order.send_to_supplier', po_id=po_id) }}"
+                      onsubmit="return confirm('Send this order to the supplier? Its lines will be locked until you recall it.');">
+                    <button type="submit" class="btn btn-accent">
+                        <i class="fa-solid fa-paper-plane me-2"></i>Send to Supplier
+                    </button>
+                </form>
+                {% else %}
+                <span class="btn btn-accent disabled" aria-disabled="true">
+                    <i class="fa-solid fa-paper-plane me-2"></i>Send to Supplier
+                </span>
+                {% endif %}
+            {% elif stage == 'Sent' %}
+            <form method="POST" action="{{ url_for('purchase_order.recall_from_supplier', po_id=po_id) }}"
+                  onsubmit="return confirm('Recall this order? It goes back to Draft and disappears from the supplier portal.');">
+                <button type="submit" class="btn btn-outline-secondary">
+                    <i class="fa-solid fa-rotate-left me-2"></i>Recall
+                </button>
+            </form>
+            {% elif stage == 'Rejected' %}
+            <form method="POST" action="{{ url_for('purchase_order.reopen_po', po_id=po_id) }}"
+                  onsubmit="return confirm('Reopen this order as a draft? Its status goes back to Pending.');">
+                <button type="submit" class="btn btn-outline-primary">
+                    <i class="fa-solid fa-folder-open me-2"></i>Reopen as Draft
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mt-3">
+        <div class="col-md-3">
+            <div class="mb-3">
+                <label class="form-label readonly-label">Order Stage</label>
+                <div class="readonly-value">
+                    <span class="po-status-badge po-stage-{{ stage | lower }}">{{ stage }}</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">{{ readonly_field('Date Sent', date_sent if date_sent else '-') }}</div>
+        <div class="col-md-3">{{ readonly_field('Date Responded', date_responded if date_responded else '-') }}</div>
+        {% if stage == 'Rejected' %}
+        <div class="col-md-12">{{ readonly_field('Rejection Reason', record.RejectionReason if record.RejectionReason else '-') }}</div>
+        {% endif %}
+    </div>
+
+    {% if not has_portal_login %}
+    <p class="form-text text-muted mb-0">
+        <i class="fa-solid fa-circle-info me-1"></i>Supplier has no portal login: this order is handled offline.
+    </p>
+    {% elif stage == 'Draft' and not can_send %}
+    <p class="form-text text-muted mb-0">
+        <i class="fa-solid fa-circle-info me-1"></i>
+        {% if po_status != 'Pending' %}Only an order with status Pending can be sent to the supplier.
+        {% else %}Add at least one spare part or motorcycle before sending the order.{% endif %}
+    </p>
+    {% elif stage == 'Sent' %}
+    <p class="form-text text-muted mb-0">
+        <i class="fa-solid fa-hourglass-half me-1"></i>Waiting for the supplier to accept or reject. Lines are locked and cannot be received yet.
+    </p>
+    {% elif stage == 'Accepted' %}
+    <p class="form-text text-muted mb-0">
+        <i class="fa-solid fa-circle-check me-1"></i>The supplier accepted this order. Lines are locked; receive them as they arrive.
+    </p>
+    {% elif stage == 'Rejected' %}
+    <p class="form-text text-muted mb-0">
+        <i class="fa-solid fa-circle-xmark me-1"></i>The supplier rejected this order, so its status is Cancelled. Reopen it as a draft to change and resend it.
+    </p>
+    {% endif %}
+</div>
+
 
 <!-- Line Items -->
 <div class="admin-card">
@@ -64,7 +141,11 @@
                 Spare parts included in this purchase order
             </p>
         </div>
-        {% if po_status in ('Received', 'Cancelled') %}
+        {% if lines_locked %}
+        <span class="btn btn-accent disabled" title="Lines cannot change once the order has been sent to the supplier">
+            <i class="fa-solid fa-lock me-2"></i>Lines locked
+        </span>
+        {% elif po_status in ('Received', 'Cancelled') %}
         <span class="btn btn-accent disabled" title="Cannot add items to a {{ po_status }} order">
             <i class="fa-solid fa-plus me-2"></i>Add Item
         </span>
@@ -117,10 +198,13 @@
                     <td class="text-end">
                         {% if item.Status == 'Ordered' %}
                         <div class="action-btn-group">
+                            {% if can_receive %}
                             <a href="{{ url_for('purchase_order.receive_item', po_id=po_id, item_id=item.POItem_ID) }}"
                                 class="btn btn-sm btn-accent">
                                 <i class="fa-solid fa-box-open me-1"></i>Receive
                             </a>
+                            {% endif %}
+                            {% if not lines_locked %}
                             <a href="{{ url_for('purchase_order.edit_item', po_id=po_id, item_id=item.POItem_ID) }}"
                                 class="btn btn-sm btn-outline-primary">
                                 <i class="fa-solid fa-pen me-1"></i>Edit
@@ -131,6 +215,10 @@
                                 data-record-name="Item #{{ item.POItem_ID }} ({{ item._sp_name }})">
                                 <i class="fa-solid fa-trash me-1"></i>
                             </button>
+                            {% endif %}
+                            {% if lines_locked and not can_receive %}
+                            <span class="sp-lock-hint"><i class="fa-solid fa-lock me-1"></i>Locked</span>
+                            {% endif %}
                         </div>
                         {% else %}
                         <span class="text-muted" style="font-size:0.78rem;">
@@ -171,7 +259,11 @@
                 One line per motorcycle unit ordered from this supplier
             </p>
         </div>
-        {% if po_status in ('Received', 'Cancelled') %}
+        {% if lines_locked %}
+        <span class="btn btn-accent disabled" title="Lines cannot change once the order has been sent to the supplier">
+            <i class="fa-solid fa-lock me-2"></i>Lines locked
+        </span>
+        {% elif po_status in ('Received', 'Cancelled') %}
         <span class="btn btn-accent disabled" title="Cannot add motorcycles to a {{ po_status }} order">
             <i class="fa-solid fa-plus me-2"></i>Add Motorcycle
         </span>
@@ -215,8 +307,10 @@
                     <td class="text-end">
                         {% if mb.Status == 'Shipped' %}
                         <div class="action-btn-group">
+                            {% if can_receive %}
                             <a href="{{ url_for('purchase_order.receive_motorbike', po_id=po_id, pobike_id=mb.POBike_ID) }}"
                                class="btn btn-sm btn-accent"><i class="fa-solid fa-box-open me-1"></i>Receive</a>
+                            {% endif %}
                             <form method="POST" class="d-inline"
                                   action="{{ url_for('purchase_order.unship_motorbike', po_id=po_id, pobike_id=mb.POBike_ID) }}"
                                   onsubmit="return confirm('Revert this shipment? The VIN and year entered by the supplier will be cleared and the line goes back to Ordered.');">
@@ -227,8 +321,11 @@
                         </div>
                         {% elif mb.Status == 'Ordered' %}
                         <div class="action-btn-group">
+                            {% if can_receive %}
                             <a href="{{ url_for('purchase_order.receive_motorbike', po_id=po_id, pobike_id=mb.POBike_ID) }}"
                                class="btn btn-sm btn-accent"><i class="fa-solid fa-box-open me-1"></i>Receive</a>
+                            {% endif %}
+                            {% if not lines_locked %}
                             <a href="{{ url_for('purchase_order.edit_motorbike', po_id=po_id, pobike_id=mb.POBike_ID) }}"
                                class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-pen me-1"></i>Edit</a>
                             <button type="button" class="btn btn-sm btn-outline-danger"
@@ -236,6 +333,10 @@
                                     data-delete-url="{{ url_for('purchase_order.delete_motorbike', po_id=po_id, pobike_id=mb.POBike_ID) }}"
                                     data-record-name="{{ mb._model_label }} ({{ mb.Color_Color }})">
                                 <i class="fa-solid fa-trash me-1"></i></button>
+                            {% endif %}
+                            {% if lines_locked and not can_receive %}
+                            <span class="sp-lock-hint"><i class="fa-solid fa-lock me-1"></i>Locked</span>
+                            {% endif %}
                         </div>
                         {% else %}
                             <span class="text-muted" style="font-size:0.78rem;">
