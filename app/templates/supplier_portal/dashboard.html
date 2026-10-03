@@ -1,0 +1,98 @@
+{% extends 'supplier_portal/base.html' %}
+
+{% block title %}Supplier Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">{{ session.get('supplier_name', '') }}</h2>
+        <p class="page-header-subtitle">Your catalogue and the purchase orders addressed to you</p>
+    </div>
+    <a href="{{ url_for('supplier_portal.orders') }}" class="btn btn-accent">
+        <i class="fa-solid fa-truck me-2"></i>View Orders
+    </a>
+</div>
+
+<div class="row g-3 mb-1">
+    <div class="col-6 col-lg-3">
+        <a class="sp-stat admin-card" href="{{ url_for('supplier_portal.orders') }}">
+            <span class="sp-stat-label">Open Purchase Orders</span>
+            <span class="sp-stat-value">{{ stats.open_pos }}</span>
+            <span class="sp-stat-hint">Pending or partially received</span>
+        </a>
+    </div>
+    <div class="col-6 col-lg-3">
+        <a class="sp-stat admin-card {% if stats.awaiting %}sp-stat-attention{% endif %}" href="{{ url_for('supplier_portal.orders') }}">
+            <span class="sp-stat-label">Lines Awaiting Shipment</span>
+            <span class="sp-stat-value">{{ stats.awaiting }}</span>
+            <span class="sp-stat-hint">Spare parts and motorcycles</span>
+        </a>
+    </div>
+    <div class="col-6 col-lg-3">
+        <a class="sp-stat admin-card" href="{{ url_for('supplier_portal.products') }}">
+            <span class="sp-stat-label">Catalogue Products</span>
+            <span class="sp-stat-value">{{ stats.products }}</span>
+            <span class="sp-stat-hint">Spare parts you supply</span>
+        </a>
+    </div>
+    <div class="col-6 col-lg-3">
+        <a class="sp-stat admin-card" href="{{ url_for('supplier_portal.models') }}">
+            <span class="sp-stat-label">Catalogue Models</span>
+            <span class="sp-stat-value">{{ stats.models }}</span>
+            <span class="sp-stat-hint">Motorbike models you supply</span>
+        </a>
+    </div>
+</div>
+
+<div class="admin-card">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <div>
+            <h3 class="sp-card-title">Recent Purchase Orders</h3>
+            <p class="sp-card-subtitle">The five most recent orders addressed to you</p>
+        </div>
+        <a href="{{ url_for('supplier_portal.orders') }}" class="btn btn-sm btn-outline-secondary">All Orders</a>
+    </div>
+
+    {% if recent_pos %}
+    <div class="table-responsive">
+        <table class="table admin-table">
+            <thead>
+                <tr>
+                    <th>PO Number</th><th>Order Date</th><th>Expected</th><th>Status</th>
+                    <th>Awaiting Shipment</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for po in recent_pos %}
+                <tr>
+                    <td><strong>PO-{{ po.PurchaseOrderID }}</strong></td>
+                    <td>{{ po.POrderDate or '-' }}</td>
+                    <td>{{ po.ExpectedDate or '-' }}</td>
+                    <td>
+                        <span class="po-status-badge po-status-{{ po.Status | lower | replace(' ', '-') }}">{{ po.Status }}</span>
+                    </td>
+                    <td>
+                        {% if po._awaiting %}
+                        <span class="sp-awaiting-badge">{{ po._awaiting }} to ship</span>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <a href="{{ url_for('supplier_portal.order_detail', po_id=po.PurchaseOrderID) }}"
+                           class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-eye me-1"></i>View</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="table-empty-state">
+        <div class="table-empty-icon-wrap"><i class="fa-solid fa-inbox"></i></div>
+        <p class="table-empty-text">No purchase orders have been addressed to you yet.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

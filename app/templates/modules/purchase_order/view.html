@@ -105,6 +105,9 @@
                         <span class="po-status-badge po-status-received">Received</span>
                         {% else %}
                         <span class="po-status-badge po-status-ordered">Ordered</span>
+                        {% if item._shipped_on %}
+                        <div class="sp-shipped-note">Shipped {{ item._shipped_on }}</div>
+                        {% endif %}
                         {% endif %}
                     </td>
                     <td>
@@ -198,6 +201,11 @@
                     <td>
                         {% if mb.Status == 'Received' %}
                             <span class="po-status-badge po-status-received">Received</span>
+                        {% elif mb.Status == 'Shipped' %}
+                            <span class="po-status-badge po-status-shipped">Shipped</span>
+                            {% if mb._shipped_on %}
+                            <div class="sp-shipped-note">Shipped {{ mb._shipped_on }}</div>
+                            {% endif %}
                         {% else %}
                             <span class="po-status-badge po-status-ordered">Ordered</span>
                         {% endif %}
@@ -205,7 +213,19 @@
                     <td class="text-muted" style="font-size:0.8rem;">{{ mb._vin if mb._vin else '—' }}</td>
                     <td>{{ mb.DateReceived if mb.DateReceived else '—' }}</td>
                     <td class="text-end">
-                        {% if mb.Status == 'Ordered' %}
+                        {% if mb.Status == 'Shipped' %}
+                        <div class="action-btn-group">
+                            <a href="{{ url_for('purchase_order.receive_motorbike', po_id=po_id, pobike_id=mb.POBike_ID) }}"
+                               class="btn btn-sm btn-accent"><i class="fa-solid fa-box-open me-1"></i>Receive</a>
+                            <form method="POST" class="d-inline"
+                                  action="{{ url_for('purchase_order.unship_motorbike', po_id=po_id, pobike_id=mb.POBike_ID) }}"
+                                  onsubmit="return confirm('Revert this shipment? The VIN and year entered by the supplier will be cleared and the line goes back to Ordered.');">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                    <i class="fa-solid fa-rotate-left me-1"></i>Revert
+                                </button>
+                            </form>
+                        </div>
+                        {% elif mb.Status == 'Ordered' %}
                         <div class="action-btn-group">
                             <a href="{{ url_for('purchase_order.receive_motorbike', po_id=po_id, pobike_id=mb.POBike_ID) }}"
                                class="btn btn-sm btn-accent"><i class="fa-solid fa-box-open me-1"></i>Receive</a>

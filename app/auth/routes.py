@@ -1,6 +1,11 @@
 from flask import render_template, request, redirect, url_for, session, flash
 from app.auth import bp
 from app.supabase_client import supabase
+from app.utils.flash_messages import flash_error
+
+# Flask session keys owned by the Admin Panel. Logout removes only these so a
+# supplier portal session in the same browser is left untouched (Task 35).
+ADMIN_SESSION_KEYS = ('access_token', 'refresh_token', 'user_email', 'payment_form_token')
 
 
 @bp.route('/login', methods=['GET', 'POST'])
@@ -24,17 +29,33 @@ def login():
         if not email or not password:
             error = 'Email and password are required.'
         else:
+            response = None
             try:
                 response = supabase.auth.sign_in_with_password({
                     'email':    email,
                     'password': password,
                 })
-                session['access_token']  = response.session.access_token
-                session['refresh_token'] = response.session.refresh_token
-                session['user_email']    = response.user.email
-                return redirect(url_for('dashboard.index'))
             except Exception:
                 error = 'Invalid email or password. Please try again.'
+
+            if response is not None:
+                # Only accounts on the Staff_User allow-list may use the Admin Panel
+                try:
+                    is_staff = supabase.rpc('is_staff').execute().data is True
+                except Exception:
+                    is_staff = False
+
+                if is_staff:
+                    session['access_token']  = response.session.access_token
+                    session['refresh_token'] = response.session.refresh_token
+                    session['user_email']    = response.user.email
+                    return redirect(url_for('dashboard.index'))
+
+                try:
+                    supabase.auth.sign_out({'scope': 'local'})
+                except Exception:
+                    pass
+                flash_error('This account is not authorised for the Admin Panel.')
 
     return render_template('auth/login.html', error=error)
 
@@ -49,6 +70,7 @@ def logout():
         supabase.auth.sign_out()
     except Exception:
         pass
-    session.clear()
+    for key in ADMIN_SESSION_KEYS:
+        session.pop(key, None)
     flash('You have been signed out successfully.', 'info')
     return redirect(url_for('auth.login'))

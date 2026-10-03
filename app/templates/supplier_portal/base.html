@@ -1,0 +1,83 @@
+{# supplier_portal/base.html: Supplier Portal layout (Task 35). Top bar instead of the admin sidebar. #}
+{% extends 'layout/base.html' %}
+
+{% block body %}
+{% set ep = request.endpoint or '' %}
+<div class="sp-wrapper">
+
+    <nav class="navbar navbar-expand-lg sp-topbar" aria-label="Supplier portal navigation">
+        <div class="container-fluid sp-topbar-inner">
+            <a class="sp-brand" href="{{ url_for('supplier_portal.dashboard') }}">
+                <span class="sp-brand-name">Supplier Portal</span>
+                <span class="sp-brand-sub">Motorbike Sales &amp; Servicing</span>
+            </a>
+
+            <button class="navbar-toggler sp-toggler" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#spNav"
+                    aria-controls="spNav" aria-expanded="false" aria-label="Toggle navigation">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+
+            <div class="collapse navbar-collapse" id="spNav">
+                <ul class="navbar-nav me-auto sp-nav">
+                    <li class="nav-item">
+                        <a class="nav-link sp-nav-link {% if ep == 'supplier_portal.dashboard' %}active{% endif %}"
+                           href="{{ url_for('supplier_portal.dashboard') }}">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link sp-nav-link {% if 'product' in ep %}active{% endif %}"
+                           href="{{ url_for('supplier_portal.products') }}">My Products</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link sp-nav-link {% if 'model' in ep %}active{% endif %}"
+                           href="{{ url_for('supplier_portal.models') }}">My Models</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link sp-nav-link {% if 'order' in ep or 'ship' in ep %}active{% endif %}"
+                           href="{{ url_for('supplier_portal.orders') }}">Orders</a>
+                    </li>
+                </ul>
+
+                <div class="sp-user">
+                    <span class="sp-company" title="{{ session.get('supplier_email', '') }}">
+                        <i class="fa-solid fa-building me-2"></i>{{ session.get('supplier_name', '') }}
+                    </span>
+                    <form method="POST" action="{{ url_for('supplier_portal.logout') }}" class="d-inline">
+                        <button type="submit" class="btn btn-sm sp-logout-btn">
+                            <i class="fa-solid fa-right-from-bracket me-1"></i>Sign Out
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Flash Messages (same markup as the Admin Panel so admin.js auto-dismiss applies) -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-container sp-flash">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show mb-2" role="alert">
+                        {% if category == 'success' %}
+                            <i class="fa-solid fa-circle-check me-2"></i>
+                        {% elif category == 'danger' %}
+                            <i class="fa-solid fa-circle-xmark me-2"></i>
+                        {% elif category == 'warning' %}
+                            <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                        {% else %}
+                            <i class="fa-solid fa-circle-info me-2"></i>
+                        {% endif %}
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <main class="content-area sp-content">
+        {% block content %}{% endblock %}
+    </main>
+
+</div>
+{% endblock %}

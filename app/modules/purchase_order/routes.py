@@ -41,6 +41,15 @@ def _get_supplier_options():
         return []
 
 
+def _format_shipped_date(raw_value, with_year=False):
+    """'2026-10-02' -> '02 Oct' (or '02 Oct 2026'). Empty or invalid values give ''."""
+    try:
+        value = date_type.fromisoformat(str(raw_value)[:10])
+    except (TypeError, ValueError):
+        return ''
+    return value.strftime('%d %b %Y' if with_year else '%d %b')
+
+
 def _validate_date(raw_value, field_label):
     """
     Validate an optional date string in YYYY-MM-DD format.
@@ -306,6 +315,7 @@ def view(po_id):
         pass
     for item in po_items:
         item['_sp_name'] = sp_lookup_view.get(item.get('SP_id'), f"SP-{item.get('SP_id')}")
+        item['_shipped_on'] = _format_shipped_date(item.get('DateShipped'))
 
     # Fetch linked New_MotorBike procurement rows
     po_motorbikes = []
@@ -1048,7 +1058,10 @@ def _get_model_catalog_for_po(po_id):
 
 
 def _enrich_po_motorbikes(rows):
-    """Attach _model_label and _vin (once received) to each PO_NewMotorBike row."""
+    """
+    Attach _model_label, _vin and _shipped_on to each PO_NewMotorBike row.
+    _vin is the inventory VIN once received, otherwise the supplier's ShippedVIN.
+    """
     brand_lookup, model_lookup = {}, {}
     try:
         br = supabase.table('Brand').select('Brand_ID, Brand_Name').execute()
@@ -1076,7 +1089,11 @@ def _enrich_po_motorbikes(rows):
 
     for r in rows:
         r['_model_label'] = model_lookup.get(r['Model_Model_No'], f"Model #{r['Model_Model_No']}")
-        r['_vin'] = vin_lookup.get(r.get('New_MotorBike_NB_ID'))
+        if r.get('New_MotorBike_NB_ID'):
+            r['_vin'] = vin_lookup.get(r.get('New_MotorBike_NB_ID')) or r.get('ShippedVIN')
+        else:
+            r['_vin'] = r.get('ShippedVIN')
+        r['_shipped_on'] = _format_shipped_date(r.get('DateShipped'))
     return rows
 
 
@@ -1147,8 +1164,8 @@ def add_motorbike(po_id):
         qty = None
         if not qty_raw:
             errors['Quantity'] = 'Quantity is required.'
-        elif not is_positive_integer(qty_raw) or not (1 <= int(qty_raw) <= 20):
-            errors['Quantity'] = 'Quantity must be a whole number between 1 and 20.'
+        elif not is_positive_integer(qty_raw) or not (1 <= int(qty_raw) <= 25):
+            errors['Quantity'] = 'Quantity must be a whole number between 1 and 25.'
         else:
             qty = int(qty_raw)
 
@@ -1193,6 +1210,12 @@ def edit_motorbike(po_id, pobike_id):
     if line.get('Status') == 'Received':
         flash_error('This motorcycle has already been received and cannot be edited.')
         return redirect(url_for('purchase_order.view', po_id=po_id))
+    if line.get('Status') != 'Ordered':
+        flash_error(
+            'This motorcycle has been shipped by the supplier and cannot be edited. '
+            'Revert the shipment first if the line needs to change.'
+        )
+        return redirect(url_for('purchase_order.view', po_id=po_id))
 
     model_label = _enrich_po_motorbikes([dict(line)])[0]['_model_label']
     _, color_options = _get_new_motorbike_dropdown_options()
@@ -1221,10 +1244,17 @@ def edit_motorbike(po_id, pobike_id):
 
         if not errors:
             try:
-                supabase.table('PO_NewMotorBike').update(
+                # Status filter: the supplier may have shipped it since the form opened
+                updated = supabase.table('PO_NewMotorBike').update(
                     {'Color_Color': color, 'BuyingPrice': price}
-                ).eq('POBike_ID', pobike_id).execute()
-                flash_success('Motorcycle order line updated.')
+                ).eq('POBike_ID', pobike_id).eq('Status', 'Ordered').execute()
+                if updated.data:
+                    flash_success('Motorcycle order line updated.')
+                else:
+                    flash_error(
+                        'This motorcycle line was not updated because it is no longer '
+                        'Ordered (the supplier may have just shipped it).'
+                    )
                 return redirect(url_for('purchase_order.view', po_id=po_id))
             except Exception as e:
                 flash_error(f'Could not update motorcycle line: {str(e)}')
@@ -1245,10 +1275,25 @@ def delete_motorbike(po_id, pobike_id):
     if line.get('Status') == 'Received':
         flash_error('Cannot delete a motorcycle line that has already been received.')
         return redirect(url_for('purchase_order.view', po_id=po_id))
+    if line.get('Status') != 'Ordered':
+        flash_error(
+            'Cannot delete a motorcycle line that the supplier has shipped. '
+            'Revert the shipment first if the line should be removed.'
+        )
+        return redirect(url_for('purchase_order.view', po_id=po_id))
     try:
-        supabase.table('PO_NewMotorBike').delete().eq('POBike_ID', pobike_id).execute()
-        flash_success('Motorcycle line removed from the purchase order.')
-        _auto_update_po_status(po_id)
+        deleted = (
+            supabase.table('PO_NewMotorBike').delete()
+            .eq('POBike_ID', pobike_id).eq('Status', 'Ordered').execute()
+        )
+        if deleted.data:
+            flash_success('Motorcycle line removed from the purchase order.')
+            _auto_update_po_status(po_id)
+        else:
+            flash_error(
+                'This motorcycle line was not removed because it is no longer '
+                'Ordered (the supplier may have just shipped it).'
+            )
     except Exception as e:
         flash_error(f'Could not remove motorcycle line: {str(e)}')
     return redirect(url_for('purchase_order.view', po_id=po_id))
@@ -1262,6 +1307,8 @@ def receive_motorbike(po_id, pobike_id):
     price) for one ordered unit, then marks the order line Received.
     Model and Colour come from the order line and cannot be changed here.
     Status is always set to 'Available'.
+    When the supplier shipped the line, VIN and Year come from ShippedVIN and
+    ShippedYear and cannot be changed here either (Task 35).
     """
     line, redir = _get_motorbike_line_or_redirect(po_id, pobike_id)
     if redir:
@@ -1269,8 +1316,13 @@ def receive_motorbike(po_id, pobike_id):
     if line.get('Status') == 'Received':
         flash_error('This motorcycle has already been received.')
         return redirect(url_for('purchase_order.view', po_id=po_id))
+    if line.get('Status') not in ('Ordered', 'Shipped'):
+        flash_error('This motorcycle line cannot be received in its current status.')
+        return redirect(url_for('purchase_order.view', po_id=po_id))
 
     line = _enrich_po_motorbikes([dict(line)])[0]
+    shipped = bool(line.get('ShippedVIN'))
+    shipped_on = _format_shipped_date(line.get('DateShipped'), with_year=True)
 
     # Model-level specs come from the supplier catalogue when they are set
     locked_specs = None
@@ -1293,6 +1345,11 @@ def receive_motorbike(po_id, pobike_id):
     if request.method == 'POST':
         form_data = request.form.to_dict()
 
+        if shipped:
+            # Supplier values win: anything posted for VIN or Year is ignored
+            form_data['VIN']  = line['ShippedVIN']
+            form_data['Year'] = '' if line.get('ShippedYear') is None else str(line['ShippedYear'])
+
         check = dict(form_data)
         check['Model_Model_No'] = str(line['Model_Model_No'])
         check['Color_Color']    = line['Color_Color']
@@ -1310,6 +1367,15 @@ def receive_motorbike(po_id, pobike_id):
         if date_err:
             errors['DateReceived'] = date_err
 
+        if shipped:
+            # VIN and Year are read-only on the form, so show their errors as a flash
+            for field in ('VIN', 'Year'):
+                if field in errors:
+                    flash_error(
+                        f'The {field} provided by the supplier is not valid: {errors[field]} '
+                        f'Revert the shipment so the supplier can correct it.'
+                    )
+
         if not errors:
             nb_id = None
             try:
@@ -1319,6 +1385,11 @@ def receive_motorbike(po_id, pobike_id):
                 msg = str(e)
                 if 'duplicate' in msg.lower() or 'unique' in msg.lower():
                     errors['VIN'] = 'A motorbike with this VIN already exists.'
+                    if shipped:
+                        flash_error(
+                            "The supplier's VIN already exists in inventory. "
+                            "Revert the shipment so the supplier can correct it."
+                        )
                 else:
                     flash_error(f'Could not create the motorbike record: {msg}')
 
@@ -1345,5 +1416,45 @@ def receive_motorbike(po_id, pobike_id):
         form_data=form_data, errors=errors, line=line, po_id=po_id, pobike_id=pobike_id,
         fuel_type_options=NB_FUEL_TYPE_OPTIONS,
         transmission_options=NB_TRANSMISSION_OPTIONS,
-        locked_specs=locked_specs
+        locked_specs=locked_specs,
+        shipped=shipped,
+        shipped_on=shipped_on
     )
+
+
+@bp.route('/<int:po_id>/motorbikes/<int:pobike_id>/unship', methods=['POST'])
+@login_required
+def unship_motorbike(po_id, pobike_id):
+    """
+    Revert a supplier shipment (Task 35): the line goes back to Ordered and the
+    supplier's VIN, year and shipped date are cleared so it can be shipped again.
+    """
+    line, redir = _get_motorbike_line_or_redirect(po_id, pobike_id)
+    if redir:
+        return redir
+    if line.get('Status') != 'Shipped':
+        flash_error('Only a motorcycle line with status Shipped can have its shipment reverted.')
+        return redirect(url_for('purchase_order.view', po_id=po_id))
+
+    try:
+        reverted = (
+            supabase.table('PO_NewMotorBike').update({
+                'Status':      'Ordered',
+                'ShippedVIN':  None,
+                'ShippedYear': None,
+                'DateShipped': None,
+            })
+            .eq('POBike_ID', pobike_id).eq('Status', 'Shipped')
+            .execute()
+        )
+        if reverted.data:
+            flash_success(
+                'Shipment reverted. The motorcycle line is back to Ordered and the '
+                'supplier can ship it again.'
+            )
+        else:
+            flash_error('The shipment could not be reverted because the line is no longer Shipped.')
+    except Exception as e:
+        flash_error(f'Could not revert the shipment: {str(e)}')
+
+    return redirect(url_for('purchase_order.view', po_id=po_id))

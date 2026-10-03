@@ -30,6 +30,10 @@
     <div class="form-card">
         <p class="form-section-title">Unit Details</p>
         <div class="row">
+            {% if shipped %}
+            <div class="col-md-3">{{ readonly_field('Year', line.ShippedYear) }}</div>
+            <div class="col-md-6">{{ readonly_field('VIN', line.ShippedVIN) }}</div>
+            {% else %}
             <div class="col-md-3">
                 {{ number_field(name='Year', label='Year', value=form_data.get('Year',''), required=True,
                     error=errors.get('Year',''), placeholder='e.g. 2026', step='1', min_val='1900') }}
@@ -39,6 +43,7 @@
                     error=errors.get('VIN',''), placeholder='e.g. JHMZD13117S001234',
                     help_text='Must be unique. Maximum 50 characters.') }}
             </div>
+            {% endif %}
             <div class="col-md-3">
                 {{ number_field(name='Warranty_Months', label='Warranty (Months)',
                     value=form_data.get('Warranty_Months',''), required=True,
@@ -46,6 +51,13 @@
                     help_text='Enter 0 if no warranty.') }}
             </div>
         </div>
+
+        {% if shipped %}
+        <p class="form-text text-muted mb-3">
+            <i class="fa-solid fa-truck me-1"></i>
+            VIN and year were provided by the supplier at shipping ({{ shipped_on if shipped_on else 'date not recorded' }}).
+        </p>
+        {% endif %}
 
         {% if locked_specs %}
         <div class="row">

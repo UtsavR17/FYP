@@ -1,0 +1,150 @@
+{% extends 'supplier_portal/base.html' %}
+{% from 'components/form_field.html' import readonly_field %}
+
+{% block title %}PO-{{ po_id }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">PO-{{ po_id }}</h2>
+        <p class="page-header-subtitle">Order details and shipping</p>
+    </div>
+    <a href="{{ url_for('supplier_portal.orders') }}" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to Orders
+    </a>
+</div>
+
+<div class="form-card">
+    <p class="form-section-title">Order Information</p>
+    <div class="row">
+        <div class="col-sm-6 col-lg-3">{{ readonly_field('PO Number', 'PO-' ~ po.PurchaseOrderID) }}</div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="mb-3">
+                <label class="form-label readonly-label">Status</label>
+                <div class="readonly-value">
+                    <span class="po-status-badge po-status-{{ po.Status | lower | replace(' ', '-') }}">{{ po.Status }}</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">{{ readonly_field('Order Date', order_date or '-') }}</div>
+        <div class="col-sm-6 col-lg-3">{{ readonly_field('Expected Delivery', expected_date or '-') }}</div>
+        <div class="col-sm-6 col-lg-3">{{ readonly_field('Spare Parts Value', 'Rs. ' ~ '{:,.2f}'.format(items_total)) }}</div>
+        <div class="col-sm-6 col-lg-3">{{ readonly_field('Motorcycles Value', 'Rs. ' ~ '{:,.2f}'.format(bikes_total)) }}</div>
+        <div class="col-sm-6 col-lg-3">{{ readonly_field('Order Total', 'Rs. ' ~ '{:,.2f}'.format(order_total)) }}</div>
+    </div>
+    {% if not can_ship %}
+    <p class="form-text text-muted mb-0">
+        <i class="fa-solid fa-lock me-1"></i>This order is {{ po.Status }}, so nothing more can be shipped on it.
+    </p>
+    {% endif %}
+</div>
+
+<!-- Spare-part items -->
+<div class="admin-card">
+    <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+        <div>
+            <h3 class="sp-card-title">
+                Spare Parts <span class="record-count-badge">{{ items | length }}</span>
+            </h3>
+            <p class="sp-card-subtitle">Shipping marks every unshipped spare-part line with today's date</p>
+        </div>
+        {% if can_ship and items_to_ship %}
+        <form method="POST" action="{{ url_for('supplier_portal.ship_items', po_id=po_id) }}"
+              onsubmit="return confirm('Mark {{ items_to_ship }} spare-part line(s) as shipped today?');">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-truck me-2"></i>Ship Spare Parts ({{ items_to_ship }})
+            </button>
+        </form>
+        {% endif %}
+    </div>
+
+    {% if items %}
+    <div class="table-responsive">
+        <table class="table admin-table">
+            <thead>
+                <tr>
+                    <th>Spare Part</th><th>Brand</th><th>Size</th><th>Qty</th>
+                    <th>Buying Price</th><th>Status</th><th>Shipped</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td><strong>{{ item._sp_name }}</strong></td>
+                    <td>{{ item._brand_name }}</td>
+                    <td>{{ item.Size_Expected or '-' }}</td>
+                    <td>{{ item.Quantity_Ordered }}</td>
+                    <td>Rs. {{ '%.2f' | format(item.BuyingPrice | float) }}</td>
+                    <td>
+                        {% if item.Status == 'Received' %}
+                        <span class="po-status-badge po-status-received">Received</span>
+                        {% elif item.DateShipped %}
+                        <span class="po-status-badge po-status-shipped">Shipped</span>
+                        {% else %}
+                        <span class="po-status-badge po-status-ordered">Ordered</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ item._shipped_on or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="table-empty-state">
+        <div class="table-empty-icon-wrap"><i class="fa-solid fa-inbox"></i></div>
+        <p class="table-empty-text">No spare parts on this order.</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Motorcycle lines -->
+<div class="admin-card">
+    <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+        <div>
+            <h3 class="sp-card-title">
+                Motorcycles <span class="record-count-badge">{{ bikes | length }}</span>
+            </h3>
+            <p class="sp-card-subtitle">One line per motorcycle unit. Enter the VIN and year of each unit when you ship it.</p>
+        </div>
+        {% if can_ship and bikes_to_ship %}
+        <a href="{{ url_for('supplier_portal.ship_motorbikes', po_id=po_id) }}" class="btn btn-accent">
+            <i class="fa-solid fa-truck me-2"></i>Ship Motorcycles ({{ bikes_to_ship }})
+        </a>
+        {% endif %}
+    </div>
+
+    {% if bikes %}
+    <div class="table-responsive">
+        <table class="table admin-table">
+            <thead>
+                <tr>
+                    <th>Model</th><th>Colour</th><th>Buying Price</th><th>Status</th>
+                    <th>VIN</th><th>Year</th><th>Shipped</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in bikes %}
+                <tr>
+                    <td><strong>{{ b._model_label }}</strong></td>
+                    <td>{{ b.Color_Color }}</td>
+                    <td>Rs. {{ '%.2f' | format(b.BuyingPrice | float) }}</td>
+                    <td>
+                        <span class="po-status-badge po-status-{{ (b.Status or 'Ordered') | lower }}">{{ b.Status }}</span>
+                    </td>
+                    <td class="sp-vin">{{ b.ShippedVIN or '-' }}</td>
+                    <td>{{ b.ShippedYear or '-' }}</td>
+                    <td>{{ b._shipped_on or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="table-empty-state">
+        <div class="table-empty-icon-wrap"><i class="fa-solid fa-motorcycle"></i></div>
+        <p class="table-empty-text">No motorcycles on this order.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -2082,3 +2082,345 @@ label.form-label {
         justify-content: center;
     }
 }
+
+
+/* ===========================================================================
+   SUPPLIER PORTAL (Task 35)
+   New rules only. Existing rules above are not modified.
+   =========================================================================== */
+
+/* Line status: shipped by the supplier, not yet received (blue) */
+.po-status-shipped {
+    background-color: rgba(14, 165, 233, 0.14);
+    color: #0369a1;
+}
+
+/* Small "Shipped 02 Oct" note under a status badge (admin PO view) */
+.sp-shipped-note {
+    font-size: 0.72rem;
+    color: #0369a1;
+    margin-top: 3px;
+    white-space: nowrap;
+}
+
+/* One-time temporary password inside the admin flash message */
+.sp-temp-password {
+    display: inline-block;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    background-color: #ffffff;
+    border: 1px dashed var(--accent);
+    border-radius: var(--border-radius-sm);
+    padding: 2px 8px;
+    margin-left: 4px;
+    user-select: all;
+    letter-spacing: 0.02em;
+}
+
+/* ---------------------------------------------------------------------------
+   Portal layout: top bar instead of the admin sidebar
+   --------------------------------------------------------------------------- */
+.sp-wrapper {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--content-bg);
+}
+
+.sp-topbar {
+    background-color: var(--sidebar-bg);
+    border-bottom: 3px solid var(--accent);
+    padding: 8px 0;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.sp-topbar-inner {
+    padding-left: 24px;
+    padding-right: 24px;
+}
+
+.sp-brand {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+    text-decoration: none;
+    margin-right: 28px;
+}
+
+.sp-brand-name {
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 1.05rem;
+}
+
+.sp-brand-sub {
+    color: var(--sidebar-text);
+    font-size: 0.7rem;
+}
+
+.sp-toggler {
+    color: #ffffff;
+    border-color: var(--sidebar-border);
+    font-size: 1.1rem;
+    padding: 4px 10px;
+}
+
+.sp-toggler:focus {
+    box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.sp-nav {
+    gap: 4px;
+}
+
+.sp-nav .sp-nav-link {
+    color: var(--sidebar-text);
+    font-weight: 500;
+    font-size: 0.86rem;
+    padding: 8px 12px;
+    border-radius: var(--border-radius);
+    transition: color var(--transition), background-color var(--transition);
+}
+
+.sp-nav .sp-nav-link:hover,
+.sp-nav .sp-nav-link:focus {
+    color: var(--sidebar-text-hover);
+    background-color: var(--sidebar-hover-bg);
+}
+
+.sp-nav .sp-nav-link.active {
+    color: var(--sidebar-active-text);
+    background-color: var(--sidebar-active-bg);
+}
+
+.sp-user {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.sp-company {
+    color: #ffffff;
+    font-size: 0.84rem;
+    font-weight: 500;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sp-company i {
+    color: var(--accent);
+}
+
+.sp-logout-btn {
+    color: var(--sidebar-text);
+    border: 1px solid var(--sidebar-border);
+    font-size: 0.8rem;
+}
+
+.sp-logout-btn:hover,
+.sp-logout-btn:focus {
+    color: #ffffff;
+    border-color: var(--accent);
+    background-color: var(--accent-soft);
+}
+
+.sp-content {
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+}
+
+.sp-flash {
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+}
+
+/* ---------------------------------------------------------------------------
+   Portal cards and badges
+   --------------------------------------------------------------------------- */
+.sp-card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.sp-card-subtitle {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: 4px 0 0;
+}
+
+.sp-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    height: 100%;
+    margin-bottom: 0;
+    text-decoration: none;
+    color: inherit;
+    border-top: 3px solid var(--border-color);
+    transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.sp-stat:hover,
+.sp-stat:focus {
+    color: inherit;
+    border-top-color: var(--accent);
+}
+
+.sp-stat-attention {
+    border-top-color: var(--accent);
+}
+
+.sp-stat-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.sp-stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.1;
+}
+
+.sp-stat-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.sp-awaiting-badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 10px;
+    background-color: var(--accent-soft);
+    color: var(--accent-hover);
+    white-space: nowrap;
+}
+
+.sp-vin {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Batch motorcycle shipping form
+   --------------------------------------------------------------------------- */
+.sp-ship-table .sp-ship-vin-col {
+    min-width: 220px;
+}
+
+.sp-ship-table .sp-ship-year-col {
+    width: 130px;
+    min-width: 110px;
+}
+
+.sp-vin-input {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    text-transform: uppercase;
+}
+
+.sp-vin-input::placeholder {
+    text-transform: none;
+}
+
+.sp-ship-table tbody tr.sp-row-error td {
+    background-color: rgba(239, 68, 68, 0.05);
+    border-bottom: none;
+}
+
+.sp-ship-table tbody tr.sp-row-error-detail td {
+    background-color: rgba(239, 68, 68, 0.05);
+    padding-top: 0;
+}
+
+.sp-row-error-text {
+    font-size: 0.78rem;
+    color: #b91c1c;
+}
+
+@media (max-width: 991.98px) {
+    .sp-nav {
+        margin: 8px 0;
+    }
+
+    .sp-user {
+        padding: 8px 0 4px;
+        border-top: 1px solid var(--sidebar-border);
+        justify-content: space-between;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .sp-topbar-inner {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .sp-stat-value {
+        font-size: 1.4rem;
+    }
+
+    .sp-company {
+        max-width: 180px;
+    }
+}
+
+/* Batch shipping form on phones: each unit becomes a labelled card */
+@media (max-width: 575.98px) {
+    .sp-ship-table thead {
+        display: none;
+    }
+
+    .sp-ship-table,
+    .sp-ship-table tbody,
+    .sp-ship-table tr,
+    .sp-ship-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .sp-ship-table.admin-table tbody tr {
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .sp-ship-table.admin-table tbody tr.sp-row-error {
+        border-bottom: none;
+    }
+
+    .sp-ship-table.admin-table tbody td {
+        border: none;
+        padding: 3px 12px;
+    }
+
+    .sp-ship-table td[data-label]::before {
+        content: attr(data-label);
+        display: block;
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .sp-ship-table td.sp-ship-unit::before {
+        display: inline;
+        margin-right: 6px;
+    }
+
+    .sp-ship-table td.sp-ship-spacer {
+        display: none;
+    }
+}

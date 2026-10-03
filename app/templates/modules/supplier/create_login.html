@@ -1,0 +1,46 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/form_field.html' import text_field, readonly_field %}
+
+{% block title %}Create Portal Login - {{ record.SupplierName }}{% endblock %}
+{% block page_title %}Create Portal Login{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">Create Portal Login - {{ record.SupplierName }}</h2>
+        <p class="page-header-subtitle">
+            Gives this supplier access to the Supplier Portal to manage their catalogue and ship purchase orders.
+        </p>
+    </div>
+    <a href="{{ url_for('supplier.view', supplier_id=supplier_id) }}" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to {{ record.SupplierName }}
+    </a>
+</div>
+
+<div class="form-card">
+    <p class="form-section-title">Login Details</p>
+    <form method="POST" novalidate>
+        <div class="row">
+            <div class="col-md-4">{{ readonly_field('Supplier', record.SupplierName) }}</div>
+            <div class="col-md-6">
+                {{ text_field(name='Email', label='Login Email', value=form_data.get('Email',''),
+                    required=True, error=errors.get('Email',''), placeholder='supplier@example.com',
+                    help_text='The supplier signs in to the portal with this email address.') }}
+            </div>
+        </div>
+
+        <div class="alert alert-info" role="alert">
+            <i class="fa-solid fa-circle-info me-2"></i>
+            A temporary password is generated automatically and shown to you once after the
+            login is created. Hand it to the supplier yourself. It is not emailed and cannot be shown again.
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-user-plus me-2"></i>Create Login
+            </button>
+            <a href="{{ url_for('supplier.view', supplier_id=supplier_id) }}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

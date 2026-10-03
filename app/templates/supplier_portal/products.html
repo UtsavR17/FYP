@@ -1,0 +1,65 @@
+{% extends 'supplier_portal/base.html' %}
+{% from 'components/modal_confirm.html' import delete_modal %}
+
+{% block title %}My Products{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">My Products</h2>
+        <p class="page-header-subtitle">Spare parts you supply, with your buying price</p>
+    </div>
+    <a href="{{ url_for('supplier_portal.add_product') }}" class="btn btn-accent">
+        <i class="fa-solid fa-plus me-2"></i>Add Product
+    </a>
+</div>
+
+<div class="admin-card">
+    <div class="mb-3">
+        <h3 class="sp-card-title">
+            Spare Parts Supplied <span class="record-count-badge">{{ products | length }}</span>
+        </h3>
+    </div>
+
+    {% if products %}
+    <div class="table-responsive">
+        <table class="table admin-table">
+            <thead>
+                <tr>
+                    <th>Spare Part</th><th>Brand</th><th>Buying Price</th>
+                    <th class="text-end" style="width:140px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in products %}
+                <tr>
+                    <td><strong>{{ p._sp_name }}</strong></td>
+                    <td>{{ p._brand_name }}</td>
+                    <td>Rs. {{ '%.2f' | format(p.BuyingPrice | float) }}</td>
+                    <td class="text-end">
+                        <div class="action-btn-group">
+                            <a href="{{ url_for('supplier_portal.edit_product', product_id=p.SupplierProduct_ID) }}"
+                               class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-pen me-1"></i>Edit</a>
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                    data-bs-toggle="modal" data-bs-target="#deleteModal"
+                                    data-delete-url="{{ url_for('supplier_portal.delete_product', product_id=p.SupplierProduct_ID) }}"
+                                    data-record-name="{{ p._sp_name }} - {{ p._brand_name }}"
+                                    aria-label="Delete {{ p._sp_name }}">
+                                <i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="table-empty-state">
+        <div class="table-empty-icon-wrap"><i class="fa-solid fa-inbox"></i></div>
+        <p class="table-empty-text">You have not listed any spare parts yet. Click "Add Product" to add your first one.</p>
+    </div>
+    {% endif %}
+</div>
+
+{{ delete_modal() }}
+{% endblock %}
