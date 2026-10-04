@@ -52,9 +52,14 @@
                 {% endif %}
             </div>
             <div class="col-md-6">
+                {% if status_locked %}
+                {{ readonly_field('Status', record.Status,
+                    help_text='Use Recall / Reopen to change the order state.') }}
+                {% else %}
                 {{ select_field(name='Status', label='Status', options=status_options,
                     selected=form_data.get('Status','Pending'), required=True,
                     error=errors.get('Status',''), empty_label='— Select a Status —') }}
+                {% endif %}
             </div>
         </div>
         <div class="row">

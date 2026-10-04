@@ -98,7 +98,7 @@ def friendly_response_error(error):
     if 'reason of at least 5 characters' in text:
         return 'Please give a reason of at least 5 characters to reject the order.'
     if 'purchase order is closed' in text:
-        return 'This purchase order is closed.'
+        return 'This purchase order has been closed by the dealership, so it can no longer be accepted or rejected.'
     if 'may only accept or reject' in text:
         return 'From the portal an order can only be accepted or rejected.'
     if 'row-level security' in text or str(getattr(error, 'code', '')) == '42501':

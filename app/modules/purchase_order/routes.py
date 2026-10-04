@@ -272,9 +272,14 @@ def edit(po_id):
     stage = record.get('SupplierStage') or STAGE_DRAFT
     supplier_locked = stage != STAGE_DRAFT
     supplier_name = dict(supplier_options).get(record.get('Supplier_SupplierID'), '-')
+    # While the order is with the supplier (Sent) or rejected, its state only
+    # changes through Recall / Reopen, so Status is read-only here
+    status_locked = stage in (STAGE_SENT, STAGE_REJECTED)
 
     if request.method == 'POST':
         form_data = request.form.to_dict()
+        if status_locked:
+            form_data['Status'] = record.get('Status', '')   # posted value ignored
 
         supplier_id_raw   = form_data.get('Supplier_SupplierID', '').strip()
         porder_date_raw   = form_data.get('POrderDate', '').strip()
@@ -344,7 +349,8 @@ def edit(po_id):
         supplier_options=supplier_options,
         status_options=PO_STATUS_OPTIONS,
         supplier_locked=supplier_locked,
-        supplier_name=supplier_name
+        supplier_name=supplier_name,
+        status_locked=status_locked
     )
 
 
