@@ -1,4 +1,4 @@
-from datetime import date as date_type
+from datetime import date as date_type, datetime, timedelta, timezone
 from flask import render_template, request, redirect, url_for
 from app.modules.purchase_order import bp
 from app.auth.decorators import login_required
@@ -22,6 +22,81 @@ PO_STATUS_OPTIONS = [
     ('Received',           'Received'),
     ('Cancelled',          'Cancelled'),
 ]
+
+# Supplier workflow stage of a Purchase Order (Task 36)
+STAGE_DRAFT    = 'Draft'
+STAGE_SENT     = 'Sent'
+STAGE_ACCEPTED = 'Accepted'
+STAGE_REJECTED = 'Rejected'
+
+ORDER_CHANGED_MSG = 'This order has changed. Refresh and try again.'
+
+
+def _mauritius_today():
+    """Today's date in Mauritius time (UTC+4) as YYYY-MM-DD."""
+    return datetime.now(timezone(timedelta(hours=4))).date().isoformat()
+
+
+def _get_po_header(po_id):
+    """
+    The PurchaseOrder row plus '_auth_user_id' (the supplier's portal login,
+    or None) and '_stage' (SupplierStage, Draft when missing). None if not found.
+    """
+    try:
+        po = (
+            supabase.table('PurchaseOrder').select('*')
+            .eq('PurchaseOrderID', po_id).single().execute()
+        ).data
+    except Exception:
+        return None
+    po['_stage'] = po.get('SupplierStage') or STAGE_DRAFT
+    po['_auth_user_id'] = None
+    try:
+        sup = (
+            supabase.table('Supplier').select('AuthUserID')
+            .eq('SupplierID', po.get('Supplier_SupplierID')).single().execute()
+        ).data
+        po['_auth_user_id'] = sup.get('AuthUserID')
+    except Exception:
+        pass
+    return po
+
+
+def _lines_locked(stage, has_portal_login=True):
+    """
+    Lines cannot be added, edited or deleted while the order is with the
+    supplier (Sent) or after the supplier accepted it. Accepted only locks for
+    suppliers with a portal login: legacy offline orders keep today's behaviour.
+    """
+    if stage == STAGE_SENT:
+        return True
+    return stage == STAGE_ACCEPTED and has_portal_login
+
+
+def _line_lock_redirect(po_id):
+    """Redirect with a flash when the lines of this PO are locked, else None."""
+    header = _get_po_header(po_id)
+    if header and _lines_locked(header['_stage'], bool(header['_auth_user_id'])):
+        if header['_stage'] == STAGE_SENT:
+            flash_error('This order was sent to the supplier. Recall it first to change its lines.')
+        else:
+            flash_error('This order was accepted by the supplier and its lines can no longer be changed.')
+        return redirect(url_for('purchase_order.view', po_id=po_id))
+    return None
+
+
+def _receive_block_redirect(po_id):
+    """Redirect with a flash when this PO's lines may not be received, else None."""
+    header = _get_po_header(po_id)
+    if header is None:
+        return None   # the line lookup reports a missing order
+    if header['_stage'] == STAGE_SENT:
+        flash_error('Wait for the supplier to accept this order before receiving.')
+        return redirect(url_for('purchase_order.view', po_id=po_id))
+    if header.get('Status') == 'Cancelled':
+        flash_error('This purchase order is cancelled, so its lines cannot be received.')
+        return redirect(url_for('purchase_order.view', po_id=po_id))
+    return None
 
 
 def _get_supplier_options():
@@ -194,9 +269,17 @@ def edit(po_id):
     errors = {}
     form_data = record.copy()
     supplier_options = _get_supplier_options()
+    stage = record.get('SupplierStage') or STAGE_DRAFT
+    supplier_locked = stage != STAGE_DRAFT
+    supplier_name = dict(supplier_options).get(record.get('Supplier_SupplierID'), '-')
+    # While the order is with the supplier (Sent) or rejected, its state only
+    # changes through Recall / Reopen, so Status is read-only here
+    status_locked = stage in (STAGE_SENT, STAGE_REJECTED)
 
     if request.method == 'POST':
         form_data = request.form.to_dict()
+        if status_locked:
+            form_data['Status'] = record.get('Status', '')   # posted value ignored
 
         supplier_id_raw   = form_data.get('Supplier_SupplierID', '').strip()
         porder_date_raw   = form_data.get('POrderDate', '').strip()
@@ -211,6 +294,13 @@ def edit(po_id):
                 supplier_id = int(supplier_id_raw)
             except ValueError:
                 errors['Supplier_SupplierID'] = 'Please select a valid supplier.'
+
+        # Once sent to the supplier the order belongs to that supplier (Task 36)
+        if supplier_locked and supplier_id != record.get('Supplier_SupplierID'):
+            errors['Supplier_SupplierID'] = (
+                'The supplier cannot be changed after the order has been sent to them.'
+            )
+            form_data['Supplier_SupplierID'] = record.get('Supplier_SupplierID')
 
         porder_date,   porder_err = _validate_date(porder_date_raw,  'Order Date')
         expected_date, exp_err    = _validate_date(expected_date_raw, 'Expected Date')
@@ -235,12 +325,16 @@ def edit(po_id):
 
         if not errors:
             try:
-                supabase.table('PurchaseOrder').update({
+                # Stage filter: the supplier may have responded since the form opened
+                updated = supabase.table('PurchaseOrder').update({
                     'POrderDate':          porder_date,
                     'ExpectedDate':        expected_date,
                     'Status':              status_value,
                     'Supplier_SupplierID': supplier_id,
-                }).eq('PurchaseOrderID', po_id).execute()
+                }).eq('PurchaseOrderID', po_id).eq('SupplierStage', stage).execute()
+                if not updated.data:
+                    flash_error(ORDER_CHANGED_MSG)
+                    return redirect(url_for('purchase_order.view', po_id=po_id))
                 flash_success(f'Purchase order PO-{po_id} was updated successfully.')
                 return redirect(url_for('purchase_order.index'))
             except Exception as e:
@@ -253,7 +347,10 @@ def edit(po_id):
         is_edit=True,
         record=record,
         supplier_options=supplier_options,
-        status_options=PO_STATUS_OPTIONS
+        status_options=PO_STATUS_OPTIONS,
+        supplier_locked=supplier_locked,
+        supplier_name=supplier_name,
+        status_locked=status_locked
     )
 
 
@@ -273,17 +370,19 @@ def view(po_id):
         flash_error(f'Purchase order ID {po_id} was not found.')
         return redirect(url_for('purchase_order.index'))
 
-    # Resolve supplier name
+    # Resolve supplier name (and whether the supplier has a portal login)
     supplier_name = '—'
+    has_portal_login = False
     try:
         sup_result = (
             supabase.table('Supplier')
-            .select('SupplierName')
+            .select('SupplierName, AuthUserID')
             .eq('SupplierID', record.get('Supplier_SupplierID'))
             .single()
             .execute()
         )
         supplier_name = sup_result.data.get('SupplierName', '-')
+        has_portal_login = bool(sup_result.data.get('AuthUserID'))
     except Exception:
         pass
 
@@ -335,6 +434,14 @@ def view(po_id):
     po_bikes_total = sum(float(m.get('BuyingPrice') or 0) for m in po_motorbikes)
     po_total = po_items_total + po_bikes_total
 
+    # Supplier workflow (Task 36)
+    stage = record.get('SupplierStage') or STAGE_DRAFT
+    line_count = len(po_items) + len(po_motorbikes)
+    can_send = (
+        stage == STAGE_DRAFT and record.get('Status') == 'Pending'
+        and has_portal_login and line_count > 0
+    )
+
     return render_template(
     'modules/purchase_order/view.html',
     record=record,
@@ -345,16 +452,46 @@ def view(po_id):
     po_motorbikes=po_motorbikes,
     po_items_total=po_items_total,
     po_bikes_total=po_bikes_total,
-    po_total=po_total
+    po_total=po_total,
+    stage=stage,
+    has_portal_login=has_portal_login,
+    line_count=line_count,
+    can_send=can_send,
+    lines_locked=_lines_locked(stage, has_portal_login),
+    can_receive=(stage != STAGE_SENT and record.get('Status') != 'Cancelled'),
+    date_sent=_format_shipped_date(record.get('DateSent'), with_year=True),
+    date_responded=_format_shipped_date(record.get('DateResponded'), with_year=True)
 )
 
 
 @bp.route('/delete/<int:po_id>', methods=['POST'])
 @login_required
 def delete(po_id):
+    header = _get_po_header(po_id)
+    if header is None:
+        flash_error(f'Purchase order ID {po_id} was not found.')
+        return redirect(url_for('purchase_order.index'))
+    stage = header['_stage']
+    if stage == STAGE_SENT:
+        flash_error('Recall the order before deleting it.')
+        return redirect(url_for('purchase_order.view', po_id=po_id))
+    if stage in (STAGE_ACCEPTED, STAGE_REJECTED):
+        flash_error(
+            'An order the supplier has already responded to cannot be deleted. '
+            'Change its status to Cancelled instead.'
+            if stage == STAGE_ACCEPTED else
+            'A rejected order cannot be deleted. Reopen it as a draft first if you need to delete it.'
+        )
+        return redirect(url_for('purchase_order.view', po_id=po_id))
     try:
-        supabase.table('PurchaseOrder').delete().eq('PurchaseOrderID', po_id).execute()
-        flash_success(f'Purchase order PO-{po_id} was deleted successfully.')
+        deleted = (
+            supabase.table('PurchaseOrder').delete()
+            .eq('PurchaseOrderID', po_id).eq('SupplierStage', STAGE_DRAFT).execute()
+        )
+        if deleted.data:
+            flash_success(f'Purchase order PO-{po_id} was deleted successfully.')
+        else:
+            flash_error(ORDER_CHANGED_MSG)
     except Exception as e:
         error_msg = str(e)
         if 'foreign key' in error_msg.lower() or 'violates' in error_msg.lower():
@@ -366,6 +503,138 @@ def delete(po_id):
             flash_error(f'Could not delete purchase order: {error_msg}')
 
     return redirect(url_for('purchase_order.index'))
+
+
+
+# =============================================================================
+# SUPPLIER WORKFLOW (Task 36): Draft -> Sent -> Accepted / Rejected
+# Every transition is a conditional update on the expected stage and checks
+# that a row was actually changed, so a race with the supplier cannot win twice.
+# =============================================================================
+
+def _po_has_lines(po_id):
+    try:
+        items = (
+            supabase.table('PurchaseOrderItem').select('POItem_ID')
+            .eq('PurchaseOrder_ID', po_id).limit(1).execute()
+        ).data or []
+        bikes = (
+            supabase.table('PO_NewMotorBike').select('POBike_ID')
+            .eq('PurchaseOrder_ID', po_id).limit(1).execute()
+        ).data or []
+        return bool(items or bikes)
+    except Exception:
+        return False
+
+
+@bp.route('/<int:po_id>/send', methods=['POST'])
+@login_required
+def send_to_supplier(po_id):
+    view_url = url_for('purchase_order.view', po_id=po_id)
+    header = _get_po_header(po_id)
+    if header is None:
+        flash_error(f'Purchase order ID {po_id} was not found.')
+        return redirect(url_for('purchase_order.index'))
+
+    errors = []
+    if header['_stage'] != STAGE_DRAFT:
+        errors.append('Only a draft order can be sent to the supplier.')
+    if header.get('Status') != 'Pending':
+        errors.append('Only an order with status Pending can be sent to the supplier.')
+    if not header['_auth_user_id']:
+        errors.append('This supplier has no portal login, so the order is handled offline.')
+    if not _po_has_lines(po_id):
+        errors.append('Add at least one spare part or motorcycle before sending the order.')
+    if errors:
+        flash_error(' '.join(errors))
+        return redirect(view_url)
+
+    try:
+        updated = (
+            supabase.table('PurchaseOrder')
+            .update({'SupplierStage': STAGE_SENT, 'DateSent': _mauritius_today()})
+            .eq('PurchaseOrderID', po_id)
+            .eq('SupplierStage', STAGE_DRAFT)
+            .eq('Status', 'Pending')
+            .execute()
+        )
+    except Exception as e:
+        flash_error(f'Could not send the order: {str(e)}')
+        return redirect(view_url)
+
+    if updated.data:
+        flash_success(f'PO-{po_id} was sent to the supplier. Its lines are locked until you recall it.')
+    else:
+        flash_error(ORDER_CHANGED_MSG)
+    return redirect(view_url)
+
+
+@bp.route('/<int:po_id>/recall', methods=['POST'])
+@login_required
+def recall_from_supplier(po_id):
+    view_url = url_for('purchase_order.view', po_id=po_id)
+    header = _get_po_header(po_id)
+    if header is None:
+        flash_error(f'Purchase order ID {po_id} was not found.')
+        return redirect(url_for('purchase_order.index'))
+    if header['_stage'] != STAGE_SENT:
+        flash_error('Only an order that is waiting for the supplier can be recalled.')
+        return redirect(view_url)
+
+    try:
+        updated = (
+            supabase.table('PurchaseOrder')
+            .update({'SupplierStage': STAGE_DRAFT, 'DateSent': None})
+            .eq('PurchaseOrderID', po_id)
+            .eq('SupplierStage', STAGE_SENT)
+            .execute()
+        )
+    except Exception as e:
+        flash_error(f'Could not recall the order: {str(e)}')
+        return redirect(view_url)
+
+    if updated.data:
+        flash_success(f'PO-{po_id} was recalled and is a draft again. Its lines can be changed.')
+    else:
+        flash_error(ORDER_CHANGED_MSG)
+    return redirect(view_url)
+
+
+@bp.route('/<int:po_id>/reopen', methods=['POST'])
+@login_required
+def reopen_po(po_id):
+    view_url = url_for('purchase_order.view', po_id=po_id)
+    header = _get_po_header(po_id)
+    if header is None:
+        flash_error(f'Purchase order ID {po_id} was not found.')
+        return redirect(url_for('purchase_order.index'))
+    if header['_stage'] != STAGE_REJECTED:
+        flash_error('Only an order rejected by the supplier can be reopened as a draft.')
+        return redirect(view_url)
+
+    try:
+        updated = (
+            supabase.table('PurchaseOrder')
+            .update({
+                'SupplierStage':   STAGE_DRAFT,
+                'Status':          'Pending',
+                'DateSent':        None,
+                'DateResponded':   None,
+                'RejectionReason': None,
+            })
+            .eq('PurchaseOrderID', po_id)
+            .eq('SupplierStage', STAGE_REJECTED)
+            .execute()
+        )
+    except Exception as e:
+        flash_error(f'Could not reopen the order: {str(e)}')
+        return redirect(view_url)
+
+    if updated.data:
+        flash_success(f'PO-{po_id} was reopened as a draft with status Pending.')
+    else:
+        flash_error(ORDER_CHANGED_MSG)
+    return redirect(view_url)
 
 
 
@@ -515,6 +784,9 @@ def _catalog_to_dropdown_options(catalog_rows, already_added_sp_ids=None):
 @login_required
 def add_item(po_id):
     """Add a line item to an existing Purchase Order."""
+    locked = _line_lock_redirect(po_id)
+    if locked:
+        return locked
     try:
         po_result = (
             supabase.table('PurchaseOrder')
@@ -647,6 +919,9 @@ def add_item(po_id):
 @login_required
 def edit_item(po_id, item_id):
     """Edit a line item that has not yet been received."""
+    locked = _line_lock_redirect(po_id)
+    if locked:
+        return locked
     try:
         item_result = (
             supabase.table('PurchaseOrderItem')
@@ -740,6 +1015,9 @@ def edit_item(po_id, item_id):
 @login_required
 def delete_item(po_id, item_id):
     """Delete a PO line item. Only allowed if Status is Ordered."""
+    locked = _line_lock_redirect(po_id)
+    if locked:
+        return locked
     try:
         item_result = (
             supabase.table('PurchaseOrderItem')
@@ -785,6 +1063,10 @@ def receive_item(po_id, item_id):
           - new:      INSERT new Stock record, QOH = Quantity_Received
           In both cases, the POItem is updated and the PO status auto-updates.
     """
+    blocked = _receive_block_redirect(po_id)
+    if blocked:
+        return blocked
+
     try:
         item_result = (
             supabase.table('PurchaseOrderItem')
@@ -1123,6 +1405,9 @@ def _get_po_status(po_id):
 @bp.route('/<int:po_id>/motorbikes/add', methods=['GET', 'POST'])
 @login_required
 def add_motorbike(po_id):
+    locked = _line_lock_redirect(po_id)
+    if locked:
+        return locked
     po_status = _get_po_status(po_id)
     if po_status is None:
         flash_error(f'Purchase order ID {po_id} was not found.')
@@ -1204,6 +1489,9 @@ def add_motorbike(po_id):
 @bp.route('/<int:po_id>/motorbikes/<int:pobike_id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_motorbike(po_id, pobike_id):
+    locked = _line_lock_redirect(po_id)
+    if locked:
+        return locked
     line, redir = _get_motorbike_line_or_redirect(po_id, pobike_id)
     if redir:
         return redir
@@ -1269,6 +1557,9 @@ def edit_motorbike(po_id, pobike_id):
 @bp.route('/<int:po_id>/motorbikes/<int:pobike_id>/delete', methods=['POST'])
 @login_required
 def delete_motorbike(po_id, pobike_id):
+    locked = _line_lock_redirect(po_id)
+    if locked:
+        return locked
     line, redir = _get_motorbike_line_or_redirect(po_id, pobike_id)
     if redir:
         return redir
@@ -1310,6 +1601,9 @@ def receive_motorbike(po_id, pobike_id):
     When the supplier shipped the line, VIN and Year come from ShippedVIN and
     ShippedYear and cannot be changed here either (Task 35).
     """
+    blocked = _receive_block_redirect(po_id)
+    if blocked:
+        return blocked
     line, redir = _get_motorbike_line_or_redirect(po_id, pobike_id)
     if redir:
         return redir

@@ -241,8 +241,9 @@ def delete(supplier_id):
         error_msg = str(e)
         if 'foreign key' in error_msg.lower() or 'violates' in error_msg.lower():
             flash_error(
-                f'Cannot delete "{name_value}" because it is referenced '
-                f'by one or more purchase orders.'
+                f'Cannot delete "{name_value}" because it is referenced by one or '
+                f'more purchase orders or catalogue entries (products or models). '
+                f'Remove those first.'
             )
         else:
             flash_error(f'Could not delete supplier: {error_msg}')

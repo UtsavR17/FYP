@@ -2,6 +2,11 @@ from functools import wraps
 from flask import session, redirect, url_for, flash
 from app.supabase_client import supabase
 
+# Flask session keys owned by the Admin Panel. Logout and session expiry
+# remove only these, so a supplier portal session in the same browser is
+# left untouched (Task 35 / 36).
+ADMIN_SESSION_KEYS = ('access_token', 'refresh_token', 'user_email', 'payment_form_token')
+
 
 def login_required(f):
     """
@@ -32,7 +37,8 @@ def login_required(f):
             if not user_response or not user_response.user:
                 raise Exception('Session invalid or expired.')
         except Exception:
-            session.clear()
+            for key in ADMIN_SESSION_KEYS:
+                session.pop(key, None)
             flash('Your session has expired. Please sign in again.', 'warning')
             return redirect(url_for('auth.login'))
 

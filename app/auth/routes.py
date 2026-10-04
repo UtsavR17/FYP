@@ -2,10 +2,7 @@ from flask import render_template, request, redirect, url_for, session, flash
 from app.auth import bp
 from app.supabase_client import supabase
 from app.utils.flash_messages import flash_error
-
-# Flask session keys owned by the Admin Panel. Logout removes only these so a
-# supplier portal session in the same browser is left untouched (Task 35).
-ADMIN_SESSION_KEYS = ('access_token', 'refresh_token', 'user_email', 'payment_form_token')
+from app.auth.decorators import ADMIN_SESSION_KEYS
 
 
 @bp.route('/login', methods=['GET', 'POST'])

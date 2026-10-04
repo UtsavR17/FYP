@@ -228,6 +228,7 @@
                                     <span class="po-status-badge po-status-{{ po.status | lower | replace(' ', '-') }}">
                                         {{ po.status }}
                                     </span>
+                                    <span class="po-status-badge po-stage-{{ po.stage | lower }}">{{ po.stage }}</span>
                                 </td>
                             </tr>
                             {% endfor %}

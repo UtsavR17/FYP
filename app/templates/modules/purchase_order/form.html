@@ -1,5 +1,5 @@
 {% extends 'layout/admin_layout.html' %}
-{% from 'components/form_field.html' import select_field, date_field %}
+{% from 'components/form_field.html' import select_field, date_field, readonly_field %}
 
 {% block title %}
     {{ 'Edit Purchase Order' if is_edit else 'New Purchase Order' }}
@@ -38,14 +38,28 @@
               {% if is_edit %}
         <div class="row">
             <div class="col-md-6">
+                {% if supplier_locked %}
+                {{ readonly_field('Supplier', supplier_name,
+                    help_text='The supplier cannot be changed after the order has been sent to them.') }}
+                <input type="hidden" name="Supplier_SupplierID" value="{{ record.Supplier_SupplierID }}">
+                {% if errors.get('Supplier_SupplierID') %}
+                <div class="text-danger small mb-3">{{ errors.get('Supplier_SupplierID') }}</div>
+                {% endif %}
+                {% else %}
                 {{ select_field(name='Supplier_SupplierID', label='Supplier', options=supplier_options,
                     selected=form_data.get('Supplier_SupplierID',''), required=True,
                     error=errors.get('Supplier_SupplierID',''), empty_label='— Select a Supplier —') }}
+                {% endif %}
             </div>
             <div class="col-md-6">
+                {% if status_locked %}
+                {{ readonly_field('Status', record.Status,
+                    help_text='Use Recall / Reopen to change the order state.') }}
+                {% else %}
                 {{ select_field(name='Status', label='Status', options=status_options,
                     selected=form_data.get('Status','Pending'), required=True,
                     error=errors.get('Status',''), empty_label='— Select a Status —') }}
+                {% endif %}
             </div>
         </div>
         <div class="row">

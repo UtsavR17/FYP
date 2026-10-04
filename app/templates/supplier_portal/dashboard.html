@@ -14,28 +14,35 @@
 </div>
 
 <div class="row g-3 mb-1">
-    <div class="col-6 col-lg-3">
+    <div class="col-6 col-lg">
+        <a class="sp-stat admin-card {% if stats.awaiting_response %}sp-stat-attention{% endif %}" href="{{ url_for('supplier_portal.orders') }}">
+            <span class="sp-stat-label">Awaiting Your Response</span>
+            <span class="sp-stat-value">{{ stats.awaiting_response }}</span>
+            <span class="sp-stat-hint">Orders to accept or reject</span>
+        </a>
+    </div>
+    <div class="col-6 col-lg">
         <a class="sp-stat admin-card" href="{{ url_for('supplier_portal.orders') }}">
             <span class="sp-stat-label">Open Purchase Orders</span>
             <span class="sp-stat-value">{{ stats.open_pos }}</span>
             <span class="sp-stat-hint">Pending or partially received</span>
         </a>
     </div>
-    <div class="col-6 col-lg-3">
+    <div class="col-6 col-lg">
         <a class="sp-stat admin-card {% if stats.awaiting %}sp-stat-attention{% endif %}" href="{{ url_for('supplier_portal.orders') }}">
             <span class="sp-stat-label">Lines Awaiting Shipment</span>
             <span class="sp-stat-value">{{ stats.awaiting }}</span>
-            <span class="sp-stat-hint">Spare parts and motorcycles</span>
+            <span class="sp-stat-hint">On accepted orders</span>
         </a>
     </div>
-    <div class="col-6 col-lg-3">
+    <div class="col-6 col-lg">
         <a class="sp-stat admin-card" href="{{ url_for('supplier_portal.products') }}">
             <span class="sp-stat-label">Catalogue Products</span>
             <span class="sp-stat-value">{{ stats.products }}</span>
             <span class="sp-stat-hint">Spare parts you supply</span>
         </a>
     </div>
-    <div class="col-6 col-lg-3">
+    <div class="col-6 col-lg">
         <a class="sp-stat admin-card" href="{{ url_for('supplier_portal.models') }}">
             <span class="sp-stat-label">Catalogue Models</span>
             <span class="sp-stat-value">{{ stats.models }}</span>
@@ -48,7 +55,7 @@
     <div class="d-flex align-items-center justify-content-between mb-3">
         <div>
             <h3 class="sp-card-title">Recent Purchase Orders</h3>
-            <p class="sp-card-subtitle">The five most recent orders addressed to you</p>
+            <p class="sp-card-subtitle">Orders awaiting your response first, then the most recent</p>
         </div>
         <a href="{{ url_for('supplier_portal.orders') }}" class="btn btn-sm btn-outline-secondary">All Orders</a>
     </div>
@@ -59,7 +66,7 @@
             <thead>
                 <tr>
                     <th>PO Number</th><th>Order Date</th><th>Expected</th><th>Status</th>
-                    <th>Awaiting Shipment</th>
+                    <th>Stage</th><th>Awaiting Shipment</th>
                     <th class="text-end">Actions</th>
                 </tr>
             </thead>
@@ -71,6 +78,10 @@
                     <td>{{ po.ExpectedDate or '-' }}</td>
                     <td>
                         <span class="po-status-badge po-status-{{ po.Status | lower | replace(' ', '-') }}">{{ po.Status }}</span>
+                    </td>
+                    <td>
+                        {% set po_stage = po.SupplierStage or 'Draft' %}
+                        <span class="po-status-badge po-stage-{{ po_stage | lower }}">{{ 'Awaiting your response' if po_stage == 'Sent' else po_stage }}</span>
                     </td>
                     <td>
                         {% if po._awaiting %}
