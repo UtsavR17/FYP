@@ -6,6 +6,7 @@ from app.supabase_client import supabase
 from app.utils.pagination import paginate
 from app.utils.flash_messages import flash_success, flash_error
 from app.utils.validators import is_positive_number
+from app.utils.order_ref import format_order_ref, parse_order_query
 from datetime import date as date_type
 
 
@@ -24,6 +25,37 @@ PAYMENT_TYPE_OPTIONS = [
 
 VALID_METHODS = [v for v, _ in PAYMENT_METHOD_OPTIONS]
 VALID_TYPES   = [v for v, _ in PAYMENT_TYPE_OPTIONS]
+
+# Online payments (Task 40) are created by the Stripe webhook of the Client
+# Side. They are system records: they cannot be edited or deleted here.
+ONLINE_PAYMENT_LOCKED_MSG = (
+    'This is an online payment recorded automatically by Stripe checkout, '
+    'so it cannot be edited or deleted here.'
+)
+
+
+def _is_online_payment(record):
+    """True for payments created by the online checkout (order link or Stripe intent)."""
+    return bool(record and (record.get('Online_Order_OrderID') or record.get('StripePaymentIntentID')))
+
+
+def _online_order_customers(order_ids):
+    """{OrderID: CustomerID} with one .in_() query per 100 ids."""
+    ids = sorted({i for i in order_ids if i})
+    order_customer = {}
+    for start in range(0, len(ids), 100):
+        try:
+            rows = (
+                supabase.table('Online_Order')
+                .select('OrderID, Customer_CustomerID')
+                .in_('OrderID', ids[start:start + 100])
+                .execute()
+            ).data or []
+            for r in rows:
+                order_customer[r['OrderID']] = r.get('Customer_CustomerID')
+        except Exception:
+            continue
+    return order_customer
 
 
 def _validate_date(raw_value, field_label):
@@ -267,17 +299,35 @@ def _enrich_payments(all_records):
     except Exception:
         pass
 
+    order_customer = _online_order_customers(
+        p.get('Online_Order_OrderID') for p in all_records
+    )
+
     for pay in all_records:
-        sale_id = pay.get('Sale_SaleID')
-        appt_id = pay.get('Appointment_AppointmentID')
+        sale_id  = pay.get('Sale_SaleID')
+        appt_id  = pay.get('Appointment_AppointmentID')
+        order_id = pay.get('Online_Order_OrderID')
+        pay['_reference_url'] = None
+        pay['_locked']        = _is_online_payment(pay)
         if sale_id:
             pay['_reference_type']  = 'Sale'
+            pay['_reference_key']   = 'sale'
             pay['_reference_label'] = sale_lookup.get(sale_id, f'SALE-{sale_id}')
         elif appt_id:
             pay['_reference_type']  = 'Appointment'
+            pay['_reference_key']   = 'appointment'
             pay['_reference_label'] = appt_lookup.get(appt_id, f'APPT-#{appt_id}')
+        elif order_id:
+            ref   = format_order_ref(order_id)
+            cname = customer_lookup.get(order_customer.get(order_id))
+            pay['_reference_type']  = 'Online Order'
+            pay['_reference_key']   = 'online'
+            pay['_reference_badge'] = ref
+            pay['_reference_label'] = f'{ref} - {cname}' if cname else ref
+            pay['_reference_url']   = url_for('online_order.view', order_id=order_id)
         else:
             pay['_reference_type']  = '-'
+            pay['_reference_key']   = 'none'
             pay['_reference_label'] = '-'
 
     return all_records
@@ -458,12 +508,15 @@ def index():
 
     if search_query:
         q = search_query.lower()
+        # "ORD-000012" or a plain order number also find online-order payments.
+        q_order_id = parse_order_query(search_query)
         all_records = [
             r for r in all_records
             if q in r.get('_reference_label', '').lower()
             or q in r.get('PaymentMethod', '').lower()
             or q in r.get('PaymentType', '').lower()
             or q in str(r.get('PaymentDate', '') or '')
+            or (q_order_id is not None and r.get('Online_Order_OrderID') == q_order_id)
         ]
 
     pagination = paginate(all_records, page, per_page=10)
@@ -570,6 +623,11 @@ def edit(payment_id):
         flash_error(f'Payment ID {payment_id} was not found.')
         return redirect(url_for('payment.index'))
 
+    # Online payments are system records (Task 40): refuse GET and POST alike.
+    if _is_online_payment(record):
+        flash_error(ONLINE_PAYMENT_LOCKED_MSG)
+        return redirect(url_for('payment.index'))
+
     current_appt_id = record.get('Appointment_AppointmentID')
     current_sale_id = record.get('Sale_SaleID')
     locked_ref_type  = 'appointment' if current_appt_id else 'sale'
@@ -629,6 +687,21 @@ def edit(payment_id):
 @bp.route('/delete/<int:payment_id>', methods=['POST'])
 @login_required
 def delete(payment_id):
+    # Online payments are system records (Task 40): check before deleting.
+    try:
+        rows = (
+            supabase.table('Payment')
+            .select('PaymentID, Online_Order_OrderID, StripePaymentIntentID')
+            .eq('PaymentID', payment_id)
+            .execute()
+        ).data or []
+    except Exception as e:
+        flash_error(f'Could not delete payment: {str(e)}')
+        return redirect(url_for('payment.index'))
+    if rows and _is_online_payment(rows[0]):
+        flash_error(ONLINE_PAYMENT_LOCKED_MSG)
+        return redirect(url_for('payment.index'))
+
     try:
         supabase.table('Payment').delete().eq('PaymentID', payment_id).execute()
         flash_success(f'Payment PAY-{payment_id} was deleted successfully.')
