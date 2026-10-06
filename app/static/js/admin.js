@@ -212,3 +212,16 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 
+/* ---------------------------------------------------------------------------
+   Bootstrap tooltips (Task 40). Only elements that opt in with
+   data-bs-toggle="tooltip" are affected; their title attribute is the
+   fallback when JavaScript is unavailable.
+   --------------------------------------------------------------------------- */
+document.addEventListener('DOMContentLoaded', function () {
+    if (!window.bootstrap || !bootstrap.Tooltip) {
+        return;
+    }
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+        bootstrap.Tooltip.getOrCreateInstance(el);
+    });
+});

@@ -86,6 +86,12 @@
             </td>
             <td>
                 <span class="po-status-badge oo-status-{{ row._status_css }}">{{ row.Status }}</span>
+                {% if row._check_stripe %}
+                <span class="oo-check-stripe" tabindex="0" data-bs-toggle="tooltip" data-bs-placement="top"
+                      title="{{ check_stripe_tooltip }}" aria-label="Check Stripe: {{ check_stripe_tooltip }}">
+                    <i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i>Check Stripe
+                </span>
+                {% endif %}
             </td>
             <td><strong>Rs. {{ '%.2f' | format(row.TotalAmount | float) }}</strong></td>
             <td>{{ row.EstimatedDate if row.EstimatedDate else '-' }}</td>

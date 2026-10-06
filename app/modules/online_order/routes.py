@@ -74,6 +74,14 @@ ACTION_LABELS = {
     STATUS_COMPLETED:  ('Mark Completed', 'fa-circle-check'),
 }
 
+# A Pending Payment order older than this has an expired Stripe session (30 min),
+# so a still-pending order may hide a payment the webhook never confirmed.
+STALE_PENDING_MINUTES = 60
+CHECK_STRIPE_TOOLTIP = (
+    'The checkout session has expired. If the customer was charged, the payment '
+    'was not confirmed automatically; check the Stripe Dashboard.'
+)
+
 ORDER_CHANGED_MSG = 'This order has changed. Refresh and try again.'
 STRIPE_REFUND_MSG = (
     'Order cancelled and stock restored. If the customer was charged, '
@@ -81,14 +89,16 @@ STRIPE_REFUND_MSG = (
 )
 
 # Explicit column lists (no audit columns, no select *).
+# Date_Created is the only audit column read, and only to work out the
+# "Check Stripe" flag; it is stripped from every row before rendering.
 ORDER_LIST_COLUMNS = (
     'OrderID, OrderDate, Customer_CustomerID, Status, FulfilmentMethod, '
-    'EstimatedDate, TotalAmount'
+    'EstimatedDate, TotalAmount, Date_Created'
 )
 ORDER_VIEW_COLUMNS = (
     'OrderID, OrderDate, Customer_CustomerID, Status, FulfilmentMethod, '
     'DeliveryStreet, DeliveryTown, DeliveryPostCode, DeliveryPhone, '
-    'EstimatedDate, TotalAmount, PaidAt'
+    'EstimatedDate, TotalAmount, PaidAt, Date_Created'
 )
 CUSTOMER_COLUMNS = 'CustomerID, FirstName, LastName, PhoneNumber, Email'
 
@@ -140,6 +150,42 @@ def to_mauritius_time(value):
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(MU_TZ).strftime('%Y-%m-%d %H:%M')
+
+
+def _parse_timestamp_utc(value):
+    """ISO timestamp -> aware datetime (naive values are treated as UTC); None if unusable."""
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def needs_stripe_check(status, date_created, now=None):
+    """
+    True for a Pending Payment order created more than STALE_PENDING_MINUTES ago.
+    Date_Created (UTC) is converted to Mauritius time and compared with the
+    current Mauritius time. Every other status is never flagged.
+    """
+    if status != STATUS_PENDING:
+        return False
+    created = _parse_timestamp_utc(date_created)
+    if created is None:
+        return False
+    created_mu = created.astimezone(MU_TZ)
+    now_mu = (now or datetime.now(MU_TZ)).astimezone(MU_TZ)
+    return now_mu - created_mu > timedelta(minutes=STALE_PENDING_MINUTES)
+
+
+def _apply_stripe_flag(order, now=None):
+    """Set order['_check_stripe'] and drop Date_Created so it can never be rendered."""
+    order['_check_stripe'] = needs_stripe_check(order.get('Status'), order.get('Date_Created'), now)
+    order.pop('Date_Created', None)
+    return order
 
 
 def rpc_error_message(error_text):
@@ -264,7 +310,9 @@ def index():
         records = []
 
     customers = _customer_lookup(r.get('Customer_CustomerID') for r in records)
+    now = datetime.now(MU_TZ)
     for r in records:
+        _apply_stripe_flag(r, now)
         r['_customer'] = customers.get(r.get('Customer_CustomerID'))
         r['_customer_name'] = _full_name(r['_customer'])
         r['_status_css'] = STATUS_CSS.get(r.get('Status'), 'pending')
@@ -283,6 +331,7 @@ def index():
         fulfilment_filter=fulfilment_filter,
         statuses=STATUSES,
         fulfilments=FULFILMENTS,
+        check_stripe_tooltip=CHECK_STRIPE_TOOLTIP,
     )
 
 
@@ -297,6 +346,7 @@ def view(order_id):
     if order is None:
         flash_error(f'Online order ID {order_id} was not found.')
         return redirect(url_for('online_order.index'))
+    _apply_stripe_flag(order)
 
     customer = _customer_lookup([order.get('Customer_CustomerID')]).get(order.get('Customer_CustomerID'))
 
@@ -348,6 +398,8 @@ def view(order_id):
         refund_reminder=status == STATUS_CANCELLED and bool(payments),
         paid_at=to_mauritius_time(order.get('PaidAt')),
         status_css=STATUS_CSS.get(status, 'pending'),
+        check_stripe=order['_check_stripe'],
+        check_stripe_tooltip=CHECK_STRIPE_TOOLTIP,
         next_actions=[(s, *ACTION_LABELS[s]) for s in next_statuses],
         can_cancel=can_cancel(status),
         cancel_restores_stock=status in CANCEL_WITH_RPC,

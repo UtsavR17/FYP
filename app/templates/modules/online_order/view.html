@@ -16,6 +16,16 @@
     </a>
 </div>
 
+{% if check_stripe %}
+<div class="oo-notice oo-notice-warning" role="status">
+    <i class="fa-solid fa-triangle-exclamation"></i>
+    <div>
+        <strong>Check Stripe.</strong> {{ check_stripe_tooltip }}
+        Search the Stripe Dashboard for {{ order_ref }} (the order id is in the payment metadata).
+    </div>
+</div>
+{% endif %}
+
 {% if refund_reminder %}
 <div class="oo-notice oo-notice-warning" role="status">
     <i class="fa-solid fa-rotate-left"></i>
@@ -73,6 +83,12 @@
                         <label class="form-label readonly-label">Status</label>
                         <div class="readonly-value">
                             <span class="po-status-badge oo-status-{{ status_css }}">{{ order.Status }}</span>
+                            {% if check_stripe %}
+                            <span class="oo-check-stripe" tabindex="0" data-bs-toggle="tooltip" data-bs-placement="top"
+                      title="{{ check_stripe_tooltip }}" aria-label="Check Stripe: {{ check_stripe_tooltip }}">
+                    <i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i>Check Stripe
+                </span>
+                            {% endif %}
                         </div>
                     </div>
                 </div>

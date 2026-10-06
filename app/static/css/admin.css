@@ -2640,6 +2640,25 @@ label.form-label {
     word-break: break-all;
 }
 
+/* "Check Stripe" warning on stale Pending Payment orders */
+.oo-check-stripe {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background-color: rgba(239, 68, 68, 0.1);
+    color: #b91c1c;
+    white-space: nowrap;
+    cursor: help;
+}
+
+.oo-check-stripe:focus-visible {
+    outline: 2px solid #b91c1c;
+    outline-offset: 2px;
+}
+
 /* "N to process" pill on the dashboard tile */
 .oo-tile-pill {
     display: inline-block;
