@@ -1,0 +1,109 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/table.html'      import search_bar, data_table %}
+{% from 'components/pagination.html' import pagination_controls %}
+{% from 'components/alert.html'      import info_alert %}
+
+{% block title %}Online Orders{% endblock %}
+{% block page_title %}Online Orders{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            Online Orders
+            <span class="record-count-badge">{{ pagination.total }}</span>
+        </h2>
+        <p class="page-header-subtitle">Spare part orders placed and paid by customers on the website</p>
+    </div>
+</div>
+
+<div class="admin-card">
+
+    {{ search_bar(
+        url_for('online_order.index'),
+        search_query,
+        'Search by order number (ORD-000012 or 12), customer name or phone...'
+    ) }}
+
+    <form method="GET" action="{{ url_for('online_order.index') }}" class="oo-filter-form">
+        {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
+        <div class="oo-filter-field">
+            <label for="oo-status-filter" class="form-label">Status</label>
+            <select id="oo-status-filter" name="status" class="form-select form-select-sm">
+                <option value="">All statuses</option>
+                {% for s in statuses %}
+                <option value="{{ s }}" {% if s == status_filter %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="oo-filter-field">
+            <label for="oo-fulfilment-filter" class="form-label">Fulfilment</label>
+            <select id="oo-fulfilment-filter" name="fulfilment" class="form-select form-select-sm">
+                <option value="">Delivery and pickup</option>
+                {% for f in fulfilments %}
+                <option value="{{ f }}" {% if f == fulfilment_filter %}selected{% endif %}>{{ f }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="oo-filter-actions">
+            <button type="submit" class="btn btn-sm btn-outline-primary">
+                <i class="fa-solid fa-filter me-1"></i>Apply
+            </button>
+            {% if status_filter or fulfilment_filter %}
+            <a href="{{ url_for('online_order.index', q=search_query or None) }}" class="btn btn-sm btn-outline-secondary">
+                <i class="fa-solid fa-xmark me-1"></i>Clear filters
+            </a>
+            {% endif %}
+        </div>
+    </form>
+
+    {% if search_query %}
+        {{ info_alert('Showing results for: <strong>' ~ search_query ~ '</strong>') }}
+    {% endif %}
+
+    {% call data_table(
+        ['Order ID', 'Date', 'Customer', 'Fulfilment', 'Status', 'Total', 'Estimated'],
+        total=pagination.total,
+        empty_message=('No online orders match these filters.' if (search_query or status_filter or fulfilment_filter)
+                       else 'No online orders yet. Orders placed on the customer website appear here.')
+    ) %}
+        {% for row in pagination.records %}
+        <tr>
+            <td style="width:120px;">
+                <a href="{{ url_for('online_order.view', order_id=row.OrderID) }}" class="fw-semibold">
+                    {{ row.OrderID | order_ref }}
+                </a>
+            </td>
+            <td>{{ row.OrderDate if row.OrderDate else '-' }}</td>
+            <td>{{ row._customer_name }}</td>
+            <td>
+                {% if row.FulfilmentMethod == 'Pickup' %}
+                    <i class="fa-solid fa-store me-1 text-secondary"></i>Pickup
+                {% else %}
+                    <i class="fa-solid fa-truck me-1 text-secondary"></i>Delivery
+                {% endif %}
+            </td>
+            <td>
+                <span class="po-status-badge oo-status-{{ row._status_css }}">{{ row.Status }}</span>
+            </td>
+            <td><strong>Rs. {{ '%.2f' | format(row.TotalAmount | float) }}</strong></td>
+            <td>{{ row.EstimatedDate if row.EstimatedDate else '-' }}</td>
+            <td class="text-end">
+                <div class="action-btn-group">
+                    <a href="{{ url_for('online_order.view', order_id=row.OrderID) }}"
+                       class="btn btn-sm btn-outline-primary">
+                        <i class="fa-solid fa-eye me-1"></i>View
+                    </a>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    {% endcall %}
+
+    {{ pagination_controls(pagination, 'online_order.index', search_query,
+                           params={'status': status_filter or None, 'fulfilment': fulfilment_filter or None}) }}
+
+</div>
+
+{% endblock %}

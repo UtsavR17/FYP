@@ -7,6 +7,10 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
+    # Online order references (Task 40): {{ order_id | order_ref }} -> ORD-000012
+    from app.utils.order_ref import format_order_ref
+    app.add_template_filter(format_order_ref, 'order_ref')
+
     # ------------------------------------------------------------------
     # BLUEPRINT REGISTRATION
     # ------------------------------------------------------------------
@@ -79,6 +83,10 @@ def create_app():
 
     from app.modules.payment import bp as payment_bp
     app.register_blueprint(payment_bp, url_prefix='/payments')
+
+    # Online Orders (Task 40): orders placed and paid on the Client Side
+    from app.modules.online_order import bp as online_order_bp
+    app.register_blueprint(online_order_bp, url_prefix='/online-orders')
 
     # Supplier Portal (Task 35): separate login and session keys from the Admin Panel
     from app.modules.supplier_portal import bp as supplier_portal_bp
