@@ -8,8 +8,13 @@
 
 <div class="page-header">
     <div>
-        <h2 class="page-header-title">{{ order_ref }}</h2>
-        <p class="page-header-subtitle">Online spare part order placed by a customer</p>
+        <h2 class="page-header-title">
+            {{ order_ref }}
+            {% if is_reservation %}<span class="oo-type-badge oo-type-reservation">Bike reservation</span>{% endif %}
+        </h2>
+        <p class="page-header-subtitle">
+            {{ 'Motorbike reserved online with a deposit' if is_reservation else 'Online spare part order placed by a customer' }}
+        </p>
     </div>
     <a href="{{ url_for('online_order.index') }}" class="btn btn-outline-secondary">
         <i class="fa-solid fa-arrow-left me-2"></i>Back to Online Orders
@@ -30,15 +35,64 @@
 <div class="oo-notice oo-notice-warning" role="status">
     <i class="fa-solid fa-rotate-left"></i>
     <div>
+        {% if is_reservation %}
+        <strong>This reservation was cancelled after the deposit was paid.</strong>
+        If not done yet, refund the deposit in the Stripe Dashboard: <code>{{ stripe_intent }}</code>
+        {% else %}
         <strong>This order was cancelled after payment.</strong>
         If not done yet, refund the payment in the Stripe Dashboard:
+        {% if payments %}
         {% for p in payments %}{% if p.StripePaymentIntentID %}<code>{{ p.StripePaymentIntentID }}</code>{% if not loop.last %}, {% endif %}{% endif %}{% endfor %}
+        {% elif stripe_intent %}<code>{{ stripe_intent }}</code>{% endif %}
+        {% endif %}
     </div>
 </div>
 {% endif %}
 
 <!-- Actions -->
-{% if next_actions or can_cancel %}
+{% if is_reservation %}
+{% if show_complete or can_cancel %}
+<div class="form-card">
+    <p class="form-section-title">Actions</p>
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+        {% if show_complete and can_complete %}
+        <button type="button" class="btn btn-accent" data-bs-toggle="modal" data-bs-target="#completeReservationModal">
+            <i class="fa-solid {{ complete_label[1] }} me-2"></i>{{ complete_label[0] }}
+        </button>
+        {% endif %}
+        {% if can_cancel %}
+        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelOrderModal">
+            <i class="fa-solid fa-ban me-2"></i>Cancel Reservation
+        </button>
+        {% endif %}
+    </div>
+    {% if show_complete and not can_complete %}
+    <div class="oo-notice oo-notice-warning mt-3 mb-0" role="status">
+        <i class="fa-solid fa-scale-unbalanced"></i>
+        <div>
+            <strong>{{ balance_block_msg }}</strong>
+            {% if balance_due is not none %}The balance due is Rs. {{ '%.2f' | format(balance_due) }}.{% endif %}
+            {% if sale_id %}
+            <div class="mt-2">
+                <a href="{{ url_for('sale.view', sale_id=sale_id) }}" class="btn btn-sm btn-outline-primary">
+                    <i class="fa-solid fa-handshake me-1"></i>Open SALE-{{ sale_id }}
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    <p class="form-text text-muted mb-0 mt-2">
+        <i class="fa-solid fa-circle-info me-1"></i>
+        {% if order.Status == 'Pending Payment' %}
+            The customer has not paid the deposit yet. Unpaid reservations are also cancelled automatically when the payment page expires.
+        {% else %}
+            Workflow: Paid (deposit received, motorbike held), then Completed once the balance is paid and the customer has collected the motorbike.
+        {% endif %}
+    </p>
+</div>
+{% endif %}
+{% elif next_actions or can_cancel %}
 <div class="form-card">
     <p class="form-section-title">Actions</p>
     <div class="d-flex flex-wrap gap-2">
@@ -83,6 +137,7 @@
                         <label class="form-label readonly-label">Status</label>
                         <div class="readonly-value">
                             <span class="po-status-badge oo-status-{{ status_css }}">{{ order.Status }}</span>
+                            {% if is_reservation and overdue %}<span class="oo-overdue-badge">Overdue</span>{% endif %}
                             {% if check_stripe %}
                             <span class="oo-check-stripe" tabindex="0" data-bs-toggle="tooltip" data-bs-placement="top"
                       title="{{ check_stripe_tooltip }}" aria-label="Check Stripe: {{ check_stripe_tooltip }}">
@@ -92,12 +147,24 @@
                         </div>
                     </div>
                 </div>
+                <div class="col-sm-6">{{ readonly_field('Type', 'Bike reservation' if is_reservation else 'Parts') }}</div>
+                {% if is_reservation %}
+                <div class="col-sm-6">{{ readonly_field('Fulfilment', 'Collect from the dealership') }}</div>
+                <div class="col-sm-6">{{ readonly_field('Reserved until', order.ReservedUntil or 'Set when the deposit is paid') }}</div>
+                {% else %}
                 <div class="col-sm-6">{{ readonly_field('Fulfilment', 'Store pickup' if order.FulfilmentMethod == 'Pickup' else 'Home delivery') }}</div>
                 <div class="col-sm-6">
                     {{ readonly_field('Ready for pickup from' if order.FulfilmentMethod == 'Pickup' else 'Estimated delivery by', order.EstimatedDate or '-') }}
                 </div>
+                {% endif %}
                 <div class="col-sm-6">{{ readonly_field('Paid At (Mauritius time)', paid_at or 'Not paid') }}</div>
-                <div class="col-sm-6">{{ readonly_field('Total', 'Rs. ' ~ ('%.2f' | format(total))) }}</div>
+                <div class="col-sm-6">{{ readonly_field('Deposit (order total)' if is_reservation else 'Total', 'Rs. ' ~ ('%.2f' | format(total))) }}</div>
+                <div class="col-12">
+                    <div class="mb-3">
+                        <label class="form-label readonly-label">Stripe Payment Intent</label>
+                        <div class="readonly-value">{% if stripe_intent %}<code>{{ stripe_intent }}</code>{% else %}-{% endif %}</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -121,6 +188,10 @@
                 <div class="col-12">{{ readonly_field('Email', customer.Email if customer and customer.Email else '-') }}</div>
             </div>
 
+            {% if is_reservation %}
+            <p class="form-section-title mt-2">Collection</p>
+            <p class="mb-0"><i class="fa-solid fa-store me-2 text-secondary"></i>Collect from the dealership.</p>
+            {% else %}
             <p class="form-section-title mt-2">{{ 'Store Pickup' if order.FulfilmentMethod == 'Pickup' else 'Home Delivery' }}</p>
             {% if order.FulfilmentMethod == 'Pickup' %}
             <p class="mb-0"><i class="fa-solid fa-store me-2 text-secondary"></i>Collect from the dealership.</p>
@@ -133,10 +204,61 @@
                 <div class="col-sm-6">{{ readonly_field('Delivery Phone', order.DeliveryPhone or '-') }}</div>
             </div>
             {% endif %}
+            {% endif %}
         </div>
     </div>
 </div>
 
+{% if is_reservation %}
+<!-- Reservation -->
+<div class="admin-card mt-3">
+    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+        <h3 class="oo-card-title">Reservation</h3>
+        {% if sale_id %}
+        <a href="{{ url_for('sale.view', sale_id=sale_id) }}" class="btn btn-sm btn-outline-primary">
+            <i class="fa-solid fa-handshake me-1"></i>View SALE-{{ sale_id }}
+        </a>
+        {% endif %}
+    </div>
+    <div class="row">
+        <div class="col-md-6">{{ readonly_field('Motorbike', order.BikeDescription or '-') }}</div>
+        <div class="col-sm-6 col-md-3">{{ readonly_field('Bike price', ('Rs. ' ~ ('%.2f' | format(bike_price))) if bike_price is not none else '-') }}</div>
+        <div class="col-sm-6 col-md-3">{{ readonly_field('Deposit paid online', 'Rs. ' ~ ('%.2f' | format(total))) }}</div>
+        <div class="col-sm-6 col-md-3">{{ readonly_field('Sale total', ('Rs. ' ~ ('%.2f' | format(sale_total))) if sale else '-') }}</div>
+        <div class="col-sm-6 col-md-3">{{ readonly_field('Paid on the sale', ('Rs. ' ~ ('%.2f' | format(sale_paid))) if sale else '-') }}</div>
+        <div class="col-sm-6 col-md-3">
+            <div class="mb-3">
+                <label class="form-label readonly-label">Balance due</label>
+                <div class="readonly-value">
+                    {% if balance_due is none %}-
+                    {% elif balance_due > 0.005 %}<strong class="oo-balance-due">Rs. {{ '%.2f' | format(balance_due) }}</strong>
+                    {% else %}<span class="oo-balance-paid">Rs. 0.00 (fully paid)</span>{% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-md-3">
+            <div class="mb-3">
+                <label class="form-label readonly-label">Reserved until</label>
+                <div class="readonly-value">
+                    {{ order.ReservedUntil or '-' }}
+                    {% if overdue %}<span class="oo-overdue-badge">Overdue</span>{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% if not sale and order.Status in ['Paid', 'Completed'] %}
+    <p class="oo-inline-warning mb-0">
+        <i class="fa-solid fa-triangle-exclamation me-1"></i>
+        No linked sale was found for this paid reservation. Check the Sales module.
+    </p>
+    {% elif not sale %}
+    <p class="text-muted mb-0">
+        {% if order.Status == 'Cancelled' %}This reservation was cancelled; its sale and deposit record were removed.
+        {% else %}The sale is created automatically when Stripe confirms the deposit.{% endif %}
+    </p>
+    {% endif %}
+</div>
+{% else %}
 <!-- Items -->
 <div class="admin-card mt-3">
     <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
@@ -183,15 +305,23 @@
     <p class="text-muted mb-0">No items were found for this order.</p>
     {% endif %}
 </div>
+{% endif %}
 
 <!-- Payment -->
 <div class="admin-card mt-3">
     <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-        <h3 class="oo-card-title">Payment <span class="record-count-badge">{{ payments | length }}</span></h3>
+        <h3 class="oo-card-title">
+            {% if is_reservation and sale_id %}Payments on SALE-{{ sale_id }}{% else %}Payment{% endif %}
+            <span class="record-count-badge">{{ payments | length }}</span>
+        </h3>
         {% if missing_payment %}
         <span class="oo-inline-warning">
             <i class="fa-solid fa-triangle-exclamation me-1"></i>
+            {% if is_reservation %}
+            This reservation is marked as paid, but no payment was found on its sale. Check the Stripe Dashboard.
+            {% else %}
             This order is marked as paid, but no payment row was found. Check the Stripe Dashboard.
+            {% endif %}
         </span>
         {% endif %}
     </div>
@@ -211,7 +341,7 @@
             <tbody>
                 {% for p in payments %}
                 <tr>
-                    <td><a href="{{ url_for('payment.index', q=order_ref) }}">PAY-{{ p.PaymentID }}</a></td>
+                    <td><a href="{{ url_for('payment.index', q=('SALE-' ~ sale_id) if is_reservation else order_ref) }}">PAY-{{ p.PaymentID }}</a></td>
                     <td>{{ p.PaymentDate or '-' }}</td>
                     <td class="text-end"><strong>Rs. {{ '%.2f' | format(p.AmountPaid | float) }}</strong></td>
                     <td>{{ p.PaymentMethod or '-' }}</td>
@@ -225,9 +355,43 @@
         </table>
     </div>
     {% elif not missing_payment %}
-    <p class="text-muted mb-0">No payment yet. Online payments are recorded automatically when Stripe confirms them.</p>
+    <p class="text-muted mb-0">
+        {% if is_reservation %}
+        No payment on a sale yet. The online deposit is recorded automatically when Stripe confirms it; record the balance on the Sale through the Payments page.
+        {% else %}
+        No payment yet. Online payments are recorded automatically when Stripe confirms them.
+        {% endif %}
+    </p>
     {% endif %}
 </div>
+
+{% if is_reservation and show_complete and can_complete %}
+<div class="modal fade" id="completeReservationModal" tabindex="-1" aria-labelledby="completeReservationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title" id="completeReservationModalLabel">Complete {{ order_ref }}?</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-body-text mb-0">{{ collect_confirm_text }}</p>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fa-solid fa-xmark me-1"></i>Not Yet
+                </button>
+                <form method="POST" action="{{ url_for('online_order.change_status', order_id=order.OrderID) }}">
+                    <input type="hidden" name="new_status" value="Completed">
+                    <input type="hidden" name="expected_status" value="{{ order.Status }}">
+                    <button type="submit" class="btn btn-accent">
+                        <i class="fa-solid fa-circle-check me-1"></i>Confirm Collected
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 {% if can_cancel %}
 <div class="modal fade" id="cancelOrderModal" tabindex="-1" aria-labelledby="cancelOrderModalLabel" aria-hidden="true">
@@ -241,7 +405,20 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                {% if cancel_restores_stock %}
+                {% if is_reservation %}
+                {% if cancel_paid_reservation %}
+                <p class="modal-body-text"><strong>{{ reservation_cancel_warning }}</strong></p>
+                <p class="modal-body-text mb-0">
+                    The motorbike becomes Available again. This <strong>cannot be undone</strong>.
+                    {% if stripe_intent %}Stripe payment intent: <code>{{ stripe_intent }}</code>{% endif %}
+                </p>
+                {% else %}
+                <p class="modal-body-text mb-0">
+                    The customer has not paid the deposit yet, so no sale exists and no refund is needed.
+                    This <strong>cannot be undone</strong>.
+                </p>
+                {% endif %}
+                {% elif cancel_restores_stock %}
                 <p class="modal-body-text">
                     The order will be cancelled and every item's quantity will be <strong>added back to stock</strong>.
                     This <strong>cannot be undone</strong>.
@@ -258,12 +435,12 @@
             </div>
             <div class="modal-footer border-0 pt-0">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-                    <i class="fa-solid fa-xmark me-1"></i>Keep Order
+                    <i class="fa-solid fa-xmark me-1"></i>{{ 'Keep Reservation' if is_reservation else 'Keep Order' }}
                 </button>
                 <form method="POST" action="{{ url_for('online_order.cancel', order_id=order.OrderID) }}">
                     <input type="hidden" name="expected_status" value="{{ order.Status }}">
                     <button type="submit" class="btn btn-danger">
-                        <i class="fa-solid fa-ban me-1"></i>Cancel Order
+                        <i class="fa-solid fa-ban me-1"></i>{{ 'Cancel Reservation' if is_reservation else 'Cancel Order' }}
                     </button>
                 </form>
             </div>
