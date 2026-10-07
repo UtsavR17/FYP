@@ -476,10 +476,6 @@ def edit(sale_id):
     if request.method == 'POST':
         form_data = request.form.to_dict()
 
-        if bike_locked:
-            # Ignore whatever bike id was posted.
-            form_data['New_MotorBike_NB_ID'] = str(original_nb_id) if original_nb_id is not None else ''
-
         cust_id_raw = form_data.get('Customer_CustomerID', '').strip()
         nb_id_raw   = form_data.get('New_MotorBike_NB_ID', '').strip()
         emp_id_raw  = form_data.get('Employee_EmployeeID', '').strip()
@@ -497,6 +493,7 @@ def edit(sale_id):
 
         nb_id = None
         if bike_locked:
+            # Ignore whatever bike id was posted.
             nb_id = original_nb_id
         elif not nb_id_raw:
             errors['New_MotorBike_NB_ID'] = 'Motorbike is required.'
