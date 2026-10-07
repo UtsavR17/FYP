@@ -1,0 +1,275 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/form_field.html' import readonly_field %}
+
+{% block title %}{{ order_ref }} Detail{% endblock %}
+{% block page_title %}Online Order Detail{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">{{ order_ref }}</h2>
+        <p class="page-header-subtitle">Online spare part order placed by a customer</p>
+    </div>
+    <a href="{{ url_for('online_order.index') }}" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to Online Orders
+    </a>
+</div>
+
+{% if check_stripe %}
+<div class="oo-notice oo-notice-warning" role="status">
+    <i class="fa-solid fa-triangle-exclamation"></i>
+    <div>
+        <strong>Check Stripe.</strong> {{ check_stripe_tooltip }}
+        Search the Stripe Dashboard for {{ order_ref }} (the order id is in the payment metadata).
+    </div>
+</div>
+{% endif %}
+
+{% if refund_reminder %}
+<div class="oo-notice oo-notice-warning" role="status">
+    <i class="fa-solid fa-rotate-left"></i>
+    <div>
+        <strong>This order was cancelled after payment.</strong>
+        If not done yet, refund the payment in the Stripe Dashboard:
+        {% for p in payments %}{% if p.StripePaymentIntentID %}<code>{{ p.StripePaymentIntentID }}</code>{% if not loop.last %}, {% endif %}{% endif %}{% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Actions -->
+{% if next_actions or can_cancel %}
+<div class="form-card">
+    <p class="form-section-title">Actions</p>
+    <div class="d-flex flex-wrap gap-2">
+        {% for target, label, icon in next_actions %}
+        <form method="POST" action="{{ url_for('online_order.change_status', order_id=order.OrderID) }}">
+            <input type="hidden" name="new_status" value="{{ target }}">
+            <input type="hidden" name="expected_status" value="{{ order.Status }}">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid {{ icon }} me-2"></i>{{ label }}
+            </button>
+        </form>
+        {% endfor %}
+        {% if can_cancel %}
+        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelOrderModal">
+            <i class="fa-solid fa-ban me-2"></i>Cancel Order
+        </button>
+        {% endif %}
+    </div>
+    <p class="form-text text-muted mb-0 mt-2">
+        <i class="fa-solid fa-circle-info me-1"></i>
+        {% if order.Status == 'Pending Payment' %}
+            The customer has not completed payment yet. Unpaid orders are also cancelled automatically when the payment page expires.
+        {% elif order.FulfilmentMethod == 'Pickup' %}
+            Workflow: Paid, Processing, Ready for Pickup, Completed.
+        {% else %}
+            Workflow: Paid, Processing, Out for Delivery, Completed.
+        {% endif %}
+    </p>
+</div>
+{% endif %}
+
+<div class="row g-3">
+    <!-- Order summary -->
+    <div class="col-lg-6">
+        <div class="form-card h-100 mb-0">
+            <p class="form-section-title">Order Summary</p>
+            <div class="row">
+                <div class="col-sm-6">{{ readonly_field('Order ID', order_ref) }}</div>
+                <div class="col-sm-6">{{ readonly_field('Order Date', order.OrderDate or '-') }}</div>
+                <div class="col-sm-6">
+                    <div class="mb-3">
+                        <label class="form-label readonly-label">Status</label>
+                        <div class="readonly-value">
+                            <span class="po-status-badge oo-status-{{ status_css }}">{{ order.Status }}</span>
+                            {% if check_stripe %}
+                            <span class="oo-check-stripe" tabindex="0" data-bs-toggle="tooltip" data-bs-placement="top"
+                      title="{{ check_stripe_tooltip }}" aria-label="Check Stripe: {{ check_stripe_tooltip }}">
+                    <i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i>Check Stripe
+                </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">{{ readonly_field('Fulfilment', 'Store pickup' if order.FulfilmentMethod == 'Pickup' else 'Home delivery') }}</div>
+                <div class="col-sm-6">
+                    {{ readonly_field('Ready for pickup from' if order.FulfilmentMethod == 'Pickup' else 'Estimated delivery by', order.EstimatedDate or '-') }}
+                </div>
+                <div class="col-sm-6">{{ readonly_field('Paid At (Mauritius time)', paid_at or 'Not paid') }}</div>
+                <div class="col-sm-6">{{ readonly_field('Total', 'Rs. ' ~ ('%.2f' | format(total))) }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Customer and fulfilment -->
+    <div class="col-lg-6">
+        <div class="form-card h-100 mb-0">
+            <p class="form-section-title">Customer</p>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="mb-3">
+                        <label class="form-label readonly-label">Name</label>
+                        <div class="readonly-value">
+                            {% if customer %}
+                            <a href="{{ url_for('customer.edit', customer_id=customer.CustomerID) }}">{{ customer_name }}</a>
+                            {% else %}{{ customer_name }}{% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">{{ readonly_field('Phone', customer.PhoneNumber if customer and customer.PhoneNumber else '-') }}</div>
+                <div class="col-12">{{ readonly_field('Email', customer.Email if customer and customer.Email else '-') }}</div>
+            </div>
+
+            <p class="form-section-title mt-2">{{ 'Store Pickup' if order.FulfilmentMethod == 'Pickup' else 'Home Delivery' }}</p>
+            {% if order.FulfilmentMethod == 'Pickup' %}
+            <p class="mb-0"><i class="fa-solid fa-store me-2 text-secondary"></i>Collect from the dealership.</p>
+            {% else %}
+            <div class="row">
+                <div class="col-12">
+                    {{ readonly_field('Delivery Address',
+                        [order.DeliveryStreet, order.DeliveryTown, order.DeliveryPostCode] | select | join(', ') or '-') }}
+                </div>
+                <div class="col-sm-6">{{ readonly_field('Delivery Phone', order.DeliveryPhone or '-') }}</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Items -->
+<div class="admin-card mt-3">
+    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+        <h3 class="oo-card-title">
+            Items <span class="record-count-badge">{{ items | length }}</span>
+        </h3>
+        {% if sum_mismatch %}
+        <span class="oo-inline-warning">
+            <i class="fa-solid fa-triangle-exclamation me-1"></i>
+            Item lines add up to Rs. {{ '%.2f' | format(items_sum) }}, but the order total is Rs. {{ '%.2f' | format(total) }}.
+        </span>
+        {% endif %}
+    </div>
+    {% if items %}
+    <div class="table-responsive">
+        <table class="table admin-table">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th class="text-end">Quantity</th>
+                    <th class="text-end">Unit Price</th>
+                    <th class="text-end">Line Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for i in items %}
+                <tr>
+                    <td>{{ i.ItemDescription or ('Stock #' ~ i.Stock_Stock_ID) }}</td>
+                    <td class="text-end">{{ i.Quantity }}</td>
+                    <td class="text-end">Rs. {{ '%.2f' | format(i.UnitPrice | float) }}</td>
+                    <td class="text-end">Rs. {{ '%.2f' | format(i._line_total) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="3" class="text-end">Order total (free delivery)</th>
+                    <th class="text-end">Rs. {{ '%.2f' | format(total) }}</th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-muted mb-0">No items were found for this order.</p>
+    {% endif %}
+</div>
+
+<!-- Payment -->
+<div class="admin-card mt-3">
+    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+        <h3 class="oo-card-title">Payment <span class="record-count-badge">{{ payments | length }}</span></h3>
+        {% if missing_payment %}
+        <span class="oo-inline-warning">
+            <i class="fa-solid fa-triangle-exclamation me-1"></i>
+            This order is marked as paid, but no payment row was found. Check the Stripe Dashboard.
+        </span>
+        {% endif %}
+    </div>
+    {% if payments %}
+    <div class="table-responsive">
+        <table class="table admin-table">
+            <thead>
+                <tr>
+                    <th>Payment</th>
+                    <th>Date</th>
+                    <th class="text-end">Amount</th>
+                    <th>Method</th>
+                    <th>Type</th>
+                    <th>Stripe Payment Intent</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in payments %}
+                <tr>
+                    <td><a href="{{ url_for('payment.index', q=order_ref) }}">PAY-{{ p.PaymentID }}</a></td>
+                    <td>{{ p.PaymentDate or '-' }}</td>
+                    <td class="text-end"><strong>Rs. {{ '%.2f' | format(p.AmountPaid | float) }}</strong></td>
+                    <td>{{ p.PaymentMethod or '-' }}</td>
+                    <td>
+                        <span class="pay-type-badge pay-type-{{ (p.PaymentType or '') | lower | replace(' ', '-') }}">{{ p.PaymentType or '-' }}</span>
+                    </td>
+                    <td>{% if p.StripePaymentIntentID %}<code>{{ p.StripePaymentIntentID }}</code>{% else %}-{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% elif not missing_payment %}
+    <p class="text-muted mb-0">No payment yet. Online payments are recorded automatically when Stripe confirms them.</p>
+    {% endif %}
+</div>
+
+{% if can_cancel %}
+<div class="modal fade" id="cancelOrderModal" tabindex="-1" aria-labelledby="cancelOrderModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title d-flex align-items-center gap-2" id="cancelOrderModalLabel">
+                    <span class="modal-warning-icon"><i class="fa-solid fa-triangle-exclamation"></i></span>
+                    Cancel {{ order_ref }}?
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                {% if cancel_restores_stock %}
+                <p class="modal-body-text">
+                    The order will be cancelled and every item's quantity will be <strong>added back to stock</strong>.
+                    This <strong>cannot be undone</strong>.
+                </p>
+                <p class="modal-body-text mb-0">
+                    The customer has paid. After cancelling, refund the payment in the Stripe Dashboard.
+                </p>
+                {% else %}
+                <p class="modal-body-text mb-0">
+                    The customer has not paid yet, so no stock was taken and no refund is needed.
+                    This <strong>cannot be undone</strong>.
+                </p>
+                {% endif %}
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fa-solid fa-xmark me-1"></i>Keep Order
+                </button>
+                <form method="POST" action="{{ url_for('online_order.cancel', order_id=order.OrderID) }}">
+                    <input type="hidden" name="expected_status" value="{{ order.Status }}">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fa-solid fa-ban me-1"></i>Cancel Order
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -152,6 +152,15 @@
                     </a>
                 </li>
 
+                <li class="nav-item">
+                    <a href="{{ url_for('online_order.index') }}"
+                       class="nav-link {% if request.blueprint == 'online_order' %}active{% endif %}"
+                       {% if request.blueprint == 'online_order' %}aria-current="page"{% endif %}>
+                        <!-- <i class="fa-solid fa-bag-shopping nav-icon"></i> -->
+                        <span>Online Orders</span>
+                    </a>
+                </li>
+
                 
                 <li class="nav-item">
                     <a href="{{ url_for('payment.index') }}"

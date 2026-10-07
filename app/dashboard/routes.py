@@ -5,6 +5,7 @@ from flask import render_template, session, url_for
 from app.dashboard import bp
 from app.auth.decorators import login_required
 from app.supabase_client import supabase
+from app.utils.order_ref import format_order_ref
 
 
 # -- Dashboard settings (Task 34) --------------------------------------------
@@ -54,6 +55,7 @@ def _get_dashboard_counts():
         ('appointment', 'Appointment'),
         ('sale','Sale'),
         ('payment', 'Payment'),
+        ('online_order', 'Online_Order'),
     ]
 
     counts = {}
@@ -65,6 +67,18 @@ def _get_dashboard_counts():
             counts[key] = result.count if result.count is not None else 0
         except Exception:
             counts[key] = 0
+
+    # Online orders waiting for staff (Task 40). Its own try, like every count.
+    try:
+        result = (
+            supabase.table('Online_Order')
+            .select('OrderID', count='exact')
+            .eq('Status', 'Paid')
+            .execute()
+        )
+        counts['online_order_to_process'] = result.count or 0
+    except Exception:
+        counts['online_order_to_process'] = 0
 
     return counts
 
@@ -474,7 +488,7 @@ def _get_recent_payments(today):
         result = (
             supabase.table('Payment')
             .select('PaymentID, PaymentDate, AmountPaid, PaymentType, '
-                    'Sale_SaleID, Appointment_AppointmentID')
+                    'Sale_SaleID, Appointment_AppointmentID, Online_Order_OrderID')
             .order('PaymentDate', desc=True)
             .order('PaymentID', desc=True)
             .limit(TABLE_LIMIT)
@@ -488,12 +502,16 @@ def _get_recent_payments(today):
     for r in rows:
         sale_id = r.get('Sale_SaleID')
         appt_id = r.get('Appointment_AppointmentID')
+        order_id = r.get('Online_Order_OrderID')
         if sale_id:
             reference = f'SALE-{sale_id}'
             link = url_for('sale.view', sale_id=sale_id)
         elif appt_id:
             reference = f'APPT-{appt_id}'
             link = url_for('appointment.view', appt_id=appt_id)
+        elif order_id:
+            reference = format_order_ref(order_id)
+            link = url_for('online_order.view', order_id=order_id)
         else:
             reference = '-'
             link = url_for('payment.edit', payment_id=r['PaymentID'])
@@ -510,7 +528,7 @@ def _get_recent_payments(today):
 
 
 def _build_module_groups(counts):
-    """The 18 module tiles, grouped by day-to-day function."""
+    """The 19 module tiles, grouped by day-to-day function."""
     def tile(key, label, icon, endpoint, desc):
         return {
             'label': label,
@@ -569,6 +587,9 @@ def _build_module_groups(counts):
                      'customer_bike.index', 'Manage registered customer motorbikes'),
                 tile('sale', 'Sales', 'fa-handshake', 'sale.index',
                      'Manage motorbike sales records'),
+                dict(tile('online_order', 'Online Orders', 'fa-bag-shopping',
+                          'online_order.index', 'Process spare part orders placed online'),
+                     pill=counts.get('online_order_to_process', 0)),
             ],
         },
         {

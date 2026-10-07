@@ -399,6 +399,7 @@
                                 <span class="dash-tile-body">
                                     <span class="dash-tile-name">{{ t.label }}</span>
                                     <span class="dash-tile-count">{{ t.count }} record{{ '' if t.count == 1 else 's' }}</span>
+                                    {% if t.pill %}<span class="oo-tile-pill">{{ t.pill }} to process</span>{% endif %}
                                 </span>
                                 <i class="fa-solid fa-chevron-right dash-tile-arrow" aria-hidden="true"></i>
                             </a>

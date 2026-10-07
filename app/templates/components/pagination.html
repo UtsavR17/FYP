@@ -19,10 +19,14 @@
     pagination — the dict returned by utils/pagination.paginate()
     endpoint   — the Flask endpoint string for this module (e.g. 'color.index')
     query      — the current search string, preserved in all page links
+    params:      optional dict of extra query parameters (for example list
+                 filters) preserved in all page links; None values are dropped.
+                 Added in Task 40; existing callers are unaffected.
 #}
 
 
-{% macro pagination_controls(pagination, endpoint, query='') %}
+{% macro pagination_controls(pagination, endpoint, query='', params=None) %}
+{% set extra = params or {} %}
 {% if pagination.total > 0 %}
 
 {% set start_record = ((pagination.page - 1) * pagination.per_page) + 1 %}
@@ -48,7 +52,7 @@
 
             <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
                 <a class="page-link"
-                   href="{{ url_for(endpoint, page=pagination.page - 1, q=query) if pagination.has_prev else '#' }}"
+                   href="{{ url_for(endpoint, page=pagination.page - 1, q=query, **extra) if pagination.has_prev else '#' }}"
                    aria-label="Previous">
                     <i class="fa-solid fa-chevron-left"></i>
                 </a>
@@ -57,7 +61,7 @@
             {% for p in range(1, pagination.total_pages + 1) %}
             <li class="page-item {% if p == pagination.page %}active{% endif %}">
                 <a class="page-link"
-                   href="{{ url_for(endpoint, page=p, q=query) }}"
+                   href="{{ url_for(endpoint, page=p, q=query, **extra) }}"
                    {% if p == pagination.page %}aria-current="page"{% endif %}>
                     {{ p }}
                 </a>
@@ -66,7 +70,7 @@
 
             <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
                 <a class="page-link"
-                   href="{{ url_for(endpoint, page=pagination.page + 1, q=query) if pagination.has_next else '#' }}"
+                   href="{{ url_for(endpoint, page=pagination.page + 1, q=query, **extra) if pagination.has_next else '#' }}"
                    aria-label="Next">
                     <i class="fa-solid fa-chevron-right"></i>
                 </a>
