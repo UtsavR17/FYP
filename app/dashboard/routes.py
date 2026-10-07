@@ -28,6 +28,11 @@ APPOINTMENT_STATUSES = [
 UPCOMING_STATUSES = ['Pending', 'Confirmed', 'In Progress']
 OPEN_PO_STATUSES = ['Pending', 'Partially Received']
 
+# Online parts orders that count as sales (the customer has paid; Task 42).
+ONLINE_PARTS_SOLD_STATUSES = [
+    'Paid', 'Processing', 'Ready for Pickup', 'Out for Delivery', 'Completed',
+]
+
 
 def _get_dashboard_counts():
     """
@@ -68,17 +73,44 @@ def _get_dashboard_counts():
         except Exception:
             counts[key] = 0
 
-    # Online orders waiting for staff (Task 40). Its own try, like every count.
+    # Online orders waiting for staff (Task 40, split by type in Task 42).
+    # Each count has its own try, like every count.
     try:
         result = (
             supabase.table('Online_Order')
             .select('OrderID', count='exact')
+            .eq('OrderType', 'Parts')
             .eq('Status', 'Paid')
             .execute()
         )
         counts['online_order_to_process'] = result.count or 0
     except Exception:
         counts['online_order_to_process'] = 0
+
+    try:
+        result = (
+            supabase.table('Online_Order')
+            .select('OrderID', count='exact')
+            .eq('OrderType', 'Reservation')
+            .eq('Status', 'Paid')
+            .execute()
+        )
+        counts['online_order_reserved'] = result.count or 0
+    except Exception:
+        counts['online_order_reserved'] = 0
+
+    try:
+        result = (
+            supabase.table('Online_Order')
+            .select('OrderID', count='exact')
+            .eq('OrderType', 'Reservation')
+            .eq('Status', 'Paid')
+            .lt('ReservedUntil', _today().isoformat())
+            .execute()
+        )
+        counts['online_order_overdue'] = result.count or 0
+    except Exception:
+        counts['online_order_overdue'] = 0
 
     return counts
 
@@ -111,6 +143,19 @@ def _to_float(value):
         return float(value or 0)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _mauritius_date(value):
+    """ISO timestamp (naive = UTC) -> its calendar date in Mauritius time, else None."""
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(MU_TZ).date()
 
 
 def _format_mur(amount):
@@ -279,6 +324,9 @@ def _get_sales_series(months, window_start, window_end, completed_in_window):
     SUM(Appointment_Stock.Quantity * Stock.S_Price) by month of
     Appointment_Date. Note: S_Price is the CURRENT selling price; the
     schema keeps no price snapshot per appointment.
+    Plus online parts orders (Task 42): SUM(Online_Order.TotalAmount) for
+    OrderType 'Parts' in a paid status, by the Mauritius month of PaidAt.
+    Reservations are not added here: their Sale is in the motorcycle series.
     """
     index = {ym: i for i, ym in enumerate(months)}
     motorcycle = [0.0] * len(months)
@@ -327,7 +375,38 @@ def _get_sales_series(months, window_start, window_end, completed_in_window):
         price = _to_float(prices.get(u.get('Stock_Stock_ID'), {}).get('S_Price'))
         parts[slot] += _to_float(u.get('Quantity')) * price
 
+    for month_index, amount in _get_online_parts_by_month(index, window_start, window_end):
+        parts[month_index] += amount
+
     return [round(v, 2) for v in motorcycle], [round(v, 2) for v in parts]
+
+
+def _get_online_parts_by_month(index, window_start, window_end):
+    """
+    [(chart slot, TotalAmount)] for paid online parts orders. The query is one
+    day wider than the window on each side (PaidAt is stored in UTC); the
+    Mauritius month of PaidAt then decides the slot exactly.
+    """
+    try:
+        orders = _fetch_all(lambda: (
+            supabase.table('Online_Order')
+            .select('OrderID, PaidAt, TotalAmount')
+            .eq('OrderType', 'Parts')
+            .in_('Status', ONLINE_PARTS_SOLD_STATUSES)
+            .gte('PaidAt', (window_start - timedelta(days=1)).isoformat())
+            .lt('PaidAt', (window_end + timedelta(days=1)).isoformat())
+            .order('OrderID')
+        ))
+    except Exception:
+        return []
+
+    out = []
+    for o in orders:
+        paid_on = _mauritius_date(o.get('PaidAt'))
+        slot = index.get((paid_on.year, paid_on.month)) if paid_on else None
+        if slot is not None:
+            out.append((slot, _to_float(o.get('TotalAmount'))))
+    return out
 
 
 def _get_month_labels(months):
@@ -527,6 +606,18 @@ def _get_recent_payments(today):
     return items
 
 
+def _online_order_pills(counts):
+    """Pills on the Online Orders tile; zero counts are left out."""
+    pills = []
+    if counts.get('online_order_to_process'):
+        pills.append({'text': f"{counts['online_order_to_process']} to process", 'css': ''})
+    if counts.get('online_order_reserved'):
+        pills.append({'text': f"{counts['online_order_reserved']} reserved", 'css': 'oo-tile-pill-reserved'})
+    if counts.get('online_order_overdue'):
+        pills.append({'text': f"{counts['online_order_overdue']} overdue", 'css': 'oo-tile-pill-overdue'})
+    return pills
+
+
 def _build_module_groups(counts):
     """The 19 module tiles, grouped by day-to-day function."""
     def tile(key, label, icon, endpoint, desc):
@@ -588,8 +679,9 @@ def _build_module_groups(counts):
                 tile('sale', 'Sales', 'fa-handshake', 'sale.index',
                      'Manage motorbike sales records'),
                 dict(tile('online_order', 'Online Orders', 'fa-bag-shopping',
-                          'online_order.index', 'Process spare part orders placed online'),
-                     pill=counts.get('online_order_to_process', 0)),
+                          'online_order.index',
+                          'Process spare part orders and bike reservations placed online'),
+                     pills=_online_order_pills(counts)),
             ],
         },
         {

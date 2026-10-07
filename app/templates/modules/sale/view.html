@@ -23,6 +23,17 @@
     </div>
 </div>
 
+{% if reservation_ref %}
+<div class="oo-notice oo-notice-info" role="status">
+    <i class="fa-solid fa-globe"></i>
+    <div>
+        <strong>Reserved online
+            (<a href="{{ url_for('online_order.view', order_id=reservation_order_id) }}">{{ reservation_ref }}</a>).</strong>
+        This sale was created when the customer paid the deposit online. To cancel it, cancel the reservation from Online Orders.
+    </div>
+</div>
+{% endif %}
+
 <!-- Sale Information -->
 <div class="form-card">
     <p class="form-section-title">Sale Information</p>

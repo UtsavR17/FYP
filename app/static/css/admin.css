@@ -2681,3 +2681,86 @@ label.form-label {
         flex: 1;
     }
 }
+
+/* =====================================================================
+   RESERVATIONS (Task 42)
+   Order type badges, overdue flag, balance figures and dashboard pills
+   for bike reservations paid online with a deposit.
+   ===================================================================== */
+.oo-type-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.oo-type-parts {
+    background-color: rgba(107, 114, 128, 0.12);
+    color: #374151;
+}
+
+.oo-type-reservation {
+    background-color: rgba(13, 148, 136, 0.12);
+    color: #0f766e;
+}
+
+.page-header-title .oo-type-badge {
+    margin-left: 8px;
+    font-size: 0.75rem;
+}
+
+.oo-reserved-until {
+    margin-top: 2px;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+
+.oo-overdue-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    background-color: rgba(239, 68, 68, 0.12);
+    color: #b91c1c;
+    white-space: nowrap;
+}
+
+.oo-balance-due {
+    color: #b45309;
+}
+
+.oo-balance-paid {
+    color: #15803d;
+    font-weight: 600;
+}
+
+.oo-tile-pills {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.oo-tile-pills .oo-tile-pill {
+    margin-left: 0;
+}
+
+.oo-tile-pill.oo-tile-pill-reserved {
+    background-color: rgba(13, 148, 136, 0.12);
+    color: #0f766e;
+}
+
+.oo-tile-pill.oo-tile-pill-overdue {
+    background-color: rgba(239, 68, 68, 0.12);
+    color: #b91c1c;
+}
+
+/* Information notice (reservation note on Sales pages) */
+.oo-notice-info {
+    border-left-color: #0d9488;
+    background-color: #f0fdfa;
+}

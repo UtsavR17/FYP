@@ -1,12 +1,18 @@
 """
-Online Orders (Task 40).
+Online Orders (Task 40, bike reservations Task 42).
 
 Orders are created and paid by customers on the Client Side (Next.js + Stripe).
 Staff can only view them, move them through the fulfilment workflow and cancel
 them. There are no create, edit or delete routes, and audit columns are never
 selected or shown.
+
+Two order types share the table:
+- Parts: spare parts with items, delivered or picked up (Task 40 workflow).
+- Reservation: a 10% online deposit for one motorbike. The database creates a
+  Sale (no employee) and a Deposit payment when Stripe confirms; the customer
+  pays the balance and collects the bike at the dealership.
 """
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from flask import render_template, request, redirect, url_for
 from app.modules.online_order import bp
@@ -34,12 +40,22 @@ STATUSES = [
 ]
 FULFILMENTS = ['Delivery', 'Pickup']
 
+TYPE_PARTS       = 'Parts'
+TYPE_RESERVATION = 'Reservation'
+ORDER_TYPES = [TYPE_PARTS, TYPE_RESERVATION]
+TYPE_LABELS = {TYPE_PARTS: 'Parts', TYPE_RESERVATION: 'Bike reservation'}
+
 # Allowed status changes. Anything not listed here is refused.
 TRANSITIONS = {
     STATUS_PAID:       [STATUS_PROCESSING],
     STATUS_PROCESSING: [STATUS_READY, STATUS_DELIVERY],
     STATUS_READY:      [STATUS_COMPLETED],
     STATUS_DELIVERY:   [STATUS_COMPLETED],
+}
+
+# Reservations: the customer collects the bike once the balance is paid.
+RESERVATION_TRANSITIONS = {
+    STATUS_PAID: [STATUS_COMPLETED],
 }
 
 # Targets that only make sense for one fulfilment method.
@@ -54,6 +70,8 @@ PAID_OR_LATER = [STATUS_PAID, STATUS_PROCESSING, STATUS_READY, STATUS_DELIVERY, 
 # Cancellable without touching stock / with stock restored by the database.
 CANCEL_UNPAID   = [STATUS_PENDING]
 CANCEL_WITH_RPC = [STATUS_PAID, STATUS_PROCESSING]
+# Reservations: a paid one is cancelled by cancel_bike_reservation.
+RESERVATION_CANCEL_WITH_RPC = [STATUS_PAID]
 
 # CSS class suffix per status (.oo-status-*)
 STATUS_CSS = {
@@ -73,6 +91,7 @@ ACTION_LABELS = {
     STATUS_DELIVERY:   ('Mark Out for Delivery', 'fa-truck'),
     STATUS_COMPLETED:  ('Mark Completed', 'fa-circle-check'),
 }
+RESERVATION_COMPLETE_LABEL = ('Mark Collected (Completed)', 'fa-motorcycle')
 
 # A Pending Payment order older than this has an expired Stripe session (30 min),
 # so a still-pending order may hide a payment the webhook never confirmed.
@@ -87,19 +106,32 @@ STRIPE_REFUND_MSG = (
     'Order cancelled and stock restored. If the customer was charged, '
     'refund the payment in the Stripe Dashboard.'
 )
+BALANCE_DUE_MSG = 'Record the remaining payment on the Sale first.'
+BALANCE_UNKNOWN_MSG = (
+    'The balance due could not be worked out because the linked sale was not found. '
+    'Check the Sale before completing this reservation.'
+)
+COLLECT_CONFIRM_TEXT = 'Confirm the customer has collected the motorcycle and the balance is paid.'
+RESERVATION_CANCEL_WARNING = (
+    'This frees the motorcycle and deletes the sale and the online deposit record. '
+    'Refund the customer in the Stripe Dashboard.'
+)
 
 # Explicit column lists (no audit columns, no select *).
 # Date_Created is the only audit column read, and only to work out the
 # "Check Stripe" flag; it is stripped from every row before rendering.
 ORDER_LIST_COLUMNS = (
     'OrderID, OrderDate, Customer_CustomerID, Status, FulfilmentMethod, '
-    'EstimatedDate, TotalAmount, Date_Created'
+    'EstimatedDate, TotalAmount, OrderType, BikeDescription, ReservedUntil, Date_Created'
 )
 ORDER_VIEW_COLUMNS = (
     'OrderID, OrderDate, Customer_CustomerID, Status, FulfilmentMethod, '
     'DeliveryStreet, DeliveryTown, DeliveryPostCode, DeliveryPhone, '
-    'EstimatedDate, TotalAmount, PaidAt, Date_Created'
+    'EstimatedDate, TotalAmount, PaidAt, OrderType, New_MotorBike_NB_ID, Sale_SaleID, '
+    'BikeDescription, BikePrice, ReservedUntil, StripePaymentIntentID, Date_Created'
 )
+PAYMENT_COLUMNS = 'PaymentID, PaymentDate, AmountPaid, PaymentMethod, PaymentType, StripePaymentIntentID'
+
 CUSTOMER_COLUMNS = 'CustomerID, FirstName, LastName, PhoneNumber, Email'
 
 IN_CHUNK_SIZE = 100
@@ -108,16 +140,46 @@ PAGE_SIZE = 1000
 
 # -- Pure helpers (unit tested) ------------------------------------------------
 
-def allowed_next_statuses(status, fulfilment):
-    """Statuses this order may move to next, given its fulfilment method."""
+def order_type_of(order):
+    """The order's type; rows without one are treated as parts orders."""
+    return TYPE_RESERVATION if (order or {}).get('OrderType') == TYPE_RESERVATION else TYPE_PARTS
+
+
+def allowed_next_statuses(status, fulfilment, order_type=TYPE_PARTS):
+    """Statuses this order may move to next, given its type and fulfilment method."""
+    if order_type == TYPE_RESERVATION:
+        return list(RESERVATION_TRANSITIONS.get(status, []))
     return [
         target for target in TRANSITIONS.get(status, [])
         if FULFILMENT_FOR_TARGET.get(target, fulfilment) == fulfilment
     ]
 
 
-def transition_error(status, fulfilment, new_status):
+def reservation_transition_error(status, new_status, balance_due):
+    """
+    Reason a reservation cannot move to new_status, or None. Completing needs the
+    sale's balance due to be zero or less (balance_due None = unknown = refused).
+    """
+    if new_status not in STATUSES:
+        return 'Please choose a valid status.'
+    if new_status in RESERVATION_TRANSITIONS.get(status, []):
+        if balance_due is None:
+            return BALANCE_UNKNOWN_MSG
+        if balance_due > 0.005:
+            return BALANCE_DUE_MSG
+        return None
+    if status in (STATUS_COMPLETED, STATUS_CANCELLED):
+        return f'This reservation is {status.lower()} and its status can no longer change.'
+    if status == STATUS_PENDING:
+        return 'The customer has not paid the deposit yet, so this reservation cannot change status.'
+    return (f'A bike reservation cannot be marked "{new_status}". '
+            'It can only be marked Completed once the customer has paid the balance and collected the motorcycle.')
+
+
+def transition_error(status, fulfilment, new_status, order_type=TYPE_PARTS, balance_due=None):
     """Friendly reason why a status change is refused, or None if it is allowed."""
+    if order_type == TYPE_RESERVATION:
+        return reservation_transition_error(status, new_status, balance_due)
     if new_status not in STATUSES:
         return 'Please choose a valid status.'
     if new_status in allowed_next_statuses(status, fulfilment):
@@ -131,8 +193,45 @@ def transition_error(status, fulfilment, new_status):
     return f'An order that is "{status}" cannot be moved to "{new_status}".'
 
 
-def can_cancel(status):
+def can_cancel(status, order_type=TYPE_PARTS):
+    if order_type == TYPE_RESERVATION:
+        return status in CANCEL_UNPAID or status in RESERVATION_CANCEL_WITH_RPC
     return status in CANCEL_UNPAID or status in CANCEL_WITH_RPC
+
+
+def balance_due(sale_total, payments):
+    """Sale total minus every payment recorded on the sale, rounded to cents."""
+    paid = sum(float(p.get('AmountPaid') or 0) for p in payments)
+    return round(float(sale_total or 0) - paid, 2)
+
+
+def today_mauritius(now=None):
+    return (now or datetime.now(MU_TZ)).astimezone(MU_TZ).date()
+
+
+def _parse_date(value):
+    try:
+        return date.fromisoformat(str(value)[:10]) if value else None
+    except ValueError:
+        return None
+
+
+def is_overdue(order_type, status, reserved_until, today=None):
+    """A paid reservation whose ReservedUntil date is before today (Mauritius)."""
+    if order_type != TYPE_RESERVATION or status != STATUS_PAID:
+        return False
+    until = _parse_date(reserved_until)
+    return until is not None and until < (today or today_mauritius())
+
+
+def stripe_intent_for(order, payments):
+    """The order's own StripePaymentIntentID, falling back to its payment rows."""
+    if order.get('StripePaymentIntentID'):
+        return order['StripePaymentIntentID']
+    for p in payments:
+        if p.get('StripePaymentIntentID'):
+            return p['StripePaymentIntentID']
+    return None
 
 
 def lines_total(items):
@@ -188,6 +287,21 @@ def _apply_stripe_flag(order, now=None):
     return order
 
 
+def reservation_rpc_error_message(error_text):
+    """Map cancel_bike_reservation errors to friendly messages."""
+    text = error_text or ''
+    if 'SALE_HAS_PAYMENTS' in text:
+        return 'Other payments were recorded on this sale. Resolve them manually before cancelling.'
+    if 'NOT_CANCELLABLE' in text:
+        return ('This reservation can no longer be cancelled here. Only reservations awaiting '
+                'the deposit or paid (not yet collected) can be cancelled.')
+    if 'ORDER_NOT_FOUND' in text:
+        return 'This reservation was not found. It may have been removed.'
+    if 'NOT_STAFF' in text:
+        return 'Only staff members can cancel reservations. Sign in with a staff account.'
+    return 'Could not cancel the reservation. Please try again.'
+
+
 def rpc_error_message(error_text):
     """Map cancel_paid_online_order errors to friendly messages."""
     text = error_text or ''
@@ -234,7 +348,7 @@ def _full_name(customer):
     return f"{customer.get('FirstName') or ''} {customer.get('LastName') or ''}".strip() or 'Unknown customer'
 
 
-def _fetch_orders(status_filter, fulfilment_filter):
+def _fetch_orders(status_filter, fulfilment_filter, type_filter=''):
     """All orders matching the (whitelisted) filters, newest first, paged past the row cap."""
     rows = []
     start = 0
@@ -244,6 +358,8 @@ def _fetch_orders(status_filter, fulfilment_filter):
             query = query.eq('Status', status_filter)
         if fulfilment_filter:
             query = query.eq('FulfilmentMethod', fulfilment_filter)
+        if type_filter:
+            query = query.eq('OrderType', type_filter)
         batch = (
             query.order('OrderDate', desc=True)
             .order('OrderID', desc=True)
@@ -289,6 +405,38 @@ def _view_url(order_id):
     return url_for('online_order.view', order_id=order_id)
 
 
+def _get_sale(sale_id):
+    """(sale row or None, payments on the sale). Raises on a database error."""
+    if not sale_id:
+        return None, []
+    rows = (
+        supabase.table('Sale')
+        .select('SaleID, SaleDate, TotalAmount')
+        .eq('SaleID', sale_id)
+        .limit(1)
+        .execute()
+    ).data or []
+    payments = (
+        supabase.table('Payment')
+        .select(PAYMENT_COLUMNS)
+        .eq('Sale_SaleID', sale_id)
+        .order('PaymentID')
+        .execute()
+    ).data or []
+    return (rows[0] if rows else None), payments
+
+
+def _reservation_balance(order):
+    """Balance due on the reservation's sale, or None when it cannot be worked out."""
+    try:
+        sale, payments = _get_sale(order.get('Sale_SaleID'))
+    except Exception:
+        return None
+    if sale is None:
+        return None
+    return balance_due(sale.get('TotalAmount'), payments)
+
+
 # -- Routes ---------------------------------------------------------------------
 
 @bp.route('/')
@@ -298,21 +446,28 @@ def index():
     page = request.args.get('page', 1, type=int)
     status_filter = request.args.get('status', '').strip()
     fulfilment_filter = request.args.get('fulfilment', '').strip()
+    type_filter = request.args.get('type', '').strip()
     if status_filter not in STATUSES:
         status_filter = ''
     if fulfilment_filter not in FULFILMENTS:
         fulfilment_filter = ''
+    if type_filter not in ORDER_TYPES:
+        type_filter = ''
 
     try:
-        records = _fetch_orders(status_filter, fulfilment_filter)
+        records = _fetch_orders(status_filter, fulfilment_filter, type_filter)
     except Exception as e:
         flash_error(f'Could not load online orders: {str(e)}')
         records = []
 
     customers = _customer_lookup(r.get('Customer_CustomerID') for r in records)
     now = datetime.now(MU_TZ)
+    today = today_mauritius(now)
     for r in records:
         _apply_stripe_flag(r, now)
+        r['_type'] = order_type_of(r)
+        r['_type_label'] = TYPE_LABELS[r['_type']]
+        r['_overdue'] = is_overdue(r['_type'], r.get('Status'), r.get('ReservedUntil'), today)
         r['_customer'] = customers.get(r.get('Customer_CustomerID'))
         r['_customer_name'] = _full_name(r['_customer'])
         r['_status_css'] = STATUS_CSS.get(r.get('Status'), 'pending')
@@ -329,8 +484,10 @@ def index():
         search_query=search_query,
         status_filter=status_filter,
         fulfilment_filter=fulfilment_filter,
+        type_filter=type_filter,
         statuses=STATUSES,
         fulfilments=FULFILMENTS,
+        order_types=[(t, TYPE_LABELS[t]) for t in ORDER_TYPES],
         check_stripe_tooltip=CHECK_STRIPE_TOOLTIP,
     )
 
@@ -349,6 +506,8 @@ def view(order_id):
     _apply_stripe_flag(order)
 
     customer = _customer_lookup([order.get('Customer_CustomerID')]).get(order.get('Customer_CustomerID'))
+    if order_type_of(order) == TYPE_RESERVATION:
+        return _render_reservation(order_id, order, customer)
 
     try:
         items = (
@@ -365,7 +524,7 @@ def view(order_id):
     try:
         payments = (
             supabase.table('Payment')
-            .select('PaymentID, PaymentDate, AmountPaid, PaymentMethod, PaymentType, StripePaymentIntentID')
+            .select(PAYMENT_COLUMNS)
             .eq('Online_Order_OrderID', order_id)
             .order('PaymentID')
             .execute()
@@ -387,6 +546,7 @@ def view(order_id):
         'modules/online_order/view.html',
         order=order,
         order_ref=format_order_ref(order_id),
+        is_reservation=False,
         customer=customer,
         customer_name=_full_name(customer),
         items=items,
@@ -395,7 +555,8 @@ def view(order_id):
         sum_mismatch=bool(items) and abs(items_sum - total) > 0.005,
         payments=payments,
         missing_payment=status in PAID_OR_LATER and not payments,
-        refund_reminder=status == STATUS_CANCELLED and bool(payments),
+        refund_reminder=status == STATUS_CANCELLED and bool(payments or order.get('StripePaymentIntentID')),
+        stripe_intent=stripe_intent_for(order, payments),
         paid_at=to_mauritius_time(order.get('PaidAt')),
         status_css=STATUS_CSS.get(status, 'pending'),
         check_stripe=order['_check_stripe'],
@@ -403,6 +564,57 @@ def view(order_id):
         next_actions=[(s, *ACTION_LABELS[s]) for s in next_statuses],
         can_cancel=can_cancel(status),
         cancel_restores_stock=status in CANCEL_WITH_RPC,
+    )
+
+
+def _render_reservation(order_id, order, customer):
+    """View page for a bike reservation: the Reservation card replaces the items."""
+    status = order.get('Status')
+    sale_id = order.get('Sale_SaleID')
+    sale, sale_payments, sale_error = None, [], False
+    try:
+        sale, sale_payments = _get_sale(sale_id)
+    except Exception:
+        sale_error = True
+        flash_error('Could not load the sale and payments of this reservation.')
+
+    balance = balance_due(sale.get('TotalAmount'), sale_payments) if sale else None
+    next_statuses = allowed_next_statuses(status, order.get('FulfilmentMethod'), TYPE_RESERVATION)
+    show_complete = STATUS_COMPLETED in next_statuses
+
+    return render_template(
+        'modules/online_order/view.html',
+        order=order,
+        order_ref=format_order_ref(order_id),
+        is_reservation=True,
+        customer=customer,
+        customer_name=_full_name(customer),
+        total=float(order.get('TotalAmount') or 0),
+        bike_price=float(order['BikePrice']) if order.get('BikePrice') is not None else None,
+        sale=sale,
+        sale_id=sale_id,
+        sale_total=float(sale.get('TotalAmount') or 0) if sale else None,
+        sale_paid=round(sum(float(p.get('AmountPaid') or 0) for p in sale_payments), 2),
+        balance_due=balance,
+        overdue=is_overdue(TYPE_RESERVATION, status, order.get('ReservedUntil')),
+        payments=sale_payments,
+        missing_payment=(status in (STATUS_PAID, STATUS_COMPLETED) and not sale_error
+                         and not sale_payments),
+        refund_reminder=status == STATUS_CANCELLED and bool(order.get('StripePaymentIntentID')),
+        stripe_intent=stripe_intent_for(order, sale_payments),
+        paid_at=to_mauritius_time(order.get('PaidAt')),
+        status_css=STATUS_CSS.get(status, 'pending'),
+        check_stripe=order['_check_stripe'],
+        check_stripe_tooltip=CHECK_STRIPE_TOOLTIP,
+        next_actions=[],
+        show_complete=show_complete,
+        can_complete=show_complete and balance is not None and balance <= 0.005,
+        complete_label=RESERVATION_COMPLETE_LABEL,
+        collect_confirm_text=COLLECT_CONFIRM_TEXT,
+        balance_block_msg=BALANCE_DUE_MSG if balance is not None else BALANCE_UNKNOWN_MSG,
+        can_cancel=can_cancel(status, TYPE_RESERVATION),
+        cancel_paid_reservation=status in RESERVATION_CANCEL_WITH_RPC,
+        reservation_cancel_warning=RESERVATION_CANCEL_WARNING,
     )
 
 
@@ -427,7 +639,12 @@ def change_status(order_id):
         flash_error(ORDER_CHANGED_MSG)
         return redirect(_view_url(order_id))
 
-    reason = transition_error(current, order.get('FulfilmentMethod'), new_status)
+    order_type = order_type_of(order)
+    balance = None
+    if order_type == TYPE_RESERVATION and new_status in RESERVATION_TRANSITIONS.get(current, []):
+        balance = _reservation_balance(order)
+
+    reason = transition_error(current, order.get('FulfilmentMethod'), new_status, order_type, balance)
     if reason:
         flash_error(reason)
         return redirect(_view_url(order_id))
@@ -444,7 +661,9 @@ def change_status(order_id):
         flash_error(f'Could not update the order: {str(e)}')
         return redirect(_view_url(order_id))
 
-    if updated.data:
+    if updated.data and order_type == TYPE_RESERVATION:
+        flash_success(f'{format_order_ref(order_id)} is completed: the motorcycle was collected.')
+    elif updated.data:
         flash_success(f'{format_order_ref(order_id)} is now "{new_status}".')
     else:
         flash_error(ORDER_CHANGED_MSG)
@@ -471,6 +690,8 @@ def cancel(order_id):
         return redirect(_view_url(order_id))
 
     ref = format_order_ref(order_id)
+    if order_type_of(order) == TYPE_RESERVATION:
+        return _cancel_reservation(order_id, order, current, ref)
 
     if current in CANCEL_UNPAID:
         # Nothing was charged and no stock was taken: a plain conditional update.
@@ -507,5 +728,51 @@ def cancel(order_id):
     flash_error(
         f'An order that is "{current}" cannot be cancelled here. Only orders awaiting '
         'payment, paid or processing can be cancelled.'
+    )
+    return redirect(_view_url(order_id))
+
+
+def _cancel_reservation(order_id, order, current, ref):
+    """Cancel a bike reservation: unpaid by conditional update, paid by the database function."""
+    if current in CANCEL_UNPAID:
+        # No sale or payment exists before the deposit is paid.
+        try:
+            updated = (
+                supabase.table('Online_Order')
+                .update({'Status': STATUS_CANCELLED})
+                .eq('OrderID', order_id)
+                .eq('Status', current)
+                .execute()
+            )
+        except Exception as e:
+            flash_error(f'Could not cancel the reservation: {str(e)}')
+            return redirect(_view_url(order_id))
+        if updated.data:
+            flash_success(f'{ref} was cancelled. The customer had not paid the deposit, so no refund is needed.')
+        else:
+            flash_error(ORDER_CHANGED_MSG)
+        return redirect(_view_url(order_id))
+
+    if current in RESERVATION_CANCEL_WITH_RPC:
+        # Deletes the deposit payment and the sale, frees the bike and cancels, atomically.
+        try:
+            result = supabase.rpc('cancel_bike_reservation', {'p_order_id': order_id}).execute()
+        except Exception as e:
+            flash_error(reservation_rpc_error_message(str(e)))
+            return redirect(_view_url(order_id))
+        if result.data is False:
+            flash_error(ORDER_CHANGED_MSG)
+            return redirect(_view_url(order_id))
+        intent = order.get('StripePaymentIntentID')
+        where = f' (payment intent {intent})' if intent else ''
+        flash_success(
+            f'{ref} was cancelled: the motorcycle is available again and the sale and online deposit '
+            f'were removed. Refund the deposit in the Stripe Dashboard{where}.'
+        )
+        return redirect(_view_url(order_id))
+
+    flash_error(
+        f'A reservation that is "{current}" cannot be cancelled here. Only reservations awaiting '
+        'the deposit or paid (not yet collected) can be cancelled.'
     )
     return redirect(_view_url(order_id))

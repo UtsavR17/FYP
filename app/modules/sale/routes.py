@@ -6,7 +6,12 @@ from app.supabase_client import supabase
 from app.utils.pagination import paginate
 from app.utils.flash_messages import flash_success, flash_error
 from app.utils.validators import required_fields, is_positive_number
+from app.utils.order_ref import format_order_ref
 from datetime import date as date_type
+
+
+# Shown wherever a sale has no salesperson (online reservations have none).
+NO_EMPLOYEE_LABEL = 'Not assigned'
 
 
 # Helpers -----------------------------------
@@ -194,6 +199,35 @@ def _set_bike_status(nb_id, status):
         pass
 
 
+def _reservation_order_for_sale(sale_id):
+    """
+    OrderID of the online reservation that created this sale, or None.
+    Raises on a database error so callers can refuse unsafe changes.
+    """
+    rows = (
+        supabase.table('Online_Order')
+        .select('OrderID')
+        .eq('Sale_SaleID', sale_id)
+        .limit(1)
+        .execute()
+    ).data or []
+    return rows[0]['OrderID'] if rows else None
+
+
+def _reservation_orders_by_sale():
+    """{SaleID: OrderID} for every online reservation linked to a sale (list page)."""
+    try:
+        rows = (
+            supabase.table('Online_Order')
+            .select('OrderID, Sale_SaleID')
+            .eq('OrderType', 'Reservation')
+            .execute()
+        ).data or []
+    except Exception:
+        return None
+    return {r['Sale_SaleID']: r['OrderID'] for r in rows if r.get('Sale_SaleID')}
+
+
 def _enrich_sales(all_records):
     """Enrich sale records with resolved Customer, Bike, and Employee names."""
     customer_lookup = {}
@@ -252,7 +286,7 @@ def _enrich_sales(all_records):
             sale.get('New_MotorBike_NB_ID'), '-'
         )
         emp_id = sale.get('Employee_EmployeeID')
-        sale['_employee_name'] = emp_lookup.get(emp_id, '-') if emp_id else '-'
+        sale['_employee_name'] = emp_lookup.get(emp_id, '-') if emp_id else NO_EMPLOYEE_LABEL
 
     return all_records
 
@@ -278,6 +312,16 @@ def index():
         all_records = []
 
     all_records = _enrich_sales(all_records)
+
+    reservations = _reservation_orders_by_sale()
+    for r in all_records:
+        if reservations is None:
+            r['_reservation_ref'] = None
+            r['_delete_blocked'] = True
+        else:
+            order_id = reservations.get(r.get('SaleID'))
+            r['_reservation_ref'] = format_order_ref(order_id) if order_id else None
+            r['_delete_blocked'] = bool(order_id)
 
     if search_query:
         q = search_query.lower()
@@ -413,6 +457,18 @@ def edit(sale_id):
     errors         = {}
     form_data      = record.copy()
 
+    # A sale created by an online reservation keeps its motorbike: the bike
+    # field is read-only and any posted bike id is ignored.
+    reservation_order_id = None
+    bike_locked = False
+    try:
+        reservation_order_id = _reservation_order_for_sale(sale_id)
+        bike_locked = reservation_order_id is not None
+    except Exception:
+        bike_locked = True
+        flash_error('Could not check whether this sale belongs to an online reservation, '
+                    'so the motorbike cannot be changed right now.')
+
     customer_options, bike_options, employee_options, has_available_bikes, bike_prices = (
         _get_form_options(current_nb_id=original_nb_id)
     )
@@ -436,7 +492,10 @@ def edit(sale_id):
                 errors['Customer_CustomerID'] = 'Please select a valid customer.'
 
         nb_id = None
-        if not nb_id_raw:
+        if bike_locked:
+            # Ignore whatever bike id was posted.
+            nb_id = original_nb_id
+        elif not nb_id_raw:
             errors['New_MotorBike_NB_ID'] = 'Motorbike is required.'
         else:
             try:
@@ -473,8 +532,8 @@ def edit(sale_id):
                     'TotalAmount':         total_amount,
                 }).eq('SaleID', sale_id).execute()
 
-                # Handle bike status change
-                if nb_id != original_nb_id:
+                # Handle bike status change (never for a reservation sale)
+                if not bike_locked and nb_id != original_nb_id:
                     # Reset the old bike to Available
                     _set_bike_status(original_nb_id, 'Available')
                     # Mark the new bike as Sold
@@ -502,7 +561,11 @@ def edit(sale_id):
         bike_options=bike_options,
         employee_options=employee_options,
         has_available_bikes=True,  
-        bike_prices=bike_prices
+        bike_prices=bike_prices,
+        bike_locked=bike_locked,
+        locked_bike_label=dict(bike_options).get(original_nb_id, f'NB-{original_nb_id}'),
+        reservation_order_id=reservation_order_id,
+        reservation_ref=format_order_ref(reservation_order_id) if reservation_order_id else None,
     )
 
 
@@ -558,8 +621,8 @@ def view(sale_id):
     except Exception:
         pass
 
-    # Resolve Employee name
-    employee_name = '—'
+    # Resolve Employee name (online reservations have no salesperson)
+    employee_name = NO_EMPLOYEE_LABEL
     emp_id = record.get('Employee_EmployeeID')
     if emp_id:
         try:
@@ -589,6 +652,12 @@ def view(sale_id):
     except Exception:
         pass
 
+    reservation_order_id = None
+    try:
+        reservation_order_id = _reservation_order_for_sale(sale_id)
+    except Exception:
+        pass
+
     return render_template(
         'modules/sale/view.html',
         record=record,
@@ -596,13 +665,30 @@ def view(sale_id):
         customer_name=customer_name,
         bike_label=bike_label,
         employee_name=employee_name,
-        payment=payment
+        payment=payment,
+        reservation_order_id=reservation_order_id,
+        reservation_ref=format_order_ref(reservation_order_id) if reservation_order_id else None,
     )
 
 
 @bp.route('/delete/<int:sale_id>', methods=['POST'])
 @login_required
 def delete(sale_id):
+    # A sale created by an online reservation is removed only by cancelling the
+    # reservation (which also deletes the deposit and frees the bike).
+    try:
+        reservation_order_id = _reservation_order_for_sale(sale_id)
+    except Exception:
+        flash_error('Could not check whether this sale belongs to an online reservation. '
+                    'Nothing was deleted; please try again.')
+        return redirect(url_for('sale.index'))
+    if reservation_order_id is not None:
+        flash_error(
+            f'This sale belongs to online reservation {format_order_ref(reservation_order_id)}. '
+            'Cancel the reservation from Online Orders.'
+        )
+        return redirect(url_for('sale.index'))
+
     # Fetch the linked bike ID before deleting
     nb_id = None
     try:
