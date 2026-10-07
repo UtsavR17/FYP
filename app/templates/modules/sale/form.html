@@ -27,6 +27,17 @@
     </a>
 </div>
 
+{% if is_edit and reservation_ref %}
+<div class="oo-notice oo-notice-info" role="status">
+    <i class="fa-solid fa-globe"></i>
+    <div>
+        <strong>Reserved online
+            (<a href="{{ url_for('online_order.view', order_id=reservation_order_id) }}">{{ reservation_ref }}</a>).</strong>
+        The customer paid a deposit online. The motorbike cannot be changed here; other details remain editable.
+    </div>
+</div>
+{% endif %}
+
 {% if not is_edit and not has_available_bikes %}
     {{ warning_alert('No available motorbikes in inventory. Add motorbikes via the New Motorbikes module before recording a sale.') }}
 {% endif %}
@@ -50,6 +61,10 @@
                 ) }}
             </div>
             <div class="col-md-6">
+                {% if is_edit and bike_locked %}
+                {{ readonly_field('Motorbike', locked_bike_label,
+                    help_text='The motorbike of an online reservation cannot be changed.') }}
+                {% else %}
                 {{ select_field(
                     name        = 'New_MotorBike_NB_ID',
                     label       = 'Motorbike (Available Only)',
@@ -59,6 +74,7 @@
                     error       = errors.get('New_MotorBike_NB_ID', ''),
                     empty_label = '— Select an Available Motorbike —'
                 ) }}
+                {% endif %}
             </div>
         </div>
 

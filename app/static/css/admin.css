@@ -2758,3 +2758,9 @@ label.form-label {
     background-color: rgba(239, 68, 68, 0.12);
     color: #b91c1c;
 }
+
+/* Information notice (reservation note on Sales pages) */
+.oo-notice-info {
+    border-left-color: #0d9488;
+    background-color: #f0fdfa;
+}
