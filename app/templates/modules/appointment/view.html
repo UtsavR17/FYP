@@ -26,6 +26,20 @@
     </div>
 </div>
 
+{% if needs_confirmation %}
+<div class="appt-confirm-notice" role="status">
+    <i class="fa-solid fa-globe" aria-hidden="true"></i>
+    <div>
+        Booked online and waiting for confirmation. Assign an employee and set the status to Confirmed on the Edit page.
+        <div class="mt-2">
+            <a href="{{ url_for('appointment.edit', appt_id=appt_id) }}" class="btn btn-sm btn-accent">
+                <i class="fa-solid fa-pen me-1"></i>Edit and confirm
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Header Info -->
 <div class="form-card">
     <p class="form-section-title">Appointment Information</p>
@@ -37,7 +51,14 @@
             {{ readonly_field('Customer Bike', bike_label) }}
         </div>
         <div class="col-md-4">
+            {% if is_unassigned %}
+            <div class="mb-3">
+                <label class="form-label readonly-label">Assigned Employee</label>
+                <div class="readonly-value"><span class="appt-unassigned">{{ employee_name }}</span></div>
+            </div>
+            {% else %}
             {{ readonly_field('Assigned Employee', employee_name) }}
+            {% endif %}
         </div>
         <div class="col-md-3">
             {{ readonly_field('Date', record.Appointment_Date if record.Appointment_Date else '-') }}
@@ -71,33 +92,6 @@
     </div>
 </div>
 
-<!-- Audit -->
-<div class="form-card">
-    <p class="form-section-title">Audit Information</p>
-    <div class="row">
-        <div class="col-md-6">
-            {{ readonly_field('Created By', record.Created_By) }}
-        </div>
-        <div class="col-md-6">
-            {{ readonly_field(
-                'Date Created',
-                record.Date_Created[:19].replace('T', ' ') if record.Date_Created else '-'
-            ) }}
-        </div>
-        <div class="col-md-6">
-            {{ readonly_field(
-                'Updated By',
-                record.Updated_By if record.Updated_By else '-'
-            ) }}
-        </div>
-        <div class="col-md-6">
-            {{ readonly_field(
-                'Date Updated',
-                record.Date_Updated[:19].replace('T', ' ') if record.Date_Updated else '-'
-            ) }}
-        </div>
-    </div>
-</div>
 
 <!-- Services -->
 <div class="admin-card">

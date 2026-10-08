@@ -35,7 +35,7 @@
     {% endif %}
 
     {% call data_table(
-        ['Sale ID', 'Customer', 'Bike', 'Salesperson', 'Sale Date', 'Total Amount', 'Date Created'],
+        ['Sale ID', 'Customer', 'Bike', 'Salesperson', 'Sale Date', 'Total Amount'],
         total=pagination.total,
         empty_message='No sales recorded yet. Use Record Sale to add a new sale.'
     ) %}
@@ -54,13 +54,6 @@
             <td>{{ row.SaleDate if row.SaleDate else '-' }}</td>
             <td>
                 <strong>Rs. {{ '%.2f' | format(row.TotalAmount | float) }}</strong>
-            </td>
-            <td>
-                {% if row.Date_Created %}
-                    {{ row.Date_Created[:19].replace('T', ' ') }}
-                {% else %}
-
-                {% endif %}
             </td>
             <td class="text-end">
                 <div class="action-btn-group">

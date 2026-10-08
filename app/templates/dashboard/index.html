@@ -163,7 +163,10 @@
                                     <a href="{{ a.url }}" class="dash-row-anchor">{{ a.when }}</a>
                                     {% if a.is_today %}<span class="dash-today-tag">Today</span>{% endif %}
                                 </td>
-                                <td>{{ a.customer }}</td>
+                                <td>
+                                    {{ a.customer }}
+                                    {% if a.unassigned %}<span class="appt-unassigned-tag">Unassigned</span>{% endif %}
+                                </td>
                                 <td class="text-secondary">{{ a.bike }}</td>
                                 <td class="text-secondary">{{ a.type }}</td>
                                 <td>
