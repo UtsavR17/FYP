@@ -21,6 +21,7 @@
         <span class="btn btn-outline-success disabled" aria-disabled="true">
             <i class="fa-solid fa-circle-check me-2"></i>Portal Login Active
         </span>
+        {% if not login_shared %}
         <form method="POST" class="d-inline"
               action="{{ url_for('supplier.reset_portal_password', supplier_id=supplier_id) }}"
               onsubmit="return confirm('Reset this supplier\'s portal password? The current password will stop working.');">
@@ -28,6 +29,7 @@
                 <i class="fa-solid fa-key me-2"></i>Reset Portal Password
             </button>
         </form>
+        {% endif %}
         {% else %}
         <a href="{{ url_for('supplier.create_login', supplier_id=supplier_id) }}"
            class="btn btn-accent">
@@ -39,6 +41,12 @@
         </a>
     </div>
 </div>
+
+{% if record.AuthUserID and login_shared %}
+<p class="text-muted small mb-3">
+    <i class="fa-solid fa-circle-info me-1" aria-hidden="true"></i>{{ shared_login_msg }}
+</p>
+{% endif %}
 
 <!-- Supplier Information -->
 <div class="form-card">
