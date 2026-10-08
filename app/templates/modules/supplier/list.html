@@ -37,7 +37,7 @@
     {% endif %}
 
     {% call data_table(
-        ['ID', 'Supplier Name', 'Phone', 'Email', 'Country', 'Date Created'],
+        ['ID', 'Supplier Name', 'Phone', 'Email', 'Country', 'BRN'],
         total=pagination.total,
         empty_message='No suppliers found. Add your first supplier to get started.'
     ) %}
@@ -53,13 +53,7 @@
                 </a>
             </td>
             <td>{{ row.Country }}</td>
-            <td>
-                {% if row.Date_Created %}
-                    {{ row.Date_Created[:19].replace('T', ' ') }}
-                {% else %}
-                    &mdash;
-                {% endif %}
-            </td>
+            <td>{{ row.BRN or '-' }}</td>
             <td class="text-end">
                 <div class="action-btn-group">
                     <a href="{{ url_for('supplier.view', supplier_id=row.SupplierID) }}"

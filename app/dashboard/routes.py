@@ -61,6 +61,7 @@ def _get_dashboard_counts():
         ('sale','Sale'),
         ('payment', 'Payment'),
         ('online_order', 'Online_Order'),
+        ('supplier_application', 'Supplier_Application'),
     ]
 
     counts = {}
@@ -111,6 +112,18 @@ def _get_dashboard_counts():
         counts['online_order_overdue'] = result.count or 0
     except Exception:
         counts['online_order_overdue'] = 0
+
+    # Supplier applications waiting for review (Task 46). Its own try, like every count.
+    try:
+        result = (
+            supabase.table('Supplier_Application')
+            .select('ApplicationID', count='exact')
+            .eq('Status', 'Pending')
+            .execute()
+        )
+        counts['supplier_application_pending'] = result.count or 0
+    except Exception:
+        counts['supplier_application_pending'] = 0
 
     # Online bookings waiting for confirmation (Task 44): Pending with no employee.
     try:
@@ -632,6 +645,12 @@ def _online_order_pills(counts):
     return pills
 
 
+def _supplier_application_pills(counts):
+    """'N pending' pill on the Supplier Applications tile; left out when zero."""
+    n = counts.get('supplier_application_pending')
+    return [{'text': f'{n} pending', 'css': 'sa-tile-pill-pending'}] if n else []
+
+
 def _appointment_pills(counts):
     """'N to confirm' pill on the Appointments tile; left out when zero."""
     n = counts.get('appointment_to_confirm')
@@ -670,6 +689,9 @@ def _build_module_groups(counts):
                      'Manage workshop services'),
                 tile('supplier', 'Suppliers', 'fa-truck', 'supplier.index',
                      'Manage supplier information'),
+                dict(tile('supplier_application', 'Supplier Applications', 'fa-file-signature',
+                          'supplier_application.index', 'Review requests to become a supplier'),
+                     pills=_supplier_application_pills(counts)),
             ],
         },
         {

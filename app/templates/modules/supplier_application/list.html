@@ -1,0 +1,110 @@
+{% extends 'layout/admin_layout.html' %}
+{% from 'components/table.html'      import data_table %}
+{% from 'components/pagination.html' import pagination_controls %}
+{% from 'components/alert.html'      import info_alert %}
+
+{% block title %}Supplier Applications{% endblock %}
+{% block page_title %}Supplier Applications{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h2 class="page-header-title">
+            Supplier Applications
+            <span class="record-count-badge">{{ pagination.total }}</span>
+        </h2>
+        <p class="page-header-subtitle">Requests to become a supplier, submitted from the online shop</p>
+    </div>
+</div>
+
+<div class="admin-card">
+
+    {# Same markup as the search_bar macro, plus the status filter so a search keeps it. #}
+    <form method="GET" action="{{ url_for('supplier_application.index') }}" class="search-form">
+        <input type="hidden" name="status" value="{{ status_filter }}">
+        <div class="input-group">
+            <span class="input-group-text search-icon-addon">
+                <i class="fa-solid fa-magnifying-glass"></i>
+            </span>
+            <input type="text" name="q" value="{{ search_query }}" class="form-control" maxlength="60"
+                   placeholder="Search by company, contact person, email or BRN..." autocomplete="off"
+                   aria-label="Search applications">
+            <button type="submit" class="btn btn-accent">
+                <i class="fa-solid fa-magnifying-glass me-1"></i>Search
+            </button>
+            {% if search_query %}
+            <a href="{{ url_for('supplier_application.index', status=status_filter) }}" class="btn btn-outline-secondary" title="Clear search">
+                <i class="fa-solid fa-xmark me-1"></i>Clear
+            </a>
+            {% endif %}
+        </div>
+    </form>
+
+    <form method="GET" action="{{ url_for('supplier_application.index') }}" class="oo-filter-form">
+        {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
+        <div class="oo-filter-field">
+            <label for="sa-status-filter" class="form-label">Status</label>
+            <select id="sa-status-filter" name="status" class="form-select form-select-sm">
+                {% for s in statuses %}
+                <option value="{{ s }}" {% if s == status_filter %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+                <option value="{{ status_all }}" {% if status_filter == status_all %}selected{% endif %}>All statuses</option>
+            </select>
+        </div>
+        <div class="oo-filter-actions">
+            <button type="submit" class="btn btn-sm btn-outline-primary">
+                <i class="fa-solid fa-filter me-1"></i>Apply
+            </button>
+        </div>
+    </form>
+
+    {% if search_query %}
+        {{ info_alert('Showing results for: <strong>' ~ search_query ~ '</strong>') }}
+    {% endif %}
+
+    {% if search_query %}
+        {% set empty_message = 'No applications match this search.' %}
+    {% elif status_filter == status_all %}
+        {% set empty_message = 'No supplier applications yet. Applications submitted on the online shop appear here.' %}
+    {% else %}
+        {% set empty_message = 'No ' ~ (status_filter | lower) ~ ' applications.' %}
+    {% endif %}
+
+    {% call data_table(
+        ['ID', 'Company', 'Contact Person', 'Email', 'Country', 'BRN', 'Submitted', 'Status'],
+        total=pagination.total,
+        empty_message=empty_message
+    ) %}
+        {% for row in pagination.records %}
+        <tr>
+            <td style="width:70px;">
+                <a href="{{ url_for('supplier_application.view', application_id=row.ApplicationID) }}" class="fw-semibold">
+                    #{{ row.ApplicationID }}
+                </a>
+            </td>
+            <td><strong>{{ row.CompanyName }}</strong></td>
+            <td>{{ row.ContactPerson or '-' }}</td>
+            <td class="text-break">{{ row.Email or '-' }}</td>
+            <td>{{ row.Country or '-' }}</td>
+            <td>{{ row.BRN or '-' }}</td>
+            <td>{{ row._submitted or '-' }}</td>
+            <td><span class="po-status-badge sa-status-{{ row._status_css }}">{{ row.Status }}</span></td>
+            <td class="text-end">
+                <div class="action-btn-group">
+                    <a href="{{ url_for('supplier_application.view', application_id=row.ApplicationID) }}"
+                       class="btn btn-sm btn-outline-primary">
+                        <i class="fa-solid fa-eye me-1"></i>{{ 'Review' if row.Status == 'Pending' else 'View' }}
+                    </a>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    {% endcall %}
+
+    {{ pagination_controls(pagination, 'supplier_application.index', search_query,
+                           params={'status': status_filter}) }}
+
+</div>
+
+{% endblock %}
