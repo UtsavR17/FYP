@@ -37,9 +37,17 @@ STAGE_REJECTED = 'Rejected'
 ORDER_CHANGED_MSG = 'This order has changed. Refresh and try again.'
 
 
+EXPECTED_PAST_MSG = 'Expected delivery date must be after today.'
+
+
 def _mauritius_today():
     """Today's date in Mauritius time (UTC+4) as YYYY-MM-DD."""
     return datetime.now(timezone(timedelta(hours=4))).date().isoformat()
+
+
+def _mauritius_tomorrow():
+    """Tomorrow in Mauritius time as YYYY-MM-DD: the earliest Expected Date allowed."""
+    return (date_type.fromisoformat(_mauritius_today()) + timedelta(days=1)).isoformat()
 
 
 def _get_po_header(po_id):
@@ -227,12 +235,12 @@ def create():
             except ValueError:
                 errors['Supplier_SupplierID'] = 'Please select a valid supplier.'
 
-        porder_date = date_type.today().isoformat()   # recorded automatically
+        porder_date = _mauritius_today()   # recorded automatically
         expected_date, exp_err = _validate_date(expected_date_raw, 'Expected Date')
         if exp_err:
             errors['ExpectedDate'] = exp_err
-        elif expected_date < porder_date:
-            errors['ExpectedDate'] = 'Expected date cannot be before today.'
+        elif date_type.fromisoformat(expected_date) <= date_type.fromisoformat(porder_date):
+            errors['ExpectedDate'] = EXPECTED_PAST_MSG
 
         if not errors:
             try:
@@ -251,7 +259,8 @@ def create():
     return render_template(
         'modules/purchase_order/form.html',
         form_data=form_data, errors=errors, is_edit=False,
-        supplier_options=supplier_options, status_options=PO_STATUS_OPTIONS
+        supplier_options=supplier_options, status_options=PO_STATUS_OPTIONS,
+        min_expected_date=_mauritius_tomorrow()
     )
 
 
@@ -315,12 +324,24 @@ def edit(po_id):
         if exp_err:
             errors['ExpectedDate'] = exp_err
 
-        if (not porder_err and not exp_err
-                and porder_date and expected_date
-                and expected_date < porder_date):
-            errors['ExpectedDate'] = (
-                'Expected date must be on or after the order date.'
-            )
+        # A changed Expected Date must be after today and after the order date.
+        # An unchanged one may be in the past, so an overdue order can still be
+        # saved (status change, receiving).
+        if not porder_err and not exp_err:
+            new_expected = date_type.fromisoformat(expected_date)
+            order_day = date_type.fromisoformat(porder_date)
+            old_expected = str(record.get('ExpectedDate') or '')[:10]
+            if new_expected.isoformat() != old_expected:
+                if new_expected <= date_type.fromisoformat(_mauritius_today()):
+                    errors['ExpectedDate'] = EXPECTED_PAST_MSG
+                elif new_expected <= order_day:
+                    errors['ExpectedDate'] = (
+                        'Expected delivery date must be after the order date.'
+                    )
+            elif new_expected < order_day:
+                errors['ExpectedDate'] = (
+                    'Expected date must be on or after the order date.'
+                )
 
         valid_statuses = [s for s, _ in PO_STATUS_OPTIONS]
         if not status_value:
