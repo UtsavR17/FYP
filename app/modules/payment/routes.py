@@ -8,6 +8,7 @@ from app.utils.flash_messages import flash_success, flash_error
 from app.utils.validators import is_positive_number
 from app.utils.order_ref import format_order_ref, parse_order_query
 from datetime import date as date_type
+from app.utils.text import norm
 
 
 PAYMENT_METHOD_OPTIONS = [
@@ -512,9 +513,9 @@ def index():
         q_order_id = parse_order_query(search_query)
         all_records = [
             r for r in all_records
-            if q in r.get('_reference_label', '').lower()
-            or q in r.get('PaymentMethod', '').lower()
-            or q in r.get('PaymentType', '').lower()
+            if q in norm(r.get('_reference_label'))
+            or q in norm(r.get('PaymentMethod'))
+            or q in norm(r.get('PaymentType'))
             or q in str(r.get('PaymentDate', '') or '')
             or (q_order_id is not None and r.get('Online_Order_OrderID') == q_order_id)
         ]

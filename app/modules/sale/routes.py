@@ -8,6 +8,7 @@ from app.utils.flash_messages import flash_success, flash_error
 from app.utils.validators import required_fields, is_positive_number
 from app.utils.order_ref import format_order_ref
 from datetime import date as date_type
+from app.utils.text import norm
 
 
 # Shown wherever a sale has no salesperson (online reservations have none).
@@ -327,9 +328,9 @@ def index():
         q = search_query.lower()
         all_records = [
             r for r in all_records
-            if q in r.get('_customer_name', '').lower()
-            or q in r.get('_bike_label', '').lower()
-            or q in r.get('_employee_name', '').lower()
+            if q in norm(r.get('_customer_name'))
+            or q in norm(r.get('_bike_label'))
+            or q in norm(r.get('_employee_name'))
             or q in str(r.get('SaleDate', '') or '')
         ]
 

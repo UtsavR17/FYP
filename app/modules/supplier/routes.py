@@ -35,6 +35,7 @@ from app.modules.new_motorbike.routes import (
     FUEL_TYPE_OPTIONS as NB_FUEL_TYPE_OPTIONS,
     TRANSMISSION_OPTIONS as NB_TRANSMISSION_OPTIONS,
 )
+from app.utils.text import norm
 
 @bp.route('/')
 @login_required
@@ -58,9 +59,9 @@ def index():
         q = search_query.lower()
         all_records = [
             r for r in all_records
-            if q in r.get('SupplierName', '').lower()
-            or q in r.get('Email', '').lower()
-            or q in r.get('Country', '').lower()
+            if q in norm(r.get('SupplierName'))
+            or q in norm(r.get('Email'))
+            or q in norm(r.get('Country'))
         ]
 
     pagination = paginate(all_records, page, per_page=10)

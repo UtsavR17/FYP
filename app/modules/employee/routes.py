@@ -5,6 +5,7 @@ from app.supabase_client import supabase
 from app.utils.pagination import paginate
 from app.utils.flash_messages import flash_success, flash_error
 from app.utils.validators import required_fields
+from app.utils.text import norm
 
 
 def _get_form_options(exclude_employee_id=None):
@@ -109,11 +110,11 @@ def index():
         q = search_query.lower()
         all_records = [
             r for r in all_records
-            if q in r.get('FirstName', '').lower()
-            or q in r.get('LastName', '').lower()
-            or q in f"{r.get('FirstName', '')} {r.get('LastName', '')}".lower()
-            or q in r.get('Phone', '').lower()
-            or q in r.get('_role_name', '').lower()
+            if q in norm(r.get('FirstName'))
+            or q in norm(r.get('LastName'))
+            or q in norm(f"{r.get('FirstName') or ''} {r.get('LastName') or ''}")
+            or q in norm(r.get('Phone'))
+            or q in norm(r.get('_role_name'))
         ]
 
     pagination = paginate(all_records, page, per_page=10)

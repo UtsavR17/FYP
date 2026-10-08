@@ -7,6 +7,7 @@ from app.utils.pagination import paginate
 from app.utils.flash_messages import flash_success, flash_error
 from app.utils.validators import required_fields, is_positive_integer
 from datetime import date as date_type
+from app.utils.text import norm
 
 
 # -- Predefined option lists -----------------------
@@ -260,10 +261,10 @@ def index():
         q = search_query.lower()
         all_records = [
             r for r in all_records
-            if q in r.get('_bike_label', '').lower()
-            or q in r.get('_employee_name', '').lower()
-            or q in r.get('AppointmentType', '').lower()
-            or q in r.get('Status', '').lower()
+            if q in norm(r.get('_bike_label'))
+            or q in norm(r.get('_employee_name'))
+            or q in norm(r.get('AppointmentType'))
+            or q in norm(r.get('Status'))
             or q in str(r.get('Appointment_Date', '') or '')
         ]
 

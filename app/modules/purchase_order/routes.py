@@ -14,6 +14,7 @@ from app.modules.new_motorbike.routes import (
     TRANSMISSION_OPTIONS as NB_TRANSMISSION_OPTIONS,
     STATUS_OPTIONS as NB_STATUS_OPTIONS,
 )
+from app.utils.text import norm
 
 # Predefined Status values for Purchase Orders
 PO_STATUS_OPTIONS = [
@@ -185,8 +186,8 @@ def index():
         q = search_query.lower()
         all_records = [
             r for r in all_records
-            if q in r.get('_supplier_name', '').lower()
-            or q in r.get('Status', '').lower()
+            if q in norm(r.get('_supplier_name'))
+            or q in norm(r.get('Status'))
             or q in str(r.get('POrderDate', '') or '')
             or q in str(r.get('ExpectedDate', '') or '')
         ]

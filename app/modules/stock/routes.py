@@ -7,6 +7,7 @@ from app.utils.flash_messages import flash_success, flash_error
 from app.utils.validators import (
     required_fields, is_positive_number, is_positive_integer
 )
+from app.utils.text import norm
 
 
 def _get_form_options():
@@ -111,9 +112,9 @@ def index():
         q = search_query.lower()
         all_records = [
             r for r in all_records
-            if q in r.get('Size', '').lower()
-            or q in r.get('_spare_part_name', '').lower()
-            or q in r.get('_brand_name', '').lower()
+            if q in norm(r.get('Size'))
+            or q in norm(r.get('_spare_part_name'))
+            or q in norm(r.get('_brand_name'))
         ]
 
     pagination = paginate(all_records, page, per_page=10)
