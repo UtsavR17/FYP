@@ -33,29 +33,13 @@
     {% endif %}
 
     {% call data_table(
-        ['Color Name', 'Created By', 'Date Created', 'Updated By', 'Date Updated'],
+        ['Color Name'],
         total=pagination.total,
         empty_message='No colors found. Add your first color to get started.'
     ) %}
         {% for row in pagination.records %}
         <tr>
             <td><strong>{{ row.Color }}</strong></td>
-            <td>{{ row.Created_By }}</td>
-            <td>
-                {% if row.Date_Created %}
-                    {{ row.Date_Created[:19].replace('T', ' ') }}
-                {% else %}
-                    &mdash;
-                {% endif %}
-            </td>
-            <td>{{ row.Updated_By if row.Updated_By else '—' }}</td>
-            <td>
-                {% if row.Date_Updated %}
-                    {{ row.Date_Updated[:19].replace('T', ' ') }}
-                {% else %}
-                    &mdash;
-                {% endif %}
-            </td>
             <td class="text-end">
                 <div class="action-btn-group">
                     <a href="{{ url_for('color.edit', color_id=row.Color) }}"

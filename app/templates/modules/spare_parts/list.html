@@ -37,7 +37,7 @@
     {% endif %}
 
     {% call data_table(
-        ['ID', 'Part Name', 'Description', 'Category', 'Date Created'],
+        ['ID', 'Part Name', 'Description', 'Category'],
         total=pagination.total,
         empty_message='No spare parts found. Add your first spare part to get started.'
     ) %}
@@ -56,13 +56,6 @@
                 <span class="role-badge">{{ row._category_name }}</span>
             </td>
       
-            <td>
-                {% if row.Date_Created %}
-                    {{ row.Date_Created[:19].replace('T', ' ') }}
-                {% else %}
-                    &mdash;
-                {% endif %}
-            </td>
             <td class="text-end">
                 <div class="action-btn-group">
                     <a href="{{ url_for('spare_parts.edit', sp_id=row.SP_id) }}"

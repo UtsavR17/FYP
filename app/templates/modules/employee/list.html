@@ -37,7 +37,7 @@
     {% endif %}
 
     {% call data_table(
-        ['ID', 'Full Name', 'Phone', 'Role', 'Supervisor', 'Date Created'],
+        ['ID', 'Full Name', 'Phone', 'Role', 'Supervisor'],
         total=pagination.total,
         empty_message='No employees found. Add your first employee to get started.'
     ) %}
@@ -52,13 +52,6 @@
                 <span class="role-badge">{{ row._role_name }}</span>
             </td>
             <td class="text-secondary">{{ row._supervisor_name }}</td>
-            <td>
-                {% if row.Date_Created %}
-                    {{ row.Date_Created[:19].replace('T', ' ') }}
-                {% else %}
-                    &mdash;
-                {% endif %}
-            </td>
             <td class="text-end">
                 <div class="action-btn-group">
                     <a href="{{ url_for('employee.edit', employee_id=row.EmployeeID) }}"

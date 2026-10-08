@@ -35,7 +35,7 @@
     {% endif %}
 
     {% call data_table(
-        ['ID', 'Model', 'Color', 'Year', 'VIN', 'Price', 'Status', 'Date Created'],
+        ['ID', 'Model', 'Color', 'Year', 'VIN', 'Price', 'Status'],
         total=pagination.total,
         empty_message='No motorbikes found. Add your first motorbike to inventory.'
     ) %}
@@ -66,13 +66,6 @@
                     <span class="bike-status-badge bike-status-sold">
                         Sold
                     </span>
-                {% endif %}
-            </td>
-            <td>
-                {% if row.Date_Created %}
-                    {{ row.Date_Created[:19].replace('T', ' ') }}
-                {% else %}
-                    <!-- &mdash; -->
                 {% endif %}
             </td>
             <td class="text-end">

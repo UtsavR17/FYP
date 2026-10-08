@@ -35,7 +35,7 @@
     {% endif %}
 
     {% call data_table(
-        ['ID', 'Full Name', 'Phone', 'Email', 'Town', 'NIC', 'Date Created'],
+        ['ID', 'Full Name', 'Phone', 'Email', 'Town', 'NIC'],
         total=pagination.total,
         empty_message='No customers found. Add your first customer to get started.'
     ) %}
@@ -54,13 +54,6 @@
             </td>
             <td>{{ row.Town }}</td>
             <td class="text-muted">{{ row.NIC }}</td>
-            <td>
-                {% if row.Date_Created %}
-                    {{ row.Date_Created[:19].replace('T', ' ') }}
-                {% else %}
-                    &mdash;
-                {% endif %}
-            </td>
             <td class="text-end">
                 <div class="action-btn-group">
                     <a href="{{ url_for('customer.edit', customer_id=row.CustomerID) }}"

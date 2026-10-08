@@ -35,7 +35,7 @@
     {% endif %}
 
     {% call data_table(
-        ['Pay ID', 'Reference', 'Type', 'Date', 'Amount Paid', 'Method', 'Date Created'],
+        ['Pay ID', 'Reference', 'Type', 'Date', 'Amount Paid', 'Method'],
         total=pagination.total,
         empty_message='No payments recorded yet. Use Record Payment to add one.'
     ) %}
@@ -70,13 +70,6 @@
                 <strong>Rs. {{ '%.2f' | format(row.AmountPaid | float) }}</strong>
             </td>
             <td>{{ row.PaymentMethod }}</td>
-            <td>
-                {% if row.Date_Created %}
-                    {{ row.Date_Created[:19].replace('T', ' ') }}
-                {% else %}
-                    &mdash;
-                {% endif %}
-            </td>
             <td class="text-end">
                 {% if row._locked %}
                 <span class="sp-lock-hint" title="Recorded automatically by Stripe checkout">

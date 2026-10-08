@@ -37,8 +37,7 @@
     {% endif %}
 
     {% call data_table(
-        ['ID', 'Brand Name', 'Country of Origin', 'Created By', 'Date Created',
-         'Updated By', 'Date Updated'],
+        ['ID', 'Brand Name', 'Country of Origin'],
         total=pagination.total,
         empty_message='No brands found. Add your first brand to get started.'
     ) %}
@@ -47,22 +46,6 @@
             <td class="text-muted" style="width: 60px;">{{ row.Brand_ID }}</td>
             <td><strong>{{ row.Brand_Name }}</strong></td>
             <td>{{ row.CountryOfOrigin }}</td>
-            <td>{{ row.Created_By }}</td>
-            <td>
-                {% if row.Date_Created %}
-                    {{ row.Date_Created[:19].replace('T', ' ') }}
-                {% else %}
-                    &mdash;
-                {% endif %}
-            </td>
-            <td>{{ row.Updated_By if row.Updated_By else '—' }}</td>
-            <td>
-                {% if row.Date_Updated %}
-                    {{ row.Date_Updated[:19].replace('T', ' ') }}
-                {% else %}
-                    &mdash;
-                {% endif %}
-            </td>
             <td class="text-end">
                 <div class="action-btn-group">
                     <a href="{{ url_for('brand.edit', brand_id=row.Brand_ID) }}"

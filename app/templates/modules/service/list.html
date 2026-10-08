@@ -37,8 +37,7 @@
     {% endif %}
 
     {% call data_table(
-        ['ID', 'Service Name', 'Description', 'Cost', 'Created By',
-         'Date Created', 'Updated By', 'Date Updated'],
+        ['ID', 'Service Name', 'Description', 'Cost'],
         total=pagination.total,
         empty_message='No services found. Add your first service to get started.'
     ) %}
@@ -54,22 +53,6 @@
                 {% endif %}
             </td>
             <td>Rs. {{ '%.2f' | format(row.Cost | float) }}</td>
-            <td>{{ row.Created_By }}</td>
-            <td>
-                {% if row.Date_Created %}
-                    {{ row.Date_Created[:19].replace('T', ' ') }}
-                {% else %}
-                    &mdash;
-                {% endif %}
-            </td>
-            <td>{{ row.Updated_By if row.Updated_By else '—' }}</td>
-            <td>
-                {% if row.Date_Updated %}
-                    {{ row.Date_Updated[:19].replace('T', ' ') }}
-                {% else %}
-                    &mdash;
-                {% endif %}
-            </td>
             <td class="text-end">
                 <div class="action-btn-group">
                     <a href="{{ url_for('service.edit', service_id=row.ServiceID) }}"

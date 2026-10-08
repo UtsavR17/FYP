@@ -35,7 +35,7 @@
     {% endif %}
 
     {% call data_table(
-        ['PO No.', 'Supplier', 'Order Date', 'Expected Date', 'Status', 'Order Stage', 'Date Created'],
+        ['PO No.', 'Supplier', 'Order Date', 'Expected Date', 'Status', 'Order Stage'],
         total=pagination.total,
         empty_message='No purchase orders found. Create your first purchase order.'
     ) %}
@@ -55,13 +55,6 @@
             <td>
                 {% set row_stage = row.SupplierStage or 'Draft' %}
                 <span class="po-status-badge po-stage-{{ row_stage | lower }}">{{ row_stage }}</span>
-            </td>
-            <td>
-                {% if row.Date_Created %}
-                    {{ row.Date_Created[:19].replace('T', ' ') }}
-                {% else %}
-                    &mdash;
-                {% endif %}
             </td>
             <td class="text-end">
                 <div class="action-btn-group">

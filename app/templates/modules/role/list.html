@@ -33,8 +33,7 @@
     {% endif %}
 
     {% call data_table(
-        ['ID', 'Role Name', 'Hourly Rate', 'Created By', 'Date Created',
-         'Updated By', 'Date Updated'],
+        ['ID', 'Role Name', 'Hourly Rate'],
         total=pagination.total,
         empty_message='No roles found. Add your first role to get started.'
     ) %}
@@ -43,22 +42,6 @@
             <td class="text-muted" style="width: 60px;">{{ row.Role_ID }}</td>
             <td><strong>{{ row.Role_Name }}</strong></td>
             <td>Rs. {{ '%.2f' | format(row.HourlyRate | float) }}</td>
-            <td>{{ row.Created_By }}</td>
-            <td>
-                {% if row.Date_Created %}
-                    {{ row.Date_Created[:19].replace('T', ' ') }}
-                {% else %}
-                    &mdash;
-                {% endif %}
-            </td>
-            <td>{{ row.Updated_By if row.Updated_By else '—' }}</td>
-            <td>
-                {% if row.Date_Updated %}
-                    {{ row.Date_Updated[:19].replace('T', ' ') }}
-                {% else %}
-                    &mdash;
-                {% endif %}
-            </td>
             <td class="text-end">
                 <div class="action-btn-group">
                     <a href="{{ url_for('role.edit', role_id=row.Role_ID) }}"

@@ -37,7 +37,7 @@
     {% endif %}
 
     {% call data_table(
-        ['ID', 'Registration No.', 'Customer', 'Model', 'Year', 'VIN', 'Date Created'],
+        ['ID', 'Registration No.', 'Customer', 'Model', 'Year', 'VIN'],
         total=pagination.total,
         empty_message='No bike registrations found. Add your first registration to get started.'
     ) %}
@@ -54,13 +54,6 @@
             <td>{{ row.Year }}</td>
             <td class="text-muted" style="font-size:0.8rem;">
                 {{ row.VIN }}
-            </td>
-            <td>
-                {% if row.Date_Created %}
-                    {{ row.Date_Created[:19].replace('T', ' ') }}
-                {% else %}
-                    &mdash;
-                {% endif %}
             </td>
             <td class="text-end">
                 <div class="action-btn-group">

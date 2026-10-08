@@ -37,8 +37,7 @@
     {% endif %}
 
     {% call data_table(
-        ['ID', 'Description', 'Brand', 'Created By', 'Date Created',
-         'Updated By', 'Date Updated'],
+        ['ID', 'Description', 'Brand'],
         total=pagination.total,
         empty_message='No models found. Add your first model to get started.'
     ) %}
@@ -48,22 +47,6 @@
             <td><strong>{{ row.Description }}</strong></td>
             <td>
                 <span class="role-badge">{{ row._brand_name }}</span>
-            </td>
-            <td>{{ row.Created_By }}</td>
-            <td>
-                {% if row.Date_Created %}
-                    {{ row.Date_Created[:19].replace('T', ' ') }}
-                {% else %}
-                    &mdash;
-                {% endif %}
-            </td>
-            <td>{{ row.Updated_By if row.Updated_By else '—' }}</td>
-            <td>
-                {% if row.Date_Updated %}
-                    {{ row.Date_Updated[:19].replace('T', ' ') }}
-                {% else %}
-                    &mdash;
-                {% endif %}
             </td>
             <td class="text-end">
                 <div class="action-btn-group">
