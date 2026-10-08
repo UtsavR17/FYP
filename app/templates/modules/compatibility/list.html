@@ -39,7 +39,7 @@
     {% endif %}
 
     {% call data_table(
-        ['ID', 'Stock Item', 'Model', 'Year From', 'Year To', 'Date Created'],
+        ['ID', 'Stock Item', 'Model', 'Year From', 'Year To'],
         total=pagination.total,
         empty_message='No compatibility records found. Add your first record to get started.'
     ) %}
@@ -62,13 +62,6 @@
                     {{ row.Year_To }}
                 {% else %}
                     <span class="text-muted">&mdash;</span>
-                {% endif %}
-            </td>
-            <td>
-                {% if row.Date_Created %}
-                    {{ row.Date_Created[:19].replace('T', ' ') }}
-                {% else %}
-                    &mdash;
                 {% endif %}
             </td>
             <td class="text-end">

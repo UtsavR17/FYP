@@ -37,7 +37,7 @@
     {% endif %}
 
     {% call data_table(
-        ['ID', 'Spare Part', 'Brand', 'Size', 'QOH', 'Price', 'Warranty', 'Date Created'],
+        ['ID', 'Spare Part', 'Brand', 'Size', 'QOH', 'Price', 'Warranty'],
         total=pagination.total,
         empty_message='No stock entries found. Add your first stock entry to get started.'
     ) %}
@@ -58,13 +58,6 @@
             </td>
             <td>Rs. {{ '%.2f' | format(row.S_Price | float) }}</td>
             <td>{{ row.Warranty }} months</td>
-            <td>
-                {% if row.Date_Created %}
-                    {{ row.Date_Created[:19].replace('T', ' ') }}
-                {% else %}
-                    &mdash;
-                {% endif %}
-            </td>
             <td class="text-end">
                 <div class="action-btn-group">
                     <a href="{{ url_for('stock.edit', stock_id=row.Stock_ID) }}"

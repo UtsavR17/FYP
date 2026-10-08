@@ -7,7 +7,7 @@ from app.modules.supplier import bp
 from app.auth.decorators import login_required
 from app.supabase_client import supabase
 from app.utils.pagination import paginate
-from app.utils.flash_messages import flash_success, flash_error, flash_warning
+from app.utils.flash_messages import flash_success, flash_error, flash_warning, flash_info
 from app.utils.validators import required_fields, is_valid_email
 
 # BRN (Task 46): optional, 5 to 30 letters, digits, hyphens or slashes, stored uppercase.
@@ -267,12 +267,19 @@ def delete(supplier_id):
     except Exception:
         name_value = f'ID {supplier_id}'
 
+    # Decided before the row is deleted: a shared login is the person's shop account
+    # and must survive (Task 47).
+    login_shared = _login_is_shared(auth_user_id) if auth_user_id else False
+
     try:
         deleted = supabase.table('Supplier').delete().eq('SupplierID', supplier_id).execute()
         flash_success(f'Supplier "{name_value}" was deleted successfully.')
-        # The supplier row is gone, so its portal login has nothing left to open
         if auth_user_id and deleted.data:
-            _delete_portal_user(auth_user_id, name_value)
+            if login_shared:
+                flash_info(SHARED_LOGIN_KEPT_MSG)
+            else:
+                # Portal-only login: the supplier row is gone, so it has nothing left to open
+                _delete_portal_user(auth_user_id, name_value)
     except Exception as e:
         error_msg = str(e)
         if 'foreign key' in error_msg.lower() or 'violates' in error_msg.lower():
@@ -451,7 +458,9 @@ def view(supplier_id):
         record=record,
         supplier_id=supplier_id,
         products=products,
-        models=models
+        models=models,
+        login_shared=_login_is_shared(record.get('AuthUserID')),
+        shared_login_msg=SHARED_LOGIN_MSG,
     )
 
 
@@ -836,6 +845,42 @@ def _flash_temporary_password(intro, password):
     ).format(intro=intro, pw=password))
 
 
+SHARED_LOGIN_MSG = (
+    'This supplier signs in with their online shop account. '
+    'To reset the password, they use Forgot password in the shop.'
+)
+SHARED_LOGIN_KEPT_MSG = 'Supplier deleted. The linked online shop account was kept.'
+
+
+def _login_is_shared(auth_user_id):
+    """
+    True when this login is also the person's online shop account (Task 47): a Customer
+    profile or a supplier application uses the same AuthUserID. Logins made with
+    "Create Portal Login" have neither and are portal-only. Any lookup failure counts as
+    shared, so a password reset or user deletion is never risked on a shop account.
+    """
+    if not auth_user_id:
+        return False
+    try:
+        customers = (
+            supabase.table('Customer')
+            .select('CustomerID')
+            .eq('AuthUserID', auth_user_id)
+            .limit(1)
+            .execute()
+        ).data or []
+        applications = (
+            supabase.table('Supplier_Application')
+            .select('ApplicationID')
+            .eq('AuthUserID', auth_user_id)
+            .limit(1)
+            .execute()
+        ).data or []
+    except Exception:
+        return True
+    return bool(customers or applications)
+
+
 def _delete_portal_user(auth_user_id, supplier_name):
     """Remove the Auth user of a deleted supplier. Failure only produces a warning."""
     admin_client, config_error = _get_service_client()
@@ -952,6 +997,12 @@ def reset_portal_password(supplier_id):
     auth_user_id = record.get('AuthUserID')
     if not auth_user_id:
         flash_error('This supplier does not have a portal login yet.')
+        return redirect(url_for('supplier.view', supplier_id=supplier_id))
+
+    # Never change the password of a shop account (the button is hidden too, but a
+    # forged POST must be refused here).
+    if _login_is_shared(auth_user_id):
+        flash_error(SHARED_LOGIN_MSG)
         return redirect(url_for('supplier.view', supplier_id=supplier_id))
 
     admin_client, config_error = _get_service_client()
