@@ -202,6 +202,14 @@
                         <span>Suppliers</span>
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('supplier_application.index') }}"
+                       class="nav-link {% if request.blueprint == 'supplier_application' %}active{% endif %}"
+                       {% if request.blueprint == 'supplier_application' %}aria-current="page"{% endif %}>
+                        <!-- <i class="fa-solid fa-file-signature nav-icon"></i> -->
+                        <span>Supplier Applications</span>
+                    </a>
+                </li>
             </ul>
 
         </nav>

@@ -88,6 +88,10 @@ def create_app():
     from app.modules.online_order import bp as online_order_bp
     app.register_blueprint(online_order_bp, url_prefix='/online-orders')
 
+    # Supplier Applications (Task 46): review requests submitted on the Client Side
+    from app.modules.supplier_application import bp as supplier_application_bp
+    app.register_blueprint(supplier_application_bp, url_prefix='/supplier-applications')
+
     # Supplier Portal (Task 35): separate login and session keys from the Admin Panel
     from app.modules.supplier_portal import bp as supplier_portal_bp
     app.register_blueprint(supplier_portal_bp, url_prefix='/supplier-portal')

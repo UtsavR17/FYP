@@ -2821,3 +2821,77 @@ label.form-label {
     background-color: rgba(251, 191, 36, 0.18);
     color: #b45309;
 }
+
+/* =====================================================================
+   SUPPLIER APPLICATIONS (Task 46)
+   Status badges (used with .po-status-badge), notices, the document
+   warning and the dashboard "pending" pill.
+   ===================================================================== */
+.sa-status-pending {
+    background-color: rgba(251, 191, 36, 0.15);
+    color: #b45309;
+}
+
+.sa-status-approved {
+    background-color: rgba(34, 197, 94, 0.12);
+    color: #15803d;
+}
+
+.sa-status-rejected {
+    background-color: rgba(239, 68, 68, 0.1);
+    color: #b91c1c;
+}
+
+.page-header-title .po-status-badge {
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+.sa-notice {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    border-radius: var(--border-radius-lg);
+    border: 1px solid var(--border-color);
+    border-left-width: 4px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+    font-size: 0.875rem;
+}
+
+.sa-notice > i {
+    margin-top: 3px;
+}
+
+.sa-notice-approved {
+    border-left-color: #22c55e;
+    background-color: #f0fdf4;
+}
+
+.sa-notice-approved > i {
+    color: #15803d;
+}
+
+.sa-notice-rejected {
+    border-left-color: #ef4444;
+    background-color: #fef2f2;
+}
+
+.sa-notice-rejected > i {
+    color: #b91c1c;
+}
+
+.sa-inline-warning {
+    font-size: 0.85rem;
+    color: #b45309;
+}
+
+.sa-products-text {
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+.oo-tile-pill.sa-tile-pill-pending {
+    background-color: rgba(251, 191, 36, 0.18);
+    color: #b45309;
+}
