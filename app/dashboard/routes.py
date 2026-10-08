@@ -112,6 +112,19 @@ def _get_dashboard_counts():
     except Exception:
         counts['online_order_overdue'] = 0
 
+    # Online bookings waiting for confirmation (Task 44): Pending with no employee.
+    try:
+        result = (
+            supabase.table('Appointment')
+            .select('AppointmentID', count='exact')
+            .eq('Status', 'Pending')
+            .is_('Employee_EmployeeID', 'null')
+            .execute()
+        )
+        counts['appointment_to_confirm'] = result.count or 0
+    except Exception:
+        counts['appointment_to_confirm'] = 0
+
     return counts
 
 
@@ -425,7 +438,7 @@ def _get_upcoming_appointments(today):
         result = (
             supabase.table('Appointment')
             .select('AppointmentID, Appointment_Date, Appointment_time, '
-                    'AppointmentType, Status, Customer_bike_BikeID')
+                    'AppointmentType, Status, Customer_bike_BikeID, Employee_EmployeeID')
             .gte('Appointment_Date', today.isoformat())
             .in_('Status', UPCOMING_STATUSES)
             .order('Appointment_Date')
@@ -471,6 +484,7 @@ def _get_upcoming_appointments(today):
             'bike': bike.get('RegistrationNumber') or '-',
             'type': r.get('AppointmentType') or '-',
             'status': r.get('Status') or '-',
+            'unassigned': r.get('Employee_EmployeeID') is None,
             'url': url_for('appointment.view', appt_id=r['AppointmentID']),
         })
     return items
@@ -618,6 +632,12 @@ def _online_order_pills(counts):
     return pills
 
 
+def _appointment_pills(counts):
+    """'N to confirm' pill on the Appointments tile; left out when zero."""
+    n = counts.get('appointment_to_confirm')
+    return [{'text': f'{n} to confirm', 'css': 'appt-tile-pill-confirm'}] if n else []
+
+
 def _build_module_groups(counts):
     """The 19 module tiles, grouped by day-to-day function."""
     def tile(key, label, icon, endpoint, desc):
@@ -688,8 +708,9 @@ def _build_module_groups(counts):
             'title': 'Service & Payments',
             'icon':  'fa-screwdriver-wrench',
             'tiles': [
-                tile('appointment', 'Appointments', 'fa-calendar-check',
-                     'appointment.index', 'Manage service and repair appointments'),
+                dict(tile('appointment', 'Appointments', 'fa-calendar-check',
+                          'appointment.index', 'Manage service and repair appointments'),
+                     pills=_appointment_pills(counts)),
                 tile('payment', 'Payments', 'fa-credit-card', 'payment.index',
                      'Manage payment records'),
             ],
