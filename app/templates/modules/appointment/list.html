@@ -30,14 +30,38 @@
         'Search by bike, employee, type or status...'
     ) }}
 
+    <form method="GET" action="{{ url_for('appointment.index') }}" class="oo-filter-form">
+        {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
+        <div class="oo-filter-field">
+            <label for="appt-filter" class="form-label">Show</label>
+            <select id="appt-filter" name="filter" class="form-select form-select-sm">
+                <option value="">All appointments</option>
+                {% for value, label in list_filters.items() %}
+                <option value="{{ value }}" {% if value == list_filter %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="oo-filter-actions">
+            <button type="submit" class="btn btn-sm btn-outline-primary">
+                <i class="fa-solid fa-filter me-1"></i>Apply
+            </button>
+            {% if list_filter %}
+            <a href="{{ url_for('appointment.index', q=search_query or None) }}" class="btn btn-sm btn-outline-secondary">
+                <i class="fa-solid fa-xmark me-1"></i>Clear filter
+            </a>
+            {% endif %}
+        </div>
+    </form>
+
     {% if search_query %}
         {{ info_alert('Showing results for: <strong>' ~ search_query ~ '</strong>') }}
     {% endif %}
 
     {% call data_table(
-        ['ID', 'Bike', 'Employee', 'Date', 'Time', 'Type', 'Status', 'Date Created'],
+        ['ID', 'Bike', 'Employee', 'Date', 'Time', 'Type', 'Status'],
         total=pagination.total,
-        empty_message='No appointments found. Create your first appointment.'
+        empty_message=('No appointments need confirmation.' if list_filter
+                       else 'No appointments found. Create your first appointment.')
     ) %}
         {% for row in pagination.records %}
         <tr>
@@ -45,7 +69,11 @@
                 <strong>#{{ row.AppointmentID }}</strong>
             </td>
             <td>{{ row._bike_label }}</td>
-            <td>{{ row._employee_name }}</td>
+            <td>
+                {% if row._unassigned %}
+                <span class="appt-unassigned">{{ row._employee_name }}</span>
+                {% else %}{{ row._employee_name }}{% endif %}
+            </td>
             <td>{{ row.Appointment_Date if row.Appointment_Date else '-' }}</td>
             <td>
                 {{ row.Appointment_time[:5] if row.Appointment_time else '-' }}
@@ -59,12 +87,8 @@
                 <span class="appt-status-badge appt-status-{{ row.Status | lower | replace(' ', '-') }}">
                     {{ row.Status }}
                 </span>
-            </td>
-            <td>
-                {% if row.Date_Created %}
-                    {{ row.Date_Created[:19].replace('T', ' ') }}
-                {% else %}
-                    &mdash;
+                {% if row._needs_confirmation %}
+                <span class="appt-needs-confirmation">Needs confirmation</span>
                 {% endif %}
             </td>
             <td class="text-end">
@@ -91,7 +115,8 @@
         {% endfor %}
     {% endcall %}
 
-    {{ pagination_controls(pagination, 'appointment.index', search_query) }}
+    {{ pagination_controls(pagination, 'appointment.index', search_query,
+                           params={'filter': list_filter or None}) }}
 
 </div>
 

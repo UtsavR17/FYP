@@ -33,6 +33,9 @@
     <p class="form-section-title">Appointment Details</p>
 
     <form method="POST" novalidate>
+        {% if is_edit %}
+        <input type="hidden" name="expected_status" value="{{ record.Status }}">
+        {% endif %}
 
         <!-- Row 1: Bike | Employee -->
         <div class="row">
@@ -48,6 +51,20 @@
                 ) }}
             </div>
             <div class="col-md-6">
+                {% if is_edit %}
+                {# Online bookings arrive unassigned: the employee is required only for
+                   Confirmed, In Progress, Completed and No Show (checked on the server). #}
+                {{ select_field(
+                    name        = 'Employee_EmployeeID',
+                    label       = 'Assigned Employee',
+                    options     = employee_options,
+                    selected    = form_data.get('Employee_EmployeeID') or '',
+                    required    = False,
+                    error       = errors.get('Employee_EmployeeID', ''),
+                    empty_label = 'Unassigned',
+                    help_text   = 'Required for ' ~ (employee_required_statuses | join(', ')) ~ '.'
+                ) }}
+                {% else %}
                 {{ select_field(
                     name        = 'Employee_EmployeeID',
                     label       = 'Assigned Employee',
@@ -57,6 +74,7 @@
                     error       = errors.get('Employee_EmployeeID', ''),
                     empty_label = 'Select an Employee'
                 ) }}
+                {% endif %}
             </div>
         </div>
 

@@ -2764,3 +2764,60 @@ label.form-label {
     border-left-color: #0d9488;
     background-color: #f0fdfa;
 }
+
+/* =====================================================================
+   ONLINE APPOINTMENTS (Task 44)
+   Unassigned employee text, "Needs confirmation" badge, the view-page
+   notice and the dashboard "to confirm" pill for online bookings.
+   ===================================================================== */
+.appt-unassigned {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.appt-unassigned-tag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    background-color: rgba(107, 114, 128, 0.12);
+    color: #4b5563;
+    white-space: nowrap;
+}
+
+.appt-needs-confirmation {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    background-color: rgba(251, 191, 36, 0.18);
+    color: #b45309;
+    white-space: nowrap;
+}
+
+.appt-confirm-notice {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    border-radius: var(--border-radius-lg);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid #f59e0b;
+    background-color: #fffbeb;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+    font-size: 0.875rem;
+}
+
+.appt-confirm-notice > i {
+    margin-top: 3px;
+    color: #b45309;
+}
+
+.oo-tile-pill.appt-tile-pill-confirm {
+    background-color: rgba(251, 191, 36, 0.18);
+    color: #b45309;
+}

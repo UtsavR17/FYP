@@ -31,8 +31,50 @@ VALID_TYPES    = [v for v, _ in APPOINTMENT_TYPE_OPTIONS]
 VALID_STATUSES = [v for v, _ in STATUS_OPTIONS]
 LOCKED_STATUSES = ('Completed', 'Cancelled')
 
+# Online bookings (Task 44) are created Pending with no employee. An employee must be
+# assigned before the appointment is confirmed or moves further; Pending and Cancelled
+# appointments may stay unassigned.
+EMPLOYEE_REQUIRED_STATUSES = ('Confirmed', 'In Progress', 'Completed', 'No Show')
+EMPLOYEE_REQUIRED_MSG = 'Assign an employee before confirming or progressing this appointment.'
+UNASSIGNED_LABEL = 'Unassigned'
+APPOINTMENT_CHANGED_MSG = 'This appointment has changed. Refresh and try again.'
+
+# List filters (whitelisted).
+FILTER_NEEDS_CONFIRMATION = 'needs_confirmation'
+LIST_FILTERS = {FILTER_NEEDS_CONFIRMATION: 'Needs confirmation'}
+
 
 #  Helpers -------------------------------
+
+def employee_required(status):
+    """True when an appointment with this status must have an employee."""
+    return status in EMPLOYEE_REQUIRED_STATUSES
+
+
+def needs_confirmation(appt):
+    """A booking still waiting for the workshop: Pending with no employee."""
+    return appt.get('Status') == 'Pending' and not appt.get('Employee_EmployeeID')
+
+
+def _employee_names(employee_ids):
+    """{EmployeeID: 'First Last'} for the given ids; None ids are skipped, never queried."""
+    ids = sorted({i for i in employee_ids if i is not None})
+    if not ids:
+        return {}
+    try:
+        result = (
+            supabase.table('Employee')
+            .select('EmployeeID, FirstName, LastName')
+            .in_('EmployeeID', ids)
+            .execute()
+        )
+    except Exception:
+        return {}
+    return {
+        r['EmployeeID']: f"{r['FirstName']} {r['LastName']}"
+        for r in (result.data or [])
+    }
+
 
 def _truncate_time(time_str):
     """Convert HH:MM:SS to HH:MM for HTML time input pre-population."""
@@ -173,27 +215,18 @@ def _enrich_appointments(all_records):
     except Exception:
         pass
 
-    emp_lookup = {}
-    try:
-        emp_result = (
-            supabase.table('Employee')
-            .select('EmployeeID, FirstName, LastName')
-            .execute()
-        )
-        emp_lookup = {
-            r['EmployeeID']: f"{r['FirstName']} {r['LastName']}"
-            for r in (emp_result.data or [])
-        }
-    except Exception:
-        pass
+    emp_lookup = _employee_names(a.get('Employee_EmployeeID') for a in all_records)
 
     for appt in all_records:
         appt['_bike_label'] = bike_lookup.get(
             appt.get('Customer_bike_BikeID'), '—'
         )
-        appt['_employee_name'] = emp_lookup.get(
-            appt.get('Employee_EmployeeID'), '—'
+        emp_id = appt.get('Employee_EmployeeID')
+        appt['_unassigned'] = emp_id is None
+        appt['_employee_name'] = (
+            UNASSIGNED_LABEL if emp_id is None else emp_lookup.get(emp_id, '-')
         )
+        appt['_needs_confirmation'] = needs_confirmation(appt)
 
     return all_records
 
@@ -205,6 +238,9 @@ def _enrich_appointments(all_records):
 def index():
     search_query = request.args.get('q', '').strip()
     page = request.args.get('page', 1, type=int)
+    list_filter = request.args.get('filter', '').strip()
+    if list_filter not in LIST_FILTERS:
+        list_filter = ''
 
     try:
         result = (
@@ -231,12 +267,17 @@ def index():
             or q in str(r.get('Appointment_Date', '') or '')
         ]
 
+    if list_filter == FILTER_NEEDS_CONFIRMATION:
+        all_records = [r for r in all_records if r['_needs_confirmation']]
+
     pagination = paginate(all_records, page, per_page=10)
 
     return render_template(
         'modules/appointment/list.html',
         pagination=pagination,
-        search_query=search_query
+        search_query=search_query,
+        list_filter=list_filter,
+        list_filters=LIST_FILTERS,
     )
 
 
@@ -355,9 +396,7 @@ def edit(appt_id):
                 errors['Customer_bike_BikeID'] = 'Please select a valid bike.'
 
         emp_id = None
-        if not emp_id_raw:
-            errors['Employee_EmployeeID'] = 'Employee is required.'
-        else:
+        if emp_id_raw:
             try:
                 emp_id = int(emp_id_raw)
             except ValueError:
@@ -381,18 +420,33 @@ def edit(appt_id):
         elif status_value not in VALID_STATUSES:
             errors['Status'] = 'Please select a valid status.'
 
+        # Online bookings start unassigned: an employee is optional only while the
+        # appointment is Pending or Cancelled (server-side rule, not just the form).
+        if (employee_required(status_value) and emp_id is None
+                and 'Employee_EmployeeID' not in errors):
+            errors['Employee_EmployeeID'] = EMPLOYEE_REQUIRED_MSG
+
+        previous_status = record.get('Status')
+        # The customer may have cancelled the booking since this form was opened.
+        expected_status = form_data.get('expected_status', '').strip()
+        if not errors and expected_status and expected_status != previous_status:
+            flash_error(APPOINTMENT_CHANGED_MSG)
+            return redirect(url_for('appointment.view', appt_id=appt_id))
+
         if not errors:
             try:
-                previous_status = record.get('Status')
-
-                supabase.table('Appointment').update({
+                updated = supabase.table('Appointment').update({
                     'Customer_bike_BikeID': bike_id,
                     'Employee_EmployeeID':  emp_id,
                     'Appointment_Date':     appt_date,
                     'Appointment_time':     appt_time,
                     'AppointmentType':      appt_type,
                     'Status':               status_value,
-                }).eq('AppointmentID', appt_id).execute()
+                }).eq('AppointmentID', appt_id).eq('Status', previous_status).execute()
+
+                if not updated.data:
+                    flash_error(APPOINTMENT_CHANGED_MSG)
+                    return redirect(url_for('appointment.view', appt_id=appt_id))
 
                 # Deduct used stock exactly once:  only on the transition  into Completed.
                 #  Re-saving an already-Completed appointment  will not trigger this again, since previous_status will  already be 'Completed'.
@@ -420,7 +474,8 @@ def edit(appt_id):
         bike_options=bike_options,
         employee_options=employee_options,
         type_options=APPOINTMENT_TYPE_OPTIONS,
-        status_options=STATUS_OPTIONS
+        status_options=STATUS_OPTIONS,
+        employee_required_statuses=EMPLOYEE_REQUIRED_STATUSES,
     )
 
 
@@ -457,20 +512,12 @@ def view(appt_id):
     except Exception:
         pass
 
-    # Resolve employee name
-    employee_name = '—'
-    try:
-        emp_result = (
-            supabase.table('Employee')
-            .select('FirstName, LastName')
-            .eq('EmployeeID', record.get('Employee_EmployeeID'))
-            .single()
-            .execute()
-        )
-        emp = emp_result.data
-        employee_name = f"{emp['FirstName']} {emp['LastName']}"
-    except Exception:
-        pass
+    # Resolve employee name (online bookings start unassigned)
+    emp_id = record.get('Employee_EmployeeID')
+    if emp_id is None:
+        employee_name = UNASSIGNED_LABEL
+    else:
+        employee_name = _employee_names([emp_id]).get(emp_id, '-')
 
     # Fetch appointment services with enrichment
     appt_services = []
@@ -629,6 +676,8 @@ def view(appt_id):
         appt_stock=appt_stock,
         appt_status=appt_status,
         is_locked=is_locked,
+        is_unassigned=emp_id is None,
+        needs_confirmation=needs_confirmation(record),
         appt_payments=appt_payments,
         appt_total_paid=appt_total_paid,
         appt_remaining=appt_remaining,
