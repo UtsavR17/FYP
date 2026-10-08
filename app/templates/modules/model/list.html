@@ -3,6 +3,7 @@
 {% from 'components/pagination.html'    import pagination_controls %}
 {% from 'components/modal_confirm.html' import delete_modal %}
 {% from 'components/alert.html'         import info_alert %}
+{% from 'components/table.html'         import product_thumb %}
 
 {% block title %}Models{% endblock %}
 {% block page_title %}Models{% endblock %}
@@ -37,12 +38,13 @@
     {% endif %}
 
     {% call data_table(
-        ['ID', 'Description', 'Brand'],
+        ['Image', 'ID', 'Description', 'Brand'],
         total=pagination.total,
         empty_message='No models found. Add your first model to get started.'
     ) %}
         {% for row in pagination.records %}
         <tr>
+            <td class="product-thumb-cell">{{ product_thumb(row._image_src, row.Description) }}</td>
             <td class="text-muted" style="width: 60px;">{{ row.Model_No }}</td>
             <td><strong>{{ row.Description }}</strong></td>
             <td>

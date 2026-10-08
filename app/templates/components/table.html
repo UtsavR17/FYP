@@ -97,3 +97,20 @@
 </div>
 {% endif %}
 {% endmacro %}
+
+
+{# -----------------------------------------------------------------------
+   product_thumb (Task 49)
+   40px rounded product image for list rows. src must already be an
+   approved product-images URL (or '' for none). A neutral placeholder is
+   shown when there is no image or it fails to load.
+   ----------------------------------------------------------------------- #}
+{% macro product_thumb(src, alt) %}
+{% if src %}
+<img src="{{ src }}" alt="{{ alt }}" class="product-thumb" loading="lazy" width="40" height="40"
+     onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
+<span class="product-thumb product-thumb-placeholder" hidden aria-hidden="true"><i class="fa-solid fa-image"></i></span>
+{% else %}
+<span class="product-thumb product-thumb-placeholder" aria-hidden="true"><i class="fa-solid fa-image"></i></span>
+{% endif %}
+{% endmacro %}
