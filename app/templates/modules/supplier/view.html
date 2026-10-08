@@ -12,7 +12,7 @@
         <h2 class="page-header-title">{{ record.SupplierName }}</h2>
         <p class="page-header-subtitle">Supplier details and product/model catalogue</p>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex flex-wrap gap-2">
         <a href="{{ url_for('supplier.edit', supplier_id=supplier_id) }}"
            class="btn btn-outline-primary">
             <i class="fa-solid fa-pen me-2"></i>Edit Supplier
