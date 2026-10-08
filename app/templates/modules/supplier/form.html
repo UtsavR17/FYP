@@ -97,6 +97,17 @@
                     help_text   = 'Maximum 100 characters.'
                 ) }}
             </div>
+            <div class="col-md-6">
+                {{ text_field(
+                    name        = 'BRN',
+                    label       = 'BRN (Business Registration Number)',
+                    value       = form_data.get('BRN') or '',
+                    required    = False,
+                    error       = errors.get('BRN', ''),
+                    placeholder = 'e.g. C12345678',
+                    help_text   = 'Optional. 5 to 30 letters, digits, hyphens or slashes; saved in capitals.'
+                ) }}
+            </div>
         </div>
 
         <div class="form-actions">

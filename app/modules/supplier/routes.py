@@ -1,3 +1,4 @@
+import re
 import secrets
 from markupsafe import Markup
 from app.utils.validators import is_positive_number
@@ -8,6 +9,27 @@ from app.supabase_client import supabase
 from app.utils.pagination import paginate
 from app.utils.flash_messages import flash_success, flash_error, flash_warning
 from app.utils.validators import required_fields, is_valid_email
+
+# BRN (Task 46): optional, 5 to 30 letters, digits, hyphens or slashes, stored uppercase.
+BRN_PATTERN = re.compile(r'^[A-Z0-9/-]{5,30}$')
+BRN_DUPLICATE_MSG = 'This BRN is already registered to another supplier or application.'
+
+
+def normalise_brn(raw):
+    """(value or None, error or None). Empty means no BRN (stored as NULL)."""
+    value = (raw or '').strip().upper()
+    if not value:
+        return None, None
+    if not BRN_PATTERN.match(value):
+        return None, 'BRN must be 5 to 30 letters, digits, hyphens or slashes.'
+    return value, None
+
+
+def _is_brn_conflict(error_msg):
+    """True when a unique violation comes from the BRN index (its name or key mentions BRN)."""
+    text = error_msg.lower()
+    return ('duplicate' in text or 'unique' in text) and 'brn' in text
+
 
 from app.modules.new_motorbike.routes import (
     FUEL_TYPE_OPTIONS as NB_FUEL_TYPE_OPTIONS,
@@ -98,6 +120,10 @@ def create():
         elif len(country_value) > 100:
             errors['Country'] = 'Country must not exceed 100 characters.'
 
+        brn_value, brn_error = normalise_brn(form_data.get('BRN'))
+        if brn_error:
+            errors['BRN'] = brn_error
+
         if not errors:
             try:
                 supabase.table('Supplier').insert({
@@ -106,6 +132,7 @@ def create():
                     'Email':        email_value,
                     'Address':      address_value,
                     'Country':      country_value,
+                    'BRN':          brn_value,
                 }).execute()
                 flash_success(f'Supplier "{name_value}" was added successfully.')
                 return redirect(url_for('supplier.index'))
@@ -114,7 +141,9 @@ def create():
 
             except Exception as e:
                 error_msg = str(e)
-                if 'duplicate' in error_msg.lower() or 'unique' in error_msg.lower():
+                if _is_brn_conflict(error_msg):
+                    errors['BRN'] = BRN_DUPLICATE_MSG
+                elif 'duplicate' in error_msg.lower() or 'unique' in error_msg.lower():
                     flash_error(f'A supplier with this name already exists.')
                 else:
                     flash_error(f'Could not add supplier: {error_msg}')
@@ -187,6 +216,10 @@ def edit(supplier_id):
         elif len(country_value) > 100:
             errors['Country'] = 'Country must not exceed 100 characters.'
 
+        brn_value, brn_error = normalise_brn(form_data.get('BRN'))
+        if brn_error:
+            errors['BRN'] = brn_error
+
         if not errors:
             try:
                 supabase.table('Supplier').update({
@@ -195,12 +228,15 @@ def edit(supplier_id):
                     'Email':        email_value,
                     'Address':      address_value,
                     'Country':      country_value,
+                    'BRN':          brn_value,
                 }).eq('SupplierID', supplier_id).execute()
                 flash_success(f'Supplier "{name_value}" was updated successfully.')
                 return redirect(url_for('supplier.index'))
             except Exception as e:
                 error_msg = str(e)
-                if 'duplicate' in error_msg.lower() or 'unique' in error_msg.lower():
+                if _is_brn_conflict(error_msg):
+                    errors['BRN'] = BRN_DUPLICATE_MSG
+                elif 'duplicate' in error_msg.lower() or 'unique' in error_msg.lower():
                     flash_error(f'A supplier with this name already exists.')
                 else:
                     flash_error(f'Could not update supplier: {error_msg}')
