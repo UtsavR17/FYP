@@ -1,6 +1,9 @@
-from flask import Flask, jsonify, redirect, url_for
+from flask import Flask, jsonify, redirect, request, url_for
+from werkzeug.exceptions import RequestEntityTooLarge
 from config import Config
 from app.supabase_client import supabase
+from app.utils.flash_messages import flash_error
+from app.utils.product_images import REQUEST_TOO_LARGE_MSG
 
 
 def create_app():
@@ -104,6 +107,19 @@ def create_app():
     @app.route('/')
     def index():
         return redirect(url_for('dashboard.index'))
+
+    # ------------------------------------------------------------------
+    # REQUEST TOO LARGE (Task 49)
+    # On the Spare Parts and Model forms a body over MAX_CONTENT_LENGTH
+    # (an oversized image) goes back to the same form with a flash
+    # instead of an error page. Other pages keep the default 413.
+    # ------------------------------------------------------------------
+    @app.errorhandler(RequestEntityTooLarge)
+    def request_too_large(error):
+        if request.blueprint in ('spare_parts', 'model') and request.endpoint:
+            flash_error(REQUEST_TOO_LARGE_MSG)
+            return redirect(url_for(request.endpoint, **(request.view_args or {})))
+        return error
 
     # ------------------------------------------------------------------
     # TEMPORARY TEST ROUTE — Remove this before Task 17 (Auth + RLS)
