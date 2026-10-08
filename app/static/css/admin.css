@@ -1200,6 +1200,17 @@ label.form-label {
     color: var(--accent);
 }
 
+/* The receive form offers one method; the other is shown greyed out (Task 48) */
+.receive-mode-option.is-fixed {
+    cursor: default;
+}
+
+.receive-mode-option.is-unavailable {
+    cursor: not-allowed;
+    opacity: 0.6;
+    border-style: dashed;
+}
+
 @media (max-width: 575.98px) {
     .receive-mode-selector {
         grid-template-columns: 1fr;

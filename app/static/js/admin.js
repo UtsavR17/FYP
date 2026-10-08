@@ -109,6 +109,8 @@ document.addEventListener('DOMContentLoaded', function () {
         // -------------------------------------------------------------------------
     // RECEIVE FORM: Mode toggle between existing stock and new stock
     // Toggles visibility of the two receiving sections when radio buttons change.
+    // Since Task 48 the radios are only rendered for legacy items (no supplier
+    // catalogue brand); otherwise the page offers a single method.
     // -------------------------------------------------------------------------
     const modeExisting = document.getElementById('mode-existing');
     const modeNew      = document.getElementById('mode-new');
