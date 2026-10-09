@@ -163,9 +163,11 @@
    date_field
    Date input using the HTML date picker.
    Value must be in YYYY-MM-DD format to pre-populate correctly.
+   Optional min (YYYY-MM-DD) greys out earlier days in the picker; the
+   route must still enforce the rule.
    ----------------------------------------------------------------------- #}
 {% macro date_field(name, label, value='', required=False, error='',
-                    help_text='') %}
+                    help_text='', min='') %}
 <div class="mb-3">
     <label for="{{ name }}" class="form-label">
         {{ label }}
@@ -177,6 +179,7 @@
         id="{{ name }}"
         name="{{ name }}"
         value="{{ value }}"
+        {% if min %}min="{{ min }}"{% endif %}
         {% if required %}required{% endif %}>
     {% if error %}
     <div class="invalid-feedback">{{ error }}</div>

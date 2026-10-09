@@ -71,7 +71,8 @@
             <div class="col-md-4">
                 {{ date_field(name='ExpectedDate', label='Expected Delivery Date',
                     value=form_data.get('ExpectedDate',''), required=True,
-                    error=errors.get('ExpectedDate',''), help_text='Must be on or after the order date.') }}
+                    error=errors.get('ExpectedDate',''),
+                    help_text='If you change it, choose tomorrow or later (and after the order date).') }}
             </div>
         </div>
         {% else %}
@@ -84,7 +85,8 @@
             <div class="col-md-4">
                 {{ date_field(name='ExpectedDate', label='Expected Delivery Date',
                     value=form_data.get('ExpectedDate',''), required=True,
-                    error=errors.get('ExpectedDate',''), help_text='When you expect the delivery.') }}
+                    error=errors.get('ExpectedDate',''), help_text='Choose tomorrow or later.',
+                    min=min_expected_date) }}
             </div>
         </div>
         <div class="alert alert-info" role="alert">

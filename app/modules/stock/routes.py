@@ -7,6 +7,43 @@ from app.utils.flash_messages import flash_success, flash_error
 from app.utils.validators import (
     required_fields, is_positive_number, is_positive_integer
 )
+from app.utils.text import norm
+
+
+DUPLICATE_STOCK_MSG = (
+    'A stock record for this part, brand and size already exists. Add to it instead.'
+)
+STOCK_CHECK_FAILED_MSG = 'Could not check the existing stock records. Please try again.'
+
+
+def same_size(a, b):
+    """Sizes match after trimming and case-folding; NULL, empty and spaces are equal."""
+    return norm(a) == norm(b)
+
+
+def find_stock_variants(sp_id, brand_id, size, exclude_id=None):
+    """
+    Stock rows that are the exact variant (same spare part, brand and size)
+    of the given values, leaving out exclude_id. Lookup errors are raised
+    so callers can refuse the save instead of creating a duplicate.
+    """
+    result = (
+        supabase.table('Stock')
+        .select('Stock_ID, Size, Brand_Brand_ID, QOH')
+        .eq('Spare_Parts_SP_id', sp_id)
+        .eq('Brand_Brand_ID', brand_id)
+        .execute()
+    )
+    return [
+        r for r in (result.data or [])
+        if same_size(r.get('Size'), size) and r.get('Stock_ID') != exclude_id
+    ]
+
+
+def is_unique_violation(error):
+    """True for a database unique violation (PostgreSQL code 23505)."""
+    code = str(getattr(error, 'code', '') or '')
+    return code == '23505' or '23505' in str(error)
 
 
 def _get_form_options():
@@ -111,9 +148,9 @@ def index():
         q = search_query.lower()
         all_records = [
             r for r in all_records
-            if q in r.get('Size', '').lower()
-            or q in r.get('_spare_part_name', '').lower()
-            or q in r.get('_brand_name', '').lower()
+            if q in norm(r.get('Size'))
+            or q in norm(r.get('_spare_part_name'))
+            or q in norm(r.get('_brand_name'))
         ]
 
     pagination = paginate(all_records, page, per_page=10)
@@ -183,6 +220,14 @@ def create():
         elif not is_positive_integer(warranty_value):
             errors['Warranty'] = 'Warranty must be a whole number of 0 or more.'
 
+        # One stock record per part, brand and size
+        if not errors:
+            try:
+                if find_stock_variants(sp_id, brand_id, size_value):
+                    errors['Size'] = DUPLICATE_STOCK_MSG
+            except Exception:
+                errors['Size'] = STOCK_CHECK_FAILED_MSG
+
         if not errors:
             try:
                 supabase.table('Stock').insert({
@@ -199,7 +244,10 @@ def create():
                 )
                 return redirect(url_for('stock.index'))
             except Exception as e:
-                flash_error(f'Could not add stock entry: {str(e)}')
+                if is_unique_violation(e):
+                    errors['Size'] = DUPLICATE_STOCK_MSG
+                else:
+                    flash_error(f'Could not add stock entry: {str(e)}')
 
     return render_template(
         'modules/stock/form.html',
@@ -290,6 +338,20 @@ def edit(stock_id):
         elif not is_positive_integer(warranty_value):
             errors['Warranty'] = 'Warranty must be a whole number of 0 or more.'
 
+        # One stock record per part, brand and size. Only checked when the
+        # key changes, so legacy duplicates can still have price or QOH edited.
+        key_changed = (
+            sp_id != record.get('Spare_Parts_SP_id')
+            or brand_id != record.get('Brand_Brand_ID')
+            or not same_size(size_value, record.get('Size'))
+        )
+        if not errors and key_changed:
+            try:
+                if find_stock_variants(sp_id, brand_id, size_value, exclude_id=stock_id):
+                    errors['Size'] = DUPLICATE_STOCK_MSG
+            except Exception:
+                errors['Size'] = STOCK_CHECK_FAILED_MSG
+
         if not errors:
             try:
                 supabase.table('Stock').update({
@@ -305,7 +367,10 @@ def edit(stock_id):
                 )
                 return redirect(url_for('stock.index'))
             except Exception as e:
-                flash_error(f'Could not update stock entry: {str(e)}')
+                if is_unique_violation(e):
+                    errors['Size'] = DUPLICATE_STOCK_MSG
+                else:
+                    flash_error(f'Could not update stock entry: {str(e)}')
 
     return render_template(
         'modules/stock/form.html',

@@ -5,6 +5,7 @@ from app.supabase_client import supabase
 from app.utils.pagination import paginate
 from app.utils.flash_messages import flash_success, flash_error
 from app.utils.validators import required_fields
+from app.utils.text import norm
 
 
 def _get_brand_options():
@@ -73,8 +74,8 @@ def index():
         q = search_query.lower()
         all_records = [
             r for r in all_records
-            if q in r.get('Description', '').lower()
-            or q in r.get('_brand_name', '').lower()
+            if q in norm(r.get('Description'))
+            or q in norm(r.get('_brand_name'))
         ]
 
     pagination = paginate(all_records, page, per_page=10)

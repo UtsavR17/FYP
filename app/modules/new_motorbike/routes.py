@@ -7,6 +7,7 @@ from app.utils.flash_messages import flash_success, flash_error
 from app.utils.validators import (
     required_fields, is_positive_number, is_positive_integer
 )
+from app.utils.text import norm
 
 
 # ---------Predefined option lists -0------------------------------------
@@ -279,11 +280,11 @@ def index():
         q = search_query.lower()
         all_records = [
             r for r in all_records
-            if q in r.get('_model_label', '').lower()
-            or q in r.get('Color_Color', '').lower()
+            if q in norm(r.get('_model_label'))
+            or q in norm(r.get('Color_Color'))
             or q in str(r.get('Year', '') or '')
-            or q in r.get('VIN', '').lower()
-            or q in r.get('Status', '').lower()
+            or q in norm(r.get('VIN'))
+            or q in norm(r.get('Status'))
         ]
 
     pagination = paginate(all_records, page, per_page=10)

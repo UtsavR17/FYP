@@ -5,6 +5,7 @@ from app.supabase_client import supabase
 from app.utils.pagination import paginate
 from app.utils.flash_messages import flash_success, flash_error
 from app.utils.validators import required_fields
+from app.utils.text import norm
 
 
 def _get_form_options():
@@ -72,9 +73,9 @@ def index():
         q = search_query.lower()
         all_records = [
             r for r in all_records
-            if q in r.get('SP_name', '').lower()
-            or q in r.get('SP_desc', '').lower()
-            or q in r.get('_category_name', '').lower()
+            if q in norm(r.get('SP_name'))
+            or q in norm(r.get('SP_desc'))
+            or q in norm(r.get('_category_name'))
         ]
 
     pagination = paginate(all_records, page, per_page=10)

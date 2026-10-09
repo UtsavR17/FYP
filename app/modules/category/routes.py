@@ -5,6 +5,7 @@ from app.supabase_client import supabase
 from app.utils.pagination import paginate
 from app.utils.flash_messages import flash_success, flash_error
 from app.utils.validators import required_fields
+from app.utils.text import norm
 
 
 @bp.route('/')
@@ -23,7 +24,7 @@ def index():
     if search_query:
         all_records = [
             r for r in all_records
-            if search_query.lower() in r.get('CAT_desc', '').lower()
+            if search_query.lower() in norm(r.get('CAT_desc'))
         ]
 
     pagination = paginate(all_records, page, per_page=10)

@@ -14,6 +14,11 @@ from app.modules.new_motorbike.routes import (
     TRANSMISSION_OPTIONS as NB_TRANSMISSION_OPTIONS,
     STATUS_OPTIONS as NB_STATUS_OPTIONS,
 )
+from app.utils.text import norm
+from app.modules.stock.routes import (
+    DUPLICATE_STOCK_MSG, STOCK_CHECK_FAILED_MSG,
+    same_size, find_stock_variants, is_unique_violation,
+)
 
 # Predefined Status values for Purchase Orders
 PO_STATUS_OPTIONS = [
@@ -32,9 +37,17 @@ STAGE_REJECTED = 'Rejected'
 ORDER_CHANGED_MSG = 'This order has changed. Refresh and try again.'
 
 
+EXPECTED_PAST_MSG = 'Expected delivery date must be after today.'
+
+
 def _mauritius_today():
     """Today's date in Mauritius time (UTC+4) as YYYY-MM-DD."""
     return datetime.now(timezone(timedelta(hours=4))).date().isoformat()
+
+
+def _mauritius_tomorrow():
+    """Tomorrow in Mauritius time as YYYY-MM-DD: the earliest Expected Date allowed."""
+    return (date_type.fromisoformat(_mauritius_today()) + timedelta(days=1)).isoformat()
 
 
 def _get_po_header(po_id):
@@ -185,8 +198,8 @@ def index():
         q = search_query.lower()
         all_records = [
             r for r in all_records
-            if q in r.get('_supplier_name', '').lower()
-            or q in r.get('Status', '').lower()
+            if q in norm(r.get('_supplier_name'))
+            or q in norm(r.get('Status'))
             or q in str(r.get('POrderDate', '') or '')
             or q in str(r.get('ExpectedDate', '') or '')
         ]
@@ -222,12 +235,12 @@ def create():
             except ValueError:
                 errors['Supplier_SupplierID'] = 'Please select a valid supplier.'
 
-        porder_date = date_type.today().isoformat()   # recorded automatically
+        porder_date = _mauritius_today()   # recorded automatically
         expected_date, exp_err = _validate_date(expected_date_raw, 'Expected Date')
         if exp_err:
             errors['ExpectedDate'] = exp_err
-        elif expected_date < porder_date:
-            errors['ExpectedDate'] = 'Expected date cannot be before today.'
+        elif date_type.fromisoformat(expected_date) <= date_type.fromisoformat(porder_date):
+            errors['ExpectedDate'] = EXPECTED_PAST_MSG
 
         if not errors:
             try:
@@ -246,7 +259,8 @@ def create():
     return render_template(
         'modules/purchase_order/form.html',
         form_data=form_data, errors=errors, is_edit=False,
-        supplier_options=supplier_options, status_options=PO_STATUS_OPTIONS
+        supplier_options=supplier_options, status_options=PO_STATUS_OPTIONS,
+        min_expected_date=_mauritius_tomorrow()
     )
 
 
@@ -310,12 +324,24 @@ def edit(po_id):
         if exp_err:
             errors['ExpectedDate'] = exp_err
 
-        if (not porder_err and not exp_err
-                and porder_date and expected_date
-                and expected_date < porder_date):
-            errors['ExpectedDate'] = (
-                'Expected date must be on or after the order date.'
-            )
+        # A changed Expected Date must be after today and after the order date.
+        # An unchanged one may be in the past, so an overdue order can still be
+        # saved (status change, receiving).
+        if not porder_err and not exp_err:
+            new_expected = date_type.fromisoformat(expected_date)
+            order_day = date_type.fromisoformat(porder_date)
+            old_expected = str(record.get('ExpectedDate') or '')[:10]
+            if new_expected.isoformat() != old_expected:
+                if new_expected <= date_type.fromisoformat(_mauritius_today()):
+                    errors['ExpectedDate'] = EXPECTED_PAST_MSG
+                elif new_expected <= order_day:
+                    errors['ExpectedDate'] = (
+                        'Expected delivery date must be after the order date.'
+                    )
+            elif new_expected < order_day:
+                errors['ExpectedDate'] = (
+                    'Expected date must be on or after the order date.'
+                )
 
         valid_statuses = [s for s, _ in PO_STATUS_OPTIONS]
         if not status_value:
@@ -1120,41 +1146,83 @@ def receive_item(po_id, item_id):
     except Exception:
         pass
 
-    # Fetch existing stock records for this spare part (for existing stock dropdown)
-    existing_stock_options = []
+    # Exact variant = Stock row with the same part, the locked brand and the
+    # expected size (sizes compared by norm, so NULL, '' and spaces are equal).
+    # Legacy items have no catalogue brand: any brand of that part and size.
+    size_expected = item.get('Size_Expected')
+    part_stock, stock_check_failed = [], False
     try:
-        stock_query = (
+        part_stock = (
             supabase.table('Stock')
             .select('Stock_ID, Size, Brand_Brand_ID, QOH')
             .eq('Spare_Parts_SP_id', sp_id)
-        )
-        if locked_brand_id:
-            stock_query = stock_query.eq('Brand_Brand_ID', locked_brand_id)
-        stock_res = stock_query.execute()
-        brand_lookup_recv = {}
-        try:
-            br = supabase.table('Brand').select('Brand_ID, Brand_Name').execute()
-            brand_lookup_recv = {r['Brand_ID']: r['Brand_Name'] for r in (br.data or [])}
-        except Exception:
-            pass
+            .execute()
+        ).data or []
+    except Exception:
+        stock_check_failed = True
 
-        for s in (stock_res.data or []):
-            size  = s.get('Size') or 'No size'
-            brand = brand_lookup_recv.get(s.get('Brand_Brand_ID'), 'Unknown Brand')
-            label = f"{size} \u2014 {brand} (QOH: {s.get('QOH', 0)})"
-            existing_stock_options.append((s['Stock_ID'], label))
+    brand_lookup_recv = {}
+    try:
+        br = supabase.table('Brand').select('Brand_ID, Brand_Name').execute()
+        brand_lookup_recv = {r['Brand_ID']: r['Brand_Name'] for r in (br.data or [])}
     except Exception:
         pass
 
+    exact_variants = [
+        s for s in part_stock
+        if same_size(s.get('Size'), size_expected)
+        and (not locked_brand_id or s.get('Brand_Brand_ID') == locked_brand_id)
+    ]
+    exact_ids = {s['Stock_ID'] for s in exact_variants}
+
+    def _stock_brand(s):
+        return brand_lookup_recv.get(s.get('Brand_Brand_ID'), 'Unknown Brand')
+
+    def _stock_description(s):
+        return f"#{s['Stock_ID']} {sp_name} - {_stock_brand(s)} ({s.get('Size') or 'no size'})"
+
+    existing_stock_options = [
+        (s['Stock_ID'], f"{_stock_description(s)}, QOH: {s.get('QOH', 0)}")
+        for s in exact_variants
+    ]
+    # Same part under other brands or sizes: shown for information only
+    other_stock = [
+        f"{_stock_brand(s)} ({s.get('Size') or 'no size'})"
+        for s in part_stock if s['Stock_ID'] not in exact_ids
+    ]
+
+    # With a catalogue brand the two modes are mutually exclusive. Legacy
+    # items keep both, because their brand is only chosen in the new-stock form.
+    if locked_brand_id:
+        allowed_modes = ['existing'] if exact_variants else ['new']
+    else:
+        allowed_modes = ['existing', 'new'] if exact_variants else ['new']
+
     brand_options = _get_brand_options()
-    form_data = {}
+    form_data = {'receiving_mode': allowed_modes[0], 'New_Size': size_expected or ''}
+    if len(exact_variants) == 1:
+        form_data['Stock_Stock_ID'] = exact_variants[0]['Stock_ID']
     errors = {}
 
     if request.method == 'POST':
         form_data    = request.form.to_dict()
-        recv_mode    = form_data.get('receiving_mode', 'existing')
+        recv_mode    = form_data.get('receiving_mode', '')
         qty_recv_raw = form_data.get('Quantity_Received', '').strip()
         date_recv_raw = form_data.get('DateReceived', '').strip()
+
+        # The mode is enforced here, not only by what the page offers
+        if stock_check_failed:
+            errors['receiving_mode'] = STOCK_CHECK_FAILED_MSG
+        elif recv_mode not in allowed_modes:
+            if recv_mode == 'new':
+                errors['receiving_mode'] = DUPLICATE_STOCK_MSG
+            elif recv_mode == 'existing':
+                errors['receiving_mode'] = (
+                    'No stock record exists yet for this part, brand and size.'
+                )
+            else:
+                errors['receiving_mode'] = 'Please choose a valid receiving method.'
+            form_data['receiving_mode'] = allowed_modes[0]
 
         # Validate Quantity_Received
         qty_recv = None
@@ -1243,6 +1311,15 @@ def receive_item(po_id, item_id):
             else:
                 new_warranty = int(new_warranty_raw)
 
+            # The size is editable (and a legacy item picks its brand), so the
+            # new record is checked against the whole part, not only the GET view
+            if new_brand_id and 'receiving_mode' not in errors:
+                try:
+                    if find_stock_variants(sp_id, new_brand_id, new_size):
+                        errors['New_Size'] = DUPLICATE_STOCK_MSG
+                except Exception:
+                    errors['receiving_mode'] = STOCK_CHECK_FAILED_MSG
+
         if not errors:
             try:
                 if recv_mode == 'existing':
@@ -1290,13 +1367,28 @@ def receive_item(po_id, item_id):
                 return redirect(url_for('purchase_order.view', po_id=po_id))
 
             except Exception as e:
-                flash_error(f'Could not process receipt: {str(e)}')
+                if recv_mode == 'new' and is_unique_violation(e):
+                    errors['New_Size'] = DUPLICATE_STOCK_MSG
+                else:
+                    flash_error(f'Could not process receipt: {str(e)}')
+
+    exact_record = None
+    if len(exact_variants) == 1:
+        only = exact_variants[0]
+        exact_record = {
+            'Stock_ID': only['Stock_ID'],
+            'description': _stock_description(only),
+            'QOH': only.get('QOH', 0),
+        }
 
     return render_template(
         'modules/purchase_order/receive_form.html',
         item=item,
         sp_name=sp_name,
         existing_stock_options=existing_stock_options,
+        exact_record=exact_record,
+        other_stock=other_stock,
+        allowed_modes=allowed_modes,
         brand_options=brand_options,
         form_data=form_data,
         errors=errors,

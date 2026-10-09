@@ -5,6 +5,7 @@ from app.supabase_client import supabase
 from app.utils.pagination import paginate
 from app.utils.flash_messages import flash_success, flash_error
 from app.utils.validators import required_fields
+from app.utils.text import norm
 
 
 def _get_form_options():
@@ -157,10 +158,10 @@ def index():
         q = search_query.lower()
         all_records = [
             r for r in all_records
-            if q in r.get('RegistrationNumber', '').lower()
-            or q in r.get('VIN', '').lower()
-            or q in r.get('_customer_name', '').lower()
-            or q in r.get('_model_label', '').lower()
+            if q in norm(r.get('RegistrationNumber'))
+            or q in norm(r.get('VIN'))
+            or q in norm(r.get('_customer_name'))
+            or q in norm(r.get('_model_label'))
             or q in str(r.get('Year', '') or '')
         ]
 
