@@ -227,3 +227,28 @@ document.addEventListener('DOMContentLoaded', function () {
         bootstrap.Tooltip.getOrCreateInstance(el);
     });
 });
+
+
+/* ---------------------------------------------------------------------------
+   Product image inputs (Task 49): refuse a file over data-max-bytes before
+   the form is sent, so a large photo does not hit the request size limit.
+   The server validates size, type and content again.
+   --------------------------------------------------------------------------- */
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('input[type="file"][data-max-bytes]').forEach(function (input) {
+        const maxBytes = parseInt(input.dataset.maxBytes, 10);
+        const feedback = input.parentElement.querySelector('[data-image-error]');
+        input.addEventListener('change', function () {
+            const file = input.files && input.files[0];
+            if (file && maxBytes && file.size > maxBytes) {
+                input.value = '';
+                input.classList.add('is-invalid');
+                if (feedback) {
+                    feedback.textContent = 'The image must be 2 MB or smaller.';
+                }
+            } else {
+                input.classList.remove('is-invalid');
+            }
+        });
+    });
+});

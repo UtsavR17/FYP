@@ -3,6 +3,7 @@
 {% from 'components/pagination.html'    import pagination_controls %}
 {% from 'components/modal_confirm.html' import delete_modal %}
 {% from 'components/alert.html'         import info_alert %}
+{% from 'components/table.html'         import product_thumb %}
 
 {% block title %}Spare Parts{% endblock %}
 {% block page_title %}Spare Parts{% endblock %}
@@ -37,12 +38,13 @@
     {% endif %}
 
     {% call data_table(
-        ['ID', 'Part Name', 'Description', 'Category'],
+        ['Image', 'ID', 'Part Name', 'Description', 'Category'],
         total=pagination.total,
         empty_message='No spare parts found. Add your first spare part to get started.'
     ) %}
         {% for row in pagination.records %}
         <tr>
+            <td class="product-thumb-cell">{{ product_thumb(row._image_src, row.SP_name) }}</td>
             <td class="text-muted" style="width: 60px;">{{ row.SP_id }}</td>
             <td><strong>{{ row.SP_name }}</strong></td>
             <td class="text-secondary">

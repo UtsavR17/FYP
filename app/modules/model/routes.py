@@ -1,6 +1,11 @@
 from flask import render_template, request, redirect, url_for
 from app.modules.model import bp
 from app.auth.decorators import login_required
+from app.utils.flash_messages import flash_warning
+from app.utils.product_images import (
+    read_image_upload, upload_image, remove_image, display_url,
+    UPLOAD_FAILED_MSG, SAVED_WITHOUT_IMAGE_MSG, MAX_IMAGE_BYTES,
+)
 from app.supabase_client import supabase
 from app.utils.pagination import paginate
 from app.utils.flash_messages import flash_success, flash_error
@@ -29,6 +34,27 @@ def _get_brand_options():
         ]
     except Exception:
         return []
+
+
+def _attach_image(model_no, image):
+    """
+    Upload the image for a newly created model and store its URL. Returns
+    False on any failure, after removing an uploaded object (no orphans).
+    """
+    if not model_no:
+        return False
+    try:
+        url = upload_image('models', image)
+    except Exception:
+        return False
+    try:
+        updated = supabase.table('Model').update({'ImageUrl': url}).eq('Model_No', model_no).execute()
+        if updated.data:
+            return True
+    except Exception:
+        pass
+    remove_image(url)
+    return False
 
 
 @bp.route('/')
@@ -68,6 +94,7 @@ def index():
         model['_brand_name'] = brand_lookup.get(
             model.get('Brand_Brand_ID'), '—'
         )
+        model['_image_src'] = display_url(model.get('ImageUrl'))
 
     # Search across enriched fields
     if search_query:
@@ -115,13 +142,20 @@ def create():
         elif len(desc_value) > 50:
             errors['Description'] = 'Model description must not exceed 50 characters.'
 
+        image, image_err = read_image_upload(request.files.get('image'))
+        if image_err:
+            errors['image'] = image_err
+
         if not errors:
             try:
-                supabase.table('Model').insert({
+                created = supabase.table('Model').insert({
                     'Brand_Brand_ID': brand_id,
                     'Description':    desc_value,
                 }).execute()
                 flash_success(f'Model "{desc_value}" was added successfully.')
+                # The row is kept even if the image cannot be attached
+                if image and not _attach_image((created.data or [{}])[0].get('Model_No'), image):
+                    flash_warning(SAVED_WITHOUT_IMAGE_MSG)
                 return redirect(url_for('model.index'))
             # except Exception as e:
             #     flash_error(f'Could not add model: {str(e)}')
@@ -138,7 +172,8 @@ def create():
         form_data=form_data,
         errors=errors,
         is_edit=False,
-        brand_options=brand_options
+        brand_options=brand_options,
+        image_max_bytes=MAX_IMAGE_BYTES,
     )
 
 
@@ -183,23 +218,47 @@ def edit(model_no):
         elif len(desc_value) > 50:
             errors['Description'] = 'Model description must not exceed 50 characters.'
 
-        if not errors:
+        image, image_err = read_image_upload(request.files.get('image'))
+        if image_err:
+            errors['image'] = image_err
+        remove_requested = form_data.get('remove_image') == '1'
+
+        # A new image is uploaded first; the row update then points at it
+        new_image_url = None
+        if not errors and image:
             try:
-                supabase.table('Model').update({
-                    'Brand_Brand_ID': brand_id,
-                    'Description':    desc_value,
-                }).eq('Model_No', model_no).execute()
-                flash_success(f'Model "{desc_value}" was updated successfully.')
-                return redirect(url_for('model.index'))
+                new_image_url = upload_image('models', image)
+            except Exception:
+                errors['image'] = UPLOAD_FAILED_MSG
+
+        if not errors:
+            payload = {
+                'Brand_Brand_ID': brand_id,
+                'Description':    desc_value,
+            }
+            if new_image_url:
+                payload['ImageUrl'] = new_image_url
+            elif remove_requested:
+                payload['ImageUrl'] = None
+            try:
+                updated = supabase.table('Model').update(payload).eq('Model_No', model_no).execute()
+                if 'ImageUrl' in payload and not updated.data:
+                    raise Exception('the record was not changed.')
             # except Exception as e:
             #     flash_error(f'Could not update model: {str(e)}')
 
             except Exception as e:
+                remove_image(new_image_url)   # keep the old image, drop the new object
                 error_msg = str(e)
                 if 'duplicate' in error_msg.lower() or 'unique' in error_msg.lower():
                     flash_error(f'A model with this name already exists.')
                 else:
                     flash_error(f'Could not update model: {error_msg}')
+            else:
+                if 'ImageUrl' in payload and payload['ImageUrl'] != record.get('ImageUrl'):
+                    remove_image(record.get('ImageUrl'))
+                flash_success(f'Model "{desc_value}" was updated successfully.')
+                return redirect(url_for('model.index'))
 
     return render_template(
         'modules/model/form.html',
@@ -207,7 +266,9 @@ def edit(model_no):
         errors=errors,
         is_edit=True,
         record=record,
-        brand_options=brand_options
+        brand_options=brand_options,
+        current_image_src=display_url(record.get('ImageUrl')),
+        image_max_bytes=MAX_IMAGE_BYTES,
     )
 
 
@@ -217,18 +278,22 @@ def delete(model_no):
     try:
         result = (
             supabase.table('Model')
-            .select('Description')
+            .select('Description, ImageUrl')
             .eq('Model_No', model_no)
             .single()
             .execute()
         )
         desc_value = result.data.get('Description', f'ID {model_no}')
+        image_url = result.data.get('ImageUrl')
     except Exception:
         desc_value = f'ID {model_no}'
+        image_url = None
 
     try:
-        supabase.table('Model').delete().eq('Model_No', model_no).execute()
+        deleted = supabase.table('Model').delete().eq('Model_No', model_no).execute()
         flash_success(f'Model "{desc_value}" was deleted successfully.')
+        if deleted.data:
+            remove_image(image_url)   # best effort, after the row is gone
     except Exception as e:
         error_msg = str(e)
         if 'foreign key' in error_msg.lower() or 'violates' in error_msg.lower():

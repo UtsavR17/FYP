@@ -220,3 +220,47 @@
     {% endif %}
 </div>
 {% endmacro %}
+
+
+{# -----------------------------------------------------------------------
+   image_field (Task 49)
+   Optional product image upload. The form needs
+   enctype="multipart/form-data". On edit, current_src (an approved
+   product-images URL, or '') shows a preview with a "Remove image"
+   checkbox; has_other_url marks a stored link that is not shown.
+   max_bytes lets admin.js refuse an oversized file before upload; the
+   route validates the file again.
+   ----------------------------------------------------------------------- #}
+{% macro image_field(name, label, current_src='', has_other_url=False, alt='',
+                     error='', help_text='', max_bytes=0) %}
+<div class="mb-3">
+    <label for="{{ name }}" class="form-label">{{ label }}</label>
+    {% if current_src or has_other_url %}
+    <div class="product-image-current">
+        {% if current_src %}
+        <img src="{{ current_src }}" alt="{{ alt }}" class="product-image-preview">
+        {% else %}
+        <p class="form-text text-muted mb-0">
+            This record has an image link that is not stored in the product images bucket, so it is not shown here.
+        </p>
+        {% endif %}
+        <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" value="1"
+                   id="remove_{{ name }}" name="remove_{{ name }}">
+            <label class="form-check-label" for="remove_{{ name }}">Remove image</label>
+        </div>
+    </div>
+    {% endif %}
+    <input
+        type="file"
+        class="form-control {% if error %}is-invalid{% endif %}"
+        id="{{ name }}"
+        name="{{ name }}"
+        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+        {% if max_bytes %}data-max-bytes="{{ max_bytes }}"{% endif %}>
+    <div class="invalid-feedback" data-image-error>{{ error }}</div>
+    {% if help_text %}
+    <div class="form-text text-muted">{{ help_text }}</div>
+    {% endif %}
+</div>
+{% endmacro %}

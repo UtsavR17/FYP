@@ -1,6 +1,11 @@
 from flask import render_template, request, redirect, url_for
 from app.modules.spare_parts import bp
 from app.auth.decorators import login_required
+from app.utils.flash_messages import flash_warning
+from app.utils.product_images import (
+    read_image_upload, upload_image, remove_image, display_url,
+    UPLOAD_FAILED_MSG, SAVED_WITHOUT_IMAGE_MSG, MAX_IMAGE_BYTES,
+)
 from app.supabase_client import supabase
 from app.utils.pagination import paginate
 from app.utils.flash_messages import flash_success, flash_error
@@ -27,6 +32,27 @@ def _get_form_options():
         pass
 
     return category_options
+
+
+def _attach_image(sp_id, image):
+    """
+    Upload the image for a newly created part and store its URL. Returns
+    False on any failure, after removing an uploaded object (no orphans).
+    """
+    if not sp_id:
+        return False
+    try:
+        url = upload_image('parts', image)
+    except Exception:
+        return False
+    try:
+        updated = supabase.table('Spare_Parts').update({'ImageUrl': url}).eq('SP_id', sp_id).execute()
+        if updated.data:
+            return True
+    except Exception:
+        pass
+    remove_image(url)
+    return False
 
 
 @bp.route('/')
@@ -67,6 +93,7 @@ def index():
         part['_category_name'] = category_lookup.get(
             part.get('Category_CAT_ID'), '—'
         )
+        part['_image_src'] = display_url(part.get('ImageUrl'))
 
     # Search across enriched fields
     if search_query:
@@ -124,15 +151,21 @@ def create():
             except ValueError:
                 errors['Category_CAT_ID'] = 'Please select a valid category.'
 
+        image, image_err = read_image_upload(request.files.get('image'))
+        if image_err:
+            errors['image'] = image_err
 
         if not errors:
             try:
-                supabase.table('Spare_Parts').insert({
+                created = supabase.table('Spare_Parts').insert({
                     'SP_name':         name_value,
                     'SP_desc':         desc_value,
                     'Category_CAT_ID': cat_id,
                 }).execute()
                 flash_success(f'Spare part "{name_value}" was added successfully.')
+                # The row is kept even if the image cannot be attached
+                if image and not _attach_image((created.data or [{}])[0].get('SP_id'), image):
+                    flash_warning(SAVED_WITHOUT_IMAGE_MSG)
                 return redirect(url_for('spare_parts.index'))
             except Exception as e:
                 flash_error(f'Could not add spare part: {str(e)}')
@@ -143,6 +176,7 @@ def create():
         errors=errors,
         is_edit=False,
         category_options=category_options,
+        image_max_bytes=MAX_IMAGE_BYTES,
     )
 
 
@@ -196,17 +230,41 @@ def edit(sp_id):
             except ValueError:
                 errors['Category_CAT_ID'] = 'Please select a valid category.'
 
-        if not errors:
+        image, image_err = read_image_upload(request.files.get('image'))
+        if image_err:
+            errors['image'] = image_err
+        remove_requested = form_data.get('remove_image') == '1'
+
+        # A new image is uploaded first; the row update then points at it
+        new_image_url = None
+        if not errors and image:
             try:
-                supabase.table('Spare_Parts').update({
-                    'SP_name':         name_value,
-                    'SP_desc':         desc_value,
-                    'Category_CAT_ID': cat_id,
-                }).eq('SP_id', sp_id).execute()
+                new_image_url = upload_image('parts', image)
+            except Exception:
+                errors['image'] = UPLOAD_FAILED_MSG
+
+        if not errors:
+            payload = {
+                'SP_name':         name_value,
+                'SP_desc':         desc_value,
+                'Category_CAT_ID': cat_id,
+            }
+            if new_image_url:
+                payload['ImageUrl'] = new_image_url
+            elif remove_requested:
+                payload['ImageUrl'] = None
+            try:
+                updated = supabase.table('Spare_Parts').update(payload).eq('SP_id', sp_id).execute()
+                if 'ImageUrl' in payload and not updated.data:
+                    raise Exception('the record was not changed.')
+            except Exception as e:
+                remove_image(new_image_url)   # keep the old image, drop the new object
+                flash_error(f'Could not update spare part: {str(e)}')
+            else:
+                if 'ImageUrl' in payload and payload['ImageUrl'] != record.get('ImageUrl'):
+                    remove_image(record.get('ImageUrl'))
                 flash_success(f'Spare part "{name_value}" was updated successfully.')
                 return redirect(url_for('spare_parts.index'))
-            except Exception as e:
-                flash_error(f'Could not update spare part: {str(e)}')
 
     return render_template(
         'modules/spare_parts/form.html',
@@ -215,6 +273,8 @@ def edit(sp_id):
         is_edit=True,
         record=record,
         category_options=category_options,
+        current_image_src=display_url(record.get('ImageUrl')),
+        image_max_bytes=MAX_IMAGE_BYTES,
     )
 
 
@@ -224,18 +284,22 @@ def delete(sp_id):
     try:
         result = (
             supabase.table('Spare_Parts')
-            .select('SP_name')
+            .select('SP_name, ImageUrl')
             .eq('SP_id', sp_id)
             .single()
             .execute()
         )
         name_value = result.data.get('SP_name', f'ID {sp_id}')
+        image_url = result.data.get('ImageUrl')
     except Exception:
         name_value = f'ID {sp_id}'
+        image_url = None
 
     try:
-        supabase.table('Spare_Parts').delete().eq('SP_id', sp_id).execute()
+        deleted = supabase.table('Spare_Parts').delete().eq('SP_id', sp_id).execute()
         flash_success(f'Spare part "{name_value}" was deleted successfully.')
+        if deleted.data:
+            remove_image(image_url)   # best effort, after the row is gone
     except Exception as e:
         error_msg = str(e)
         if 'foreign key' in error_msg.lower() or 'violates' in error_msg.lower():

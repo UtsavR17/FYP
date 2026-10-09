@@ -1,5 +1,5 @@
 {% extends 'layout/admin_layout.html' %}
-{% from 'components/form_field.html' import text_field, select_field, readonly_field %}
+{% from 'components/form_field.html' import text_field, select_field, readonly_field, image_field %}
 
 {% block title %}{{ 'Edit Model' if is_edit else 'Add Model' }}{% endblock %}
 {% block page_title %}{{ 'Edit Model' if is_edit else 'Add Model' }}{% endblock %}
@@ -25,7 +25,7 @@
 <div class="form-card">
     <p class="form-section-title">Model Details</p>
 
-    <form method="POST" novalidate>
+    <form method="POST" enctype="multipart/form-data" novalidate>
 
         <!-- Row 1: Brand | Description -->
         <div class="row">
@@ -49,6 +49,22 @@
                     error       = errors.get('Description', ''),
                     placeholder = 'e.g. Honda CB Shine 125cc',
                     help_text   = 'Maximum 50 characters.'
+                ) }}
+            </div>
+        </div>
+
+        <!-- Row 2: Product image (optional) -->
+        <div class="row">
+            <div class="col-md-8 col-lg-6">
+                {{ image_field(
+                    name          = 'image',
+                    label         = 'Product Image',
+                    current_src   = current_image_src if is_edit else '',
+                    has_other_url = is_edit and record.ImageUrl and not current_image_src,
+                    alt           = record.Description if is_edit else '',
+                    error         = errors.get('image', ''),
+                    help_text     = 'Optional. JPG, PNG or WebP, up to 2 MB. Square or landscape images look best.',
+                    max_bytes     = image_max_bytes
                 ) }}
             </div>
         </div>
