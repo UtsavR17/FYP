@@ -2,185 +2,111 @@
 {% from 'components/form_field.html' import select_field, date_field,
     number_field, readonly_field %}
 
-{% block title %}
-    {{ 'Edit Payment' if is_edit else 'Record Payment' }}
-{% endblock %}
-{% block page_title %}
-    {{ 'Edit Payment' if is_edit else 'Record Payment' }}
-{% endblock %}
+{% if is_edit %}
+    {% set heading = 'Edit Payment - PAY-' ~ record.PaymentID %}
+{% elif mode == 'sale' %}
+    {% set heading = 'Record sale payment' %}
+{% else %}
+    {% set heading = 'Record appointment payment' %}
+{% endif %}
+
+{% block title %}{{ heading }}{% endblock %}
+{% block page_title %}{{ heading }}{% endblock %}
+
+{% macro money(value) -%}
+    {%- if value is not none -%}Rs. {{ '{:,.2f}'.format(value | float) }}{%- else -%}-{%- endif -%}
+{%- endmacro %}
 
 {% block content %}
 
 <div class="page-header">
     <div>
-        <h2 class="page-header-title">
-            {% if is_edit %}Edit Payment &mdash; PAY-{{ record.PaymentID }}
-            {% else %}Record Payment{% endif %}
-        </h2>
+        <h2 class="page-header-title">{{ heading }}</h2>
         <p class="page-header-subtitle">
-            {{ 'Update payment details.' if is_edit
-               else 'Record a payment for a sale or appointment.' }}
+            {% if is_edit %}Update payment details.
+            {% elif mode == 'sale' %}Record a payment for SALE-{{ context.sale_id if context else '' }}.
+            {% else %}Record a payment for a confirmed, in progress or completed appointment.{% endif %}
         </p>
     </div>
-    <a href="{{ url_for('payment.index') }}" class="btn btn-outline-secondary">
-        <i class="fa-solid fa-arrow-left me-2"></i>Back to Payments
+    <a href="{{ cancel_url }}" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-2"></i>{{ 'Back to Sale' if mode == 'sale' and not is_edit else 'Back to Payments' }}
     </a>
 </div>
 
-{% if is_edit and record %}
-<form method="POST" novalidate id="paymentForm"
-      data-is-edit="true" data-payment-id="{{ record.PaymentID }}">
-{% else %}
-<form method="POST" novalidate id="paymentForm"
-      data-is-edit="false" data-payment-id="">
+{% if errors.get('reference') %}
+<div class="alert alert-danger" role="alert">
+    <i class="fa-solid fa-circle-exclamation me-2"></i>{{ errors.get('reference') }}
+</div>
 {% endif %}
+
+<form method="POST" novalidate id="paymentForm"
+      data-is-edit="{{ 'true' if is_edit else 'false' }}"
+      data-payment-id="{{ record.PaymentID if is_edit and record else '' }}"
+      data-mode="{{ mode }}">
 
     {% if not is_edit and form_token %}
     <input type="hidden" name="form_token" value="{{ form_token }}">
     {% endif %}
+    <input type="hidden" name="reference_type" value="{{ mode }}">
 
-    <!-- Card 1: Payment Reference -->
+    <!-- Card 1: what is being paid -->
     <div class="form-card">
-        <p class="form-section-title">Payment Reference</p>
+        <p class="form-section-title">{{ 'Sale' if mode == 'sale' else 'Appointment' }}</p>
 
-        {% if is_edit %}
-        <input type="hidden" name="reference_type" value="{{ locked_ref_type }}">
-        <div class="mb-3">
-            <label class="form-label readonly-label">Reference Type</label>
-            <div class="readonly-value">
-                {% if locked_ref_type == 'sale' %}
-                    <i class="fa-solid fa-handshake me-2" style="color:var(--accent)"></i>
-                    <strong>Sale Payment</strong>
+        {% if mode == 'sale' and not is_edit %}
+            <input type="hidden" name="Sale_SaleID" value="{{ form_data.get('Sale_SaleID', '') }}">
+        {% elif mode == 'sale' %}
+            {{ select_field(
+                name        = 'Sale_SaleID',
+                label       = 'Sale',
+                options     = sale_options,
+                selected    = form_data.get('Sale_SaleID', ''),
+                required    = True,
+                error       = errors.get('Sale_SaleID', ''),
+                empty_label = 'Select a Sale',
+                help_text   = 'Reference type cannot be changed when editing.'
+            ) }}
+        {% else %}
+            {{ select_field(
+                name        = 'Appointment_AppointmentID',
+                label       = 'Appointment',
+                options     = appt_options,
+                selected    = form_data.get('Appointment_AppointmentID', ''),
+                required    = True,
+                error       = errors.get('Appointment_AppointmentID', ''),
+                empty_label = 'Select an Appointment',
+                help_text   = ('Reference type cannot be changed when editing.' if is_edit
+                               else 'Only confirmed, in progress or completed appointments with a balance are listed.')
+            ) }}
+            {% if not appt_options %}
+            <div class="alert alert-info" role="alert">
+                <i class="fa-solid fa-circle-info me-2"></i>
+                No appointments with a remaining balance are ready for payment.
+            </div>
+            {% endif %}
+        {% endif %}
+
+        <!-- Context card (ISS-05): read-only, refreshed by the script when the selection changes -->
+        <div id="payment-context" class="payment-context mt-2" {% if not context %}hidden{% endif %}>
+            <dl class="payment-context-grid">
+                {% if mode == 'sale' %}
+                <div><dt>Motorbike</dt><dd data-ctx="bike">{{ context.bike if context else '-' }}</dd></div>
+                <div><dt>VIN</dt><dd data-ctx="vin">{{ (context.vin if context else None) or '-' }}</dd></div>
+                <div><dt>Customer</dt><dd data-ctx="customer_name">{{ (context.customer_name if context else None) or '-' }}</dd></div>
+                <div><dt>Sale date</dt><dd data-ctx="sale_date">{{ (context.sale_date if context else None) or '-' }}</dd></div>
                 {% else %}
-                    <i class="fa-solid fa-calendar-check me-2" style="color:#1d4ed8"></i>
-                    <strong>Appointment Payment</strong>
+                <div><dt>Registration</dt><dd data-ctx="registration">{{ (context.registration if context else None) or '-' }}</dd></div>
+                <div><dt>Motorbike</dt><dd data-ctx="bike">{{ context.bike if context else '-' }}</dd></div>
+                <div><dt>Customer</dt><dd data-ctx="customer_name">{{ (context.customer_name if context else None) or '-' }}</dd></div>
+                <div><dt>Date</dt><dd data-ctx="appointment_date">{{ (context.appointment_date if context else None) or '-' }}</dd></div>
+                <div><dt>Status</dt><dd data-ctx="appointment_status">{{ (context.appointment_status if context else None) or '-' }}</dd></div>
                 {% endif %}
-                <span class="text-muted ms-2" style="font-size:0.75rem;">
-                    &mdash; Reference type cannot be changed when editing.
-                </span>
-            </div>
+                <div><dt>Total</dt><dd data-ctx="total_amount" data-money>{{ money(context.total_amount if context else None) }}</dd></div>
+                <div><dt>Already paid</dt><dd data-ctx="total_paid" data-money>{{ money(context.total_paid if context else None) }}</dd></div>
+                <div><dt>Remaining</dt><dd data-ctx="remaining" data-money class="payment-context-remaining"
+                    data-value="{{ context.remaining if context else '' }}">{{ money(context.remaining if context else None) }}</dd></div>
+            </dl>
         </div>
-
-        {% if locked_ref_type == 'sale' %}
-            {{ select_field(
-                name        = 'Sale_SaleID',
-                label       = 'Sale',
-                options     = sale_options,
-                selected    = form_data.get('Sale_SaleID', ''),
-                required    = True,
-                error       = errors.get('Sale_SaleID', ''),
-                empty_label = 'Select a Sale'
-            ) }}
-            {% if not sale_options %}
-            <div class="alert alert-warning" role="alert">
-                <i class="fa-solid fa-triangle-exclamation me-2"></i>
-                No sales with a remaining balance found.
-            </div>
-            {% endif %}
-        {% else %}
-            {{ select_field(
-                name        = 'Appointment_AppointmentID',
-                label       = 'Appointment',
-                options     = appt_options,
-                selected    = form_data.get('Appointment_AppointmentID', ''),
-                required    = True,
-                error       = errors.get('Appointment_AppointmentID', ''),
-                empty_label = 'Select an Appointment'
-            ) }}
-            {% if not appt_options %}
-            <div class="alert alert-info" role="alert">
-                <i class="fa-solid fa-circle-info me-2"></i>
-                No appointments with a remaining balance found.
-            </div>
-            {% endif %}
-        {% endif %}
-
-        {% else %}
-        <div class="receive-mode-selector mb-3">
-            <label class="receive-mode-option {% if form_data.get('reference_type', 'sale') == 'sale' %}active{% endif %}"
-                   id="ref-label-sale">
-                <input type="radio"
-                       name="reference_type"
-                       value="sale"
-                       id="ref-type-sale"
-                       {% if form_data.get('reference_type', 'sale') == 'sale' %}checked{% endif %}>
-                <i class="fa-solid fa-handshake"></i>
-                <span>For a Sale</span>
-                <small>Payment linked to a motorbike sale record.</small>
-            </label>
-            <label class="receive-mode-option {% if form_data.get('reference_type') == 'appointment' %}active{% endif %}"
-                   id="ref-label-appt">
-                <input type="radio"
-                       name="reference_type"
-                       value="appointment"
-                       id="ref-type-appt"
-                       {% if form_data.get('reference_type') == 'appointment' %}checked{% endif %}>
-                <i class="fa-solid fa-calendar-check"></i>
-                <span>For an Appointment</span>
-                <small>Payment linked to a service or repair appointment.</small>
-            </label>
-        </div>
-
-        <div id="section-sale"
-             {% if form_data.get('reference_type') == 'appointment' %}style="display:none;"{% endif %}>
-            {{ select_field(
-                name        = 'Sale_SaleID',
-                label       = 'Sale',
-                options     = sale_options,
-                selected    = form_data.get('Sale_SaleID', ''),
-                required    = False,
-                error       = errors.get('Sale_SaleID', ''),
-                empty_label = 'Select a Sale'
-            ) }}
-            {% if not sale_options %}
-            <div class="alert alert-warning" role="alert">
-                <i class="fa-solid fa-triangle-exclamation me-2"></i>
-                No sales with a remaining balance found. All current sales
-                may be fully paid, or no sales exist yet.
-            </div>
-            {% endif %}
-        </div>
-
-        <div id="section-appt"
-             {% if form_data.get('reference_type', 'sale') != 'appointment' %}style="display:none;"{% endif %}>
-            {{ select_field(
-                name        = 'Appointment_AppointmentID',
-                label       = 'Appointment',
-                options     = appt_options,
-                selected    = form_data.get('Appointment_AppointmentID', ''),
-                required    = False,
-                error       = errors.get('Appointment_AppointmentID', ''),
-                empty_label = 'Select an Appointment'
-            ) }}
-            {% if not appt_options %}
-            <div class="alert alert-info" role="alert">
-                <i class="fa-solid fa-circle-info me-2"></i>
-                No appointments with a remaining balance found.
-            </div>
-            {% endif %}
-        </div>
-        {% endif %}
-
-        <!-- Shared balance panel — populated by JS for whichever reference is active -->
-        <div id="balance-info-display"
-             class="mt-2 p-3 rounded"
-             style="display:none; background:var(--accent-soft); border:1px solid rgba(230,126,34,0.2);">
-            <div class="row g-2">
-                <div class="col-md-4">
-                    <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);margin-bottom:4px;">Total</div>
-                    <div id="bal-total" style="font-size:1rem;font-weight:700;color:var(--text-primary);">—</div>
-                </div>
-                <div class="col-md-4">
-                    <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);margin-bottom:4px;">Already Paid</div>
-                    <div id="bal-paid" style="font-size:1rem;font-weight:700;color:var(--text-secondary);">—</div>
-                </div>
-                <div class="col-md-4">
-                    <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);margin-bottom:4px;">Remaining Balance</div>
-                    <div id="bal-remaining" style="font-size:1rem;font-weight:700;color:var(--accent);">—</div>
-                </div>
-            </div>
-        </div>
-
     </div>
 
     <!-- Card 2: Payment Details -->
@@ -189,13 +115,15 @@
 
         <div class="row">
             <div class="col-md-4">
-                {{ date_field(
-                    name      = 'PaymentDate',
-                    label     = 'Payment Date',
-                    value     = form_data.get('PaymentDate', ''),
-                    required  = True,
-                    error     = errors.get('PaymentDate', ''),
-                    help_text = 'The date the payment was received.'
+                {{ select_field(
+                    name        = 'PaymentType',
+                    label       = 'Payment Type',
+                    options     = type_options,
+                    selected    = form_data.get('PaymentType', ''),
+                    required    = True,
+                    error       = errors.get('PaymentType', ''),
+                    empty_label = 'Select Type',
+                    help_text   = type_help
                 ) }}
             </div>
             <div class="col-md-4">
@@ -208,7 +136,17 @@
                     placeholder = '',
                     step        = '0.01',
                     min_val     = '0.01',
-                    help_text   = 'Actual amount received. Cannot exceed remaining balance.'
+                    help_text   = ('Remaining balance: ' ~ money(context.remaining)) if context else 'Actual amount received.'
+                ) }}
+            </div>
+            <div class="col-md-4">
+                {{ date_field(
+                    name      = 'PaymentDate',
+                    label     = 'Payment Date',
+                    value     = form_data.get('PaymentDate', ''),
+                    required  = True,
+                    error     = errors.get('PaymentDate', ''),
+                    help_text = 'The date the payment was received (not in the future).'
                 ) }}
             </div>
         </div>
@@ -225,17 +163,6 @@
                     empty_label = 'Select Method'
                 ) }}
             </div>
-            <div class="col-md-4">
-                {{ select_field(
-                    name        = 'PaymentType',
-                    label       = 'Payment Type',
-                    options     = type_options,
-                    selected    = form_data.get('PaymentType', ''),
-                    required    = True,
-                    error       = errors.get('PaymentType', ''),
-                    empty_label = 'Select Type'
-                ) }}
-            </div>
         </div>
 
         <div class="form-actions">
@@ -243,10 +170,8 @@
                 <i class="fa-solid fa-floppy-disk me-2"></i>
                 {{ 'Save Changes' if is_edit else 'Confirm Payment' }}
             </button>
-            <a href="{{ url_for('payment.index') }}"
-               class="btn btn-outline-secondary">Cancel</a>
+            <a href="{{ cancel_url }}" class="btn btn-outline-secondary">Cancel</a>
         </div>
-
     </div>
 
 </form>
@@ -259,132 +184,99 @@
 (function () {
     'use strict';
 
-    const payForm   = document.getElementById('paymentForm');
-    const submitBtn = document.getElementById('paySubmitBtn');
+    var payForm   = document.getElementById('paymentForm');
+    var submitBtn = document.getElementById('paySubmitBtn');
+    if (!payForm) return;
 
-    if (payForm && submitBtn) {
+    if (submitBtn) {
         payForm.addEventListener('submit', function () {
             if (submitBtn.disabled) return;
             submitBtn.disabled = true;
-            submitBtn.innerHTML =
-                '<i class="fa-solid fa-spinner fa-spin me-2"></i>Processing...';
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Processing...';
         });
     }
 
-    const refTypeSale    = document.getElementById('ref-type-sale');
-    const refTypeAppt    = document.getElementById('ref-type-appt');
-    const refLabelSale   = document.getElementById('ref-label-sale');
-    const refLabelAppt   = document.getElementById('ref-label-appt');
-    const sectionPaySale = document.getElementById('section-sale');
-    const sectionPayAppt = document.getElementById('section-appt');
-    const infoPanel      = document.getElementById('balance-info-display');
+    var mode         = payForm.dataset.mode;
+    var isEdit       = payForm.dataset.isEdit === 'true';
+    var currentPayId = payForm.dataset.paymentId || '';
+    var contextCard  = document.getElementById('payment-context');
+    var refSelect    = document.getElementById(mode === 'sale' ? 'Sale_SaleID' : 'Appointment_AppointmentID');
+    var typeSelect   = document.getElementById('PaymentType');
+    var amountInput  = document.getElementById('AmountPaid');
+    var amountHint   = amountInput ? amountInput.parentElement.querySelector('.form-text') : null;
 
-    const saleSelect   = document.getElementById('Sale_SaleID');
-    const apptSelect   = document.getElementById('Appointment_AppointmentID');
-    const payDateInput = document.getElementById('PaymentDate');
-    const amountInput  = document.getElementById('AmountPaid');
-
-    const isEdit       = payForm.dataset.isEdit === 'true';
-    const currentPayId = payForm.dataset.paymentId ? Number(payForm.dataset.paymentId) : null;
+    // Remaining balance from the server-rendered card (sale mode, edit, or a re-shown form).
+    var remainingEl = contextCard ? contextCard.querySelector('[data-ctx="remaining"]') : null;
+    var remaining = remainingEl && !contextCard.hidden && remainingEl.dataset.value !== ''
+        ? Number(remainingEl.dataset.value) : null;
+    var autoFilled = false;
 
     function formatRs(num) {
-        return 'Rs.\u00a0' + Number(num).toLocaleString('en-US', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        });
+        return 'Rs. ' + Number(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    function showBalancePanel(data) {
-        const balTotal     = document.getElementById('bal-total');
-        const balPaid      = document.getElementById('bal-paid');
-        const balRemaining = document.getElementById('bal-remaining');
-        if (balTotal)     balTotal.textContent     = formatRs(data.total_amount);
-        if (balPaid)      balPaid.textContent      = formatRs(data.total_paid);
-        if (balRemaining) balRemaining.textContent = formatRs(data.remaining);
-        if (infoPanel) infoPanel.style.display = '';
-        if (amountInput) {
-            amountInput.setAttribute('max', Number(data.remaining).toFixed(2));
-            if (!amountInput.value) {
-                amountInput.value = Number(data.remaining).toFixed(2);
-            }
+    // Full Payment fills and locks the remaining balance; Deposit and Instalment are typed by
+    // the user (never pre-filled), with the remaining balance as a hint and the max.
+    function applyType() {
+        if (!amountInput || !typeSelect) return;
+        var type = typeSelect.value;
+        if (remaining === null || isNaN(remaining)) {
+            amountInput.readOnly = false;
+            return;
         }
-    }
-
-    function loadBalanceInfo(kind, refId) {
-        if (!refId || !infoPanel) return;
-        let url = kind === 'sale'
-            ? '/payments/sale-info/' + refId
-            : '/payments/appointment-info/' + refId;
-        if (isEdit && currentPayId) {
-            url += '?exclude_payment_id=' + currentPayId;
-        }
-        fetch(url)
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                if (data.error) return;
-                if (kind === 'sale' && payDateInput && data.sale_date && !payDateInput.value) {
-                    payDateInput.value = data.sale_date;
-                }
-                showBalancePanel(data);
-            })
-            .catch(function (err) {
-                console.error('[MotoAdmin] Balance info fetch error:', err);
-            });
-    }
-
-    function applyPaymentRefMode(mode) {
-        if (!sectionPaySale || !sectionPayAppt) return;
-        if (mode === 'sale') {
-            sectionPaySale.style.display = '';
-            sectionPayAppt.style.display = 'none';
-            if (refLabelSale) refLabelSale.classList.add('active');
-            if (refLabelAppt) refLabelAppt.classList.remove('active');
+        amountInput.setAttribute('max', remaining.toFixed(2));
+        if (amountHint) amountHint.textContent = 'Remaining balance: ' + formatRs(remaining);
+        if (type === 'Full Payment') {
+            amountInput.value = remaining.toFixed(2);
+            amountInput.readOnly = true;
+            autoFilled = true;
         } else {
-            sectionPaySale.style.display = 'none';
-            sectionPayAppt.style.display = '';
-            if (refLabelSale) refLabelSale.classList.remove('active');
-            if (refLabelAppt) refLabelAppt.classList.add('active');
-        }
-        if (infoPanel) infoPanel.style.display = 'none';
-
-        if (mode === 'sale' && saleSelect && saleSelect.value) {
-            loadBalanceInfo('sale', saleSelect.value);
-        } else if (mode === 'appointment' && apptSelect && apptSelect.value) {
-            loadBalanceInfo('appointment', apptSelect.value);
+            amountInput.readOnly = false;
+            if (autoFilled) amountInput.value = '';
+            autoFilled = false;
         }
     }
 
-    if (refTypeSale && refTypeAppt) {
-        refTypeSale.addEventListener('change', function () { applyPaymentRefMode('sale'); });
-        refTypeAppt.addEventListener('change', function () { applyPaymentRefMode('appointment'); });
-    }
-
-    if (saleSelect) {
-        saleSelect.addEventListener('change', function () {
-            if (!this.value) { if (infoPanel) infoPanel.style.display = 'none'; return; }
-            loadBalanceInfo('sale', this.value);
+    function showContext(data) {
+        if (!contextCard) return;
+        contextCard.querySelectorAll('[data-ctx]').forEach(function (el) {
+            var v = data[el.dataset.ctx];
+            el.textContent = (v === null || v === undefined || v === '') ? '-'
+                : (el.hasAttribute('data-money') ? formatRs(v) : String(v));
         });
+        contextCard.hidden = false;
+        remaining = Number(data.remaining);
+        var remainingCell = contextCard.querySelector('[data-ctx="remaining"]');
+        if (remainingCell) remainingCell.dataset.value = String(remaining);
+        applyType();
     }
 
-    if (apptSelect) {
-        apptSelect.addEventListener('change', function () {
-            if (!this.value) { if (infoPanel) infoPanel.style.display = 'none'; return; }
-            loadBalanceInfo('appointment', this.value);
-        });
+    function loadContext(refId) {
+        if (!refId) {
+            if (contextCard) contextCard.hidden = true;
+            remaining = null;
+            applyType();
+            return;
+        }
+        var url = (mode === 'sale' ? '/payments/sale-info/' : '/payments/appointment-info/') + refId;
+        if (isEdit && currentPayId) url += '?exclude_payment_id=' + currentPayId;
+        fetch(url, { headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.json(); })
+            .then(function (data) { if (!data.error) showContext(data); })
+            .catch(function (err) { console.error('[MotoAdmin] Payment context fetch error:', err); });
     }
 
-    // Trigger balance load on initial page render (edit mode, or a
-    // pre-selected value left over from a failed validation resubmit)
-    const initialMode = refTypeSale
-        ? (refTypeSale.checked ? 'sale' : 'appointment')
-        : (saleSelect ? 'sale' : (apptSelect ? 'appointment' : null));
-
-    if (initialMode === 'sale' && saleSelect && saleSelect.value) {
-        loadBalanceInfo('sale', saleSelect.value);
-    } else if (initialMode === 'appointment' && apptSelect && apptSelect.value) {
-        loadBalanceInfo('appointment', apptSelect.value);
+    if (refSelect && refSelect.tagName === 'SELECT') {
+        refSelect.addEventListener('change', function () { loadContext(this.value); });
+        if (refSelect.value && (!contextCard || contextCard.hidden)) loadContext(refSelect.value);
     }
+    if (typeSelect) typeSelect.addEventListener('change', applyType);
 
+    // On load: lock a Full Payment amount; keep any stored or typed amount for the other types.
+    if (typeSelect && typeSelect.value === 'Full Payment') applyType();
+    else if (remaining !== null && amountInput) {
+        amountInput.setAttribute('max', remaining.toFixed(2));
+    }
 })();
 </script>
 {% endblock %}

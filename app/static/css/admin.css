@@ -2948,3 +2948,54 @@ label.form-label {
     background-color: var(--content-bg);
     object-fit: contain;
 }
+
+
+/* ---------------------------------------------------------------------------
+   MODULE - Payment context card and sale payment summary (Fix Phase 1)
+   --------------------------------------------------------------------------- */
+.payment-context {
+    padding: 14px 16px;
+    border-radius: var(--border-radius);
+    background-color: var(--accent-soft);
+    border: 1px solid rgba(230, 126, 34, 0.2);
+}
+
+.payment-context-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px 16px;
+    margin: 0;
+}
+
+.payment-context-grid dt {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
+
+.payment-context-grid dd {
+    margin: 0;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+}
+
+.payment-context-remaining {
+    color: var(--accent);
+}
+
+.pay-status-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.pay-status-unpaid { background: rgba(220, 38, 38, 0.1); color: #b91c1c; }
+.pay-status-partially-paid { background: rgba(251, 191, 36, 0.18); color: #b45309; }
+.pay-status-paid { background: rgba(22, 163, 74, 0.12); color: #15803d; }

@@ -9,6 +9,7 @@ from app.utils.validators import is_positive_number
 from app.utils.order_ref import format_order_ref, parse_order_query
 from datetime import date as date_type
 from app.utils.text import norm
+from app.modules.online_order.routes import today_mauritius
 
 
 PAYMENT_METHOD_OPTIONS = [
@@ -26,6 +27,21 @@ PAYMENT_TYPE_OPTIONS = [
 
 VALID_METHODS = [v for v, _ in PAYMENT_METHOD_OPTIONS]
 VALID_TYPES   = [v for v, _ in PAYMENT_TYPE_OPTIONS]
+
+TYPE_FULL        = 'Full Payment'
+TYPE_DEPOSIT     = 'Deposit'
+TYPE_INSTALMENT  = 'Instalment'
+
+# Appointments that can take payments (DEC-6). Pending, Cancelled and No Show never can.
+PAYABLE_APPOINTMENT_STATUSES = ('Confirmed', 'In Progress', 'Completed')
+
+# Money is NUMERIC(10,2); amounts closer than half a cent are equal.
+CENT = 0.005
+
+PAYMENT_TYPE_HELP = (
+    'Full Payment settles the whole remaining balance. Deposit is a first, partial payment. '
+    'Instalment is a later payment after a deposit.'
+)
 
 # Online payments (Task 40) are created by the Stripe webhook of the Client
 # Side. They are system records: they cannot be edited or deleted here.
@@ -68,24 +84,6 @@ def _validate_date(raw_value, field_label):
         return value, None
     except ValueError:
         return None, f'{field_label} must be a valid date.'
-
-
-def _get_sale_total_paid(sale_id, exclude_payment_id=None):
-    try:
-        result = (
-            supabase.table('Payment')
-            .select('PaymentID, AmountPaid')
-            .eq('Sale_SaleID', sale_id)
-            .execute()
-        )
-        total = 0.0
-        for p in (result.data or []):
-            if exclude_payment_id and p.get('PaymentID') == exclude_payment_id:
-                continue
-            total += float(p.get('AmountPaid') or 0)
-        return total
-    except Exception:
-        return 0.0
 
 
 def _get_sale_options(exclude_sale_id=None):
@@ -142,83 +140,103 @@ def _get_sale_options(exclude_sale_id=None):
     return options
 
 
-def _get_appointment_total(appt_id):
+def _chunks(ids, size=100):
+    ids = sorted({i for i in ids if i is not None})
+    for start in range(0, len(ids), size):
+        yield ids[start:start + size]
+
+
+def _appointment_totals(appt_ids):
     """
-    Replicates the Appointment cost calculation used in the Appointment
-    module's own view page (services + stock used), so Payment balance
-    validation stays consistent with the Appointment's cost summary.
-    This is a read-only, independent calculation — it does not import or
-    modify anything in the appointment module.
+    {AppointmentID: total} for services plus stock used, with batched queries.
+    Same calculation as the Appointment view page (service quantity defaults to 1,
+    stock quantity to 0). Lookup errors count as 0, as before.
     """
-    service_total = 0.0
-    try:
-        svc_rows = (
-            supabase.table('appointment_service')
-            .select('Service_ServiceID, Quantity')
-            .eq('Appointment_AppointmentID', appt_id)
-            .execute()
-        )
-        raw_services = svc_rows.data or []
-        if raw_services:
+    ids = list({i for i in appt_ids if i is not None})
+    totals = {i: 0.0 for i in ids}
+    if not ids:
+        return totals
+
+    service_rows, stock_rows = [], []
+    for chunk in _chunks(ids):
+        try:
+            service_rows += (
+                supabase.table('appointment_service')
+                .select('Appointment_AppointmentID, Service_ServiceID, Quantity')
+                .in_('Appointment_AppointmentID', chunk)
+                .execute()
+            ).data or []
+        except Exception:
+            pass
+        try:
+            stock_rows += (
+                supabase.table('Appointment_Stock')
+                .select('Appointment_AppointmentID, Stock_Stock_ID, Quantity')
+                .in_('Appointment_AppointmentID', chunk)
+                .execute()
+            ).data or []
+        except Exception:
+            pass
+
+    cost_lookup = {}
+    if service_rows:
+        try:
             all_svc = supabase.table('Service').select('ServiceID, Cost').execute()
-            cost_lookup = {
-                r['ServiceID']: float(r.get('Cost') or 0)
-                for r in (all_svc.data or [])
-            }
-            for r in raw_services:
-                qty = int(r.get('Quantity') or 1)
-                service_total += cost_lookup.get(r['Service_ServiceID'], 0.0) * qty
-    except Exception:
-        pass
+            cost_lookup = {r['ServiceID']: float(r.get('Cost') or 0) for r in (all_svc.data or [])}
+        except Exception:
+            pass
+    price_lookup = {}
+    for chunk in _chunks(r.get('Stock_Stock_ID') for r in stock_rows):
+        try:
+            rows = supabase.table('Stock').select('Stock_ID, S_Price').in_('Stock_ID', chunk).execute()
+            price_lookup.update({r['Stock_ID']: float(r.get('S_Price') or 0) for r in (rows.data or [])})
+        except Exception:
+            pass
 
-    stock_total = 0.0
-    try:
-        stk_rows = (
-            supabase.table('Appointment_Stock')
-            .select('Stock_Stock_ID, Quantity')
-            .eq('Appointment_AppointmentID', appt_id)
-            .execute()
-        )
-        raw_stock = stk_rows.data or []
-        if raw_stock:
-            all_stk = supabase.table('Stock').select('Stock_ID, S_Price').execute()
-            price_lookup = {
-                r['Stock_ID']: float(r.get('S_Price') or 0)
-                for r in (all_stk.data or [])
-            }
-            for r in raw_stock:
-                qty = int(r.get('Quantity') or 0)
-                stock_total += price_lookup.get(r['Stock_Stock_ID'], 0.0) * qty
-    except Exception:
-        pass
+    for r in service_rows:
+        qty = int(r.get('Quantity') or 1)
+        totals[r['Appointment_AppointmentID']] += cost_lookup.get(r['Service_ServiceID'], 0.0) * qty
+    for r in stock_rows:
+        qty = int(r.get('Quantity') or 0)
+        totals[r['Appointment_AppointmentID']] += price_lookup.get(r['Stock_Stock_ID'], 0.0) * qty
+    return totals
 
-    return service_total + stock_total
+
+def _get_appointment_total(appt_id):
+    """Services plus stock used for one appointment (see _appointment_totals)."""
+    return _appointment_totals([appt_id]).get(appt_id, 0.0)
+
+
+def _paid_by(column, ref_ids, exclude_payment_id=None):
+    """{reference id: amount paid} for Sale_SaleID or Appointment_AppointmentID, batched."""
+    paid = {}
+    for chunk in _chunks(ref_ids):
+        try:
+            rows = (
+                supabase.table('Payment')
+                .select(f'PaymentID, {column}, AmountPaid')
+                .in_(column, chunk)
+                .execute()
+            ).data or []
+        except Exception:
+            continue
+        for r in rows:
+            if exclude_payment_id and r.get('PaymentID') == exclude_payment_id:
+                continue
+            paid[r[column]] = paid.get(r[column], 0.0) + float(r.get('AmountPaid') or 0)
+    return paid
 
 
 def _get_appointment_total_paid(appt_id, exclude_payment_id=None):
-    try:
-        result = (
-            supabase.table('Payment')
-            .select('PaymentID, AmountPaid')
-            .eq('Appointment_AppointmentID', appt_id)
-            .execute()
-        )
-        total = 0.0
-        for p in (result.data or []):
-            if exclude_payment_id and p.get('PaymentID') == exclude_payment_id:
-                continue
-            total += float(p.get('AmountPaid') or 0)
-        return total
-    except Exception:
-        return 0.0
+    return _paid_by('Appointment_AppointmentID', [appt_id], exclude_payment_id).get(appt_id, 0.0)
 
 
-def _get_appointment_options(exclude_appt_id=None):
+def _get_appointment_options(current_appt_id=None):
     """
-    Appointments that still have a remaining balance greater than 0,
-    labelled with the remaining amount — mirrors _get_sale_options().
-    The currently-linked appointment (exclude_appt_id) is always included
-    so the edit form can pre-select it.
+    Payable appointments (PAYABLE_APPOINTMENT_STATUSES) with a remaining balance,
+    labelled with the amount left. On Edit the payment's own appointment
+    (current_appt_id) is always included, marked with its status when it is no
+    longer payable, so the record can still be edited.
     """
     bike_lookup = {}
     try:
@@ -231,22 +249,28 @@ def _get_appointment_options(exclude_appt_id=None):
     try:
         appts = (
             supabase.table('Appointment')
-            .select('AppointmentID, Customer_bike_BikeID, Appointment_Date')
+            .select('AppointmentID, Customer_bike_BikeID, Appointment_Date, Status')
             .order('AppointmentID', desc=True)
             .execute()
         )
-        appts_data = appts.data or []
+        appts_data = [
+            a for a in (appts.data or [])
+            if a.get('Status') in PAYABLE_APPOINTMENT_STATUSES or a['AppointmentID'] == current_appt_id
+        ]
     except Exception:
         pass
+
+    ids = [a['AppointmentID'] for a in appts_data]
+    totals = _appointment_totals(ids)
+    paid = _paid_by('Appointment_AppointmentID', ids)
 
     options = []
     for a in appts_data:
         aid       = a['AppointmentID']
-        total     = _get_appointment_total(aid)
-        paid      = _get_appointment_total_paid(aid)
-        remaining = max(0.0, total - paid)
+        total     = totals.get(aid, 0.0)
+        remaining = max(0.0, total - paid.get(aid, 0.0))
 
-        if remaining <= 0.001 and aid != exclude_appt_id:
+        if remaining <= 0.001 and aid != current_appt_id:
             continue
 
         reg = bike_lookup.get(a.get('Customer_bike_BikeID'), 'Unknown')
@@ -254,7 +278,9 @@ def _get_appointment_options(exclude_appt_id=None):
             f'Rs. {remaining:,.2f} remaining' if remaining < total - 0.001
             else f'Rs. {total:,.2f}'
         )
-        label = f"APPT-#{aid} \u2014 {reg} ({a.get('Appointment_Date', '?')}) [{balance_str}]"
+        status = a.get('Status')
+        status_note = '' if status in PAYABLE_APPOINTMENT_STATUSES else f' ({status})'
+        label = f"APPT-#{aid} - {reg} ({a.get('Appointment_Date', '?')}) [{balance_str}]{status_note}"
         options.append((aid, label))
 
     return options
@@ -334,104 +360,311 @@ def _enrich_payments(all_records):
     return all_records
 
 
-def _validate_form(form_data, current_appt_id=None, current_payment_id=None, locked_ref_type=None):
+def _payment_history(column, ref_id):
+    """
+    Payments of one sale or appointment (column = Sale_SaleID or
+    Appointment_AppointmentID), oldest first. Raises on a database error so the
+    caller can refuse a save instead of guessing the balance.
+    """
+    return (
+        supabase.table('Payment')
+        .select('PaymentID, PaymentType, AmountPaid, PaymentDate, PaymentMethod, '
+                'Online_Order_OrderID, StripePaymentIntentID')
+        .eq(column, ref_id)
+        .order('PaymentID')
+        .execute()
+    ).data or []
+
+
+def _effective_type(payment):
+    """An online (Stripe) payment on a sale is the reservation deposit (DEC-5)."""
+    return TYPE_DEPOSIT if _is_online_payment(payment) else payment.get('PaymentType')
+
+
+def payment_summary(total, payments, exclude_payment_id=None):
+    """Total, paid, balance and status (Unpaid / Partially paid / Paid) of a sale or appointment."""
+    total = round(float(total or 0), 2)
+    paid = round(sum(float(p.get('AmountPaid') or 0) for p in payments
+                     if p.get('PaymentID') != exclude_payment_id), 2)
+    balance = round(max(0.0, total - paid), 2)
+    if balance <= CENT:
+        status = 'Paid'
+    elif paid > CENT:
+        status = 'Partially paid'
+    else:
+        status = 'Unpaid'
+    return {'total': total, 'paid': paid, 'balance': balance, 'status': status}
+
+
+def check_payment_rules(payment_type, amount, total, history, current_payment=None, noun='sale'):
+    """
+    DEC-5 payment matrix. Returns (field, message) for the first broken rule, or None.
+
+    history: every payment of this sale or appointment (from _payment_history).
+    current_payment: the stored record when editing; it is excluded from the
+    balance, and only payments recorded before it count as "earlier".
+    """
+    current_id = current_payment.get('PaymentID') if current_payment else None
+    others = [p for p in history if p.get('PaymentID') != current_id]
+    earlier = [p for p in others if current_id is None or (p.get('PaymentID') or 0) < current_id]
+    later = [p for p in others if current_id is not None and (p.get('PaymentID') or 0) > current_id]
+    total = round(float(total or 0), 2)
+    remaining = round(max(0.0, total - sum(float(p.get('AmountPaid') or 0) for p in others)), 2)
+
+    if remaining <= CENT:
+        return 'AmountPaid', f'This {noun} is already fully paid (Rs. {total:,.2f}).'
+
+    if (current_payment and current_payment.get('PaymentType') == TYPE_DEPOSIT and later
+            and payment_type != TYPE_DEPOSIT):
+        return 'PaymentType', 'This deposit already has later payments, so its type cannot be changed.'
+
+    if payment_type == TYPE_FULL:
+        if abs(amount - remaining) > CENT:
+            return 'AmountPaid', f'A full payment must settle the remaining balance of Rs. {remaining:,.2f}.'
+        return None
+
+    if payment_type == TYPE_DEPOSIT:
+        if earlier:
+            return 'PaymentType', (
+                f'A deposit can only be the first payment on this {noun}. '
+                f'Choose Instalment or Full Payment.'
+            )
+        if amount >= total - CENT:
+            return 'AmountPaid', (
+                f'A deposit must be less than the total of Rs. {total:,.2f}. '
+                f'Choose Full Payment to pay everything.'
+            )
+    elif payment_type == TYPE_INSTALMENT:
+        if not any(_effective_type(p) == TYPE_DEPOSIT for p in earlier):
+            return 'PaymentType', 'Record the deposit first. Instalments can only follow a deposit.'
+
+    if amount > remaining + CENT:
+        return 'AmountPaid', (
+            f'Amount paid (Rs. {amount:,.2f}) exceeds the remaining balance of '
+            f'Rs. {remaining:,.2f} for this {noun}.'
+        )
+    return None
+
+
+def _customer_name(customer_id):
+    if not customer_id:
+        return None
+    rows = (
+        supabase.table('Customer').select('FirstName, LastName')
+        .eq('CustomerID', customer_id).execute()
+    ).data or []
+    if not rows:
+        return None
+    return f"{rows[0].get('FirstName') or ''} {rows[0].get('LastName') or ''}".strip() or None
+
+
+def _model_and_brand(model_no):
+    """(model description, brand name) for a Model_No; None parts when missing."""
+    if not model_no:
+        return None, None
+    rows = (
+        supabase.table('Model').select('Description, Brand_Brand_ID')
+        .eq('Model_No', model_no).execute()
+    ).data or []
+    if not rows:
+        return None, None
+    brand = None
+    if rows[0].get('Brand_Brand_ID'):
+        b = (
+            supabase.table('Brand').select('Brand_Name')
+            .eq('Brand_ID', rows[0]['Brand_Brand_ID']).execute()
+        ).data or []
+        brand = b[0].get('Brand_Name') if b else None
+    return rows[0].get('Description'), brand
+
+
+def _bike_text(brand, model, year=None, colour=None):
+    """'Brand Model (Year), Colour' with missing parts left out; '-' when nothing is known."""
+    text = ' '.join(x for x in (brand, model) if x)
+    if year:
+        text = f'{text} ({year})' if text else f'({year})'
+    if colour:
+        text = f'{text}, {colour}' if text else colour
+    return text or '-'
+
+
+def _sale_context(sale_id, exclude_payment_id=None):
+    """
+    Read-only context for a sale payment: bike (brand, model, year, colour, VIN),
+    customer, sale date and the balance. Raises LookupError when the sale does
+    not exist; other database errors are raised as they are.
+    """
+    rows = (
+        supabase.table('Sale')
+        .select('SaleID, Customer_CustomerID, New_MotorBike_NB_ID, SaleDate, TotalAmount')
+        .eq('SaleID', sale_id).execute()
+    ).data or []
+    if not rows:
+        raise LookupError(sale_id)
+    sale = rows[0]
+    bike = {}
+    if sale.get('New_MotorBike_NB_ID'):
+        b = (
+            supabase.table('New_MotorBike')
+            .select('NB_ID, Model_Model_No, Year, VIN, Color_Color')
+            .eq('NB_ID', sale['New_MotorBike_NB_ID']).execute()
+        ).data or []
+        bike = b[0] if b else {}
+    model, brand = _model_and_brand(bike.get('Model_Model_No'))
+    summary = payment_summary(sale.get('TotalAmount'), _payment_history('Sale_SaleID', sale_id),
+                              exclude_payment_id)
+    return {
+        'kind':          'sale',
+        'sale_id':       sale_id,
+        'customer_name': _customer_name(sale.get('Customer_CustomerID')),
+        'brand':         brand,
+        'model':         model,
+        'year':          bike.get('Year'),
+        'colour':        bike.get('Color_Color'),
+        'vin':           bike.get('VIN'),
+        'bike':          _bike_text(brand, model, bike.get('Year'), bike.get('Color_Color')),
+        'sale_date':     sale.get('SaleDate'),
+        'total_amount':  summary['total'],
+        'total_paid':    summary['paid'],
+        'remaining':     summary['balance'],
+        'status':        summary['status'],
+    }
+
+
+def _appointment_context(appt_id, exclude_payment_id=None):
+    """
+    Read-only context for an appointment payment: registration, brand and
+    model, customer, date, status and the balance. Raises LookupError when the
+    appointment does not exist.
+    """
+    rows = (
+        supabase.table('Appointment')
+        .select('AppointmentID, Customer_bike_BikeID, Appointment_Date, Status')
+        .eq('AppointmentID', appt_id).execute()
+    ).data or []
+    if not rows:
+        raise LookupError(appt_id)
+    appt = rows[0]
+    bike = {}
+    if appt.get('Customer_bike_BikeID'):
+        b = (
+            supabase.table('Customer_bike')
+            .select('BikeID, RegistrationNumber, Model_Model_No, Customer_CustomerID')
+            .eq('BikeID', appt['Customer_bike_BikeID']).execute()
+        ).data or []
+        bike = b[0] if b else {}
+    model, brand = _model_and_brand(bike.get('Model_Model_No'))
+    summary = payment_summary(_get_appointment_total(appt_id),
+                              _payment_history('Appointment_AppointmentID', appt_id), exclude_payment_id)
+    return {
+        'kind':                'appointment',
+        'appointment_id':      appt_id,
+        'registration':        bike.get('RegistrationNumber'),
+        'bike':                _bike_text(brand, model),
+        'brand':               brand,
+        'model':               model,
+        'customer_name':       _customer_name(bike.get('Customer_CustomerID')),
+        'appointment_date':    appt.get('Appointment_Date'),
+        'appointment_status':  appt.get('Status'),
+        'total_amount':        summary['total'],
+        'total_paid':          summary['paid'],
+        'remaining':           summary['balance'],
+        'status':              summary['status'],
+    }
+
+
+def _int_or_none(raw):
+    try:
+        return int(str(raw).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _validate_form(form_data, mode, context_sale_id=None, current_payment=None):
+    """
+    Validate a payment form. mode is 'sale' (the sale page path, context_sale_id
+    set) or 'appointment' (the standalone page) on Create, and the stored
+    reference type on Edit (current_payment set). The reference always comes
+    from the mode, never from the posted reference_type.
+    """
     errors = {}
-    parsed = {}
+    parsed = {'reference_type': mode, 'Sale_SaleID': None, 'Appointment_AppointmentID': None}
 
-    reference_type = locked_ref_type or form_data.get('reference_type', 'sale')
-    parsed['reference_type'] = reference_type
+    posted_type = (form_data.get('reference_type') or '').strip()
+    sale_id_raw = (form_data.get('Sale_SaleID') or '').strip()
+    appt_id_raw = (form_data.get('Appointment_AppointmentID') or '').strip()
+    is_edit = current_payment is not None
 
-    sale_id_raw = form_data.get('Sale_SaleID', '').strip()
-    appt_id_raw = form_data.get('Appointment_AppointmentID', '').strip()
+    # Context: a sale payment only from its sale page, an appointment payment never there.
+    if not is_edit and mode == 'appointment' and (posted_type == 'sale' or sale_id_raw):
+        errors['reference'] = 'Sale payments are recorded from the sale: open the sale and choose Record payment.'
+    if not is_edit and mode == 'sale' and (posted_type == 'appointment' or appt_id_raw):
+        errors['reference'] = f'This page records a payment for SALE-{context_sale_id} only.'
 
-    sale_id    = None
-    sale_total = None
-    appt_id    = None
-    appt_total = None
-
-    if reference_type == 'sale':
+    total, history, noun = None, None, mode
+    if mode == 'sale':
+        sale_id = _int_or_none(sale_id_raw)
         if not sale_id_raw:
             errors['Sale_SaleID'] = 'Please select a sale.'
+        elif sale_id is None:
+            errors['Sale_SaleID'] = 'Please select a valid sale.'
+        elif not is_edit and sale_id != context_sale_id:
+            errors['reference'] = (
+                f'This page records a payment for SALE-{context_sale_id} only. '
+                f'Open the sale you want to pay.'
+            )
         else:
             try:
-                sale_id = int(sale_id_raw)
-                parsed['Sale_SaleID']               = sale_id
-                parsed['Appointment_AppointmentID'] = None
-                sale_r = (
-                    supabase.table('Sale')
-                    .select('TotalAmount')
-                    .eq('SaleID', sale_id)
-                    .single()
-                    .execute()
-                )
-                sale_total = float(sale_r.data.get('TotalAmount') or 0)
-            except ValueError:
-                errors['Sale_SaleID'] = 'Please select a valid sale.'
+                rows = (
+                    supabase.table('Sale').select('SaleID, TotalAmount')
+                    .eq('SaleID', sale_id).execute()
+                ).data or []
+                if not rows:
+                    errors['Sale_SaleID'] = 'Please select a valid sale.'
+                else:
+                    total = float(rows[0].get('TotalAmount') or 0)
+                    history = _payment_history('Sale_SaleID', sale_id)
+                    parsed['Sale_SaleID'] = sale_id
             except Exception:
-                pass
+                errors['reference'] = 'Could not check this sale\'s payments. Please try again.'
     else:
+        noun = 'appointment'
+        appt_id = _int_or_none(appt_id_raw)
         if not appt_id_raw:
             errors['Appointment_AppointmentID'] = 'Please select an appointment.'
+        elif appt_id is None:
+            errors['Appointment_AppointmentID'] = 'Please select a valid appointment.'
         else:
             try:
-                appt_id = int(appt_id_raw)
-                parsed['Appointment_AppointmentID'] = appt_id
-                parsed['Sale_SaleID']               = None
-                appt_total = _get_appointment_total(appt_id)
-            except ValueError:
-                errors['Appointment_AppointmentID'] = 'Please select a valid appointment.'
+                rows = (
+                    supabase.table('Appointment').select('AppointmentID, Status')
+                    .eq('AppointmentID', appt_id).execute()
+                ).data or []
+                keeps_own = is_edit and appt_id == current_payment.get('Appointment_AppointmentID')
+                if not rows:
+                    errors['Appointment_AppointmentID'] = 'Please select a valid appointment.'
+                elif rows[0].get('Status') not in PAYABLE_APPOINTMENT_STATUSES and not keeps_own:
+                    errors['Appointment_AppointmentID'] = (
+                        f"Payments can only be recorded for Confirmed, In Progress or Completed "
+                        f"appointments. This one is {rows[0].get('Status')}."
+                    )
+                else:
+                    total = _get_appointment_total(appt_id)
+                    history = _payment_history('Appointment_AppointmentID', appt_id)
+                    parsed['Appointment_AppointmentID'] = appt_id
+            except Exception:
+                errors['reference'] = 'Could not check this appointment\'s payments. Please try again.'
 
-    date_raw = form_data.get('PaymentDate', '').strip()
+    date_raw = (form_data.get('PaymentDate') or '').strip()
     pay_date, date_err = _validate_date(date_raw, 'Payment Date')
     if date_err:
         errors['PaymentDate'] = date_err
+    elif date_type.fromisoformat(pay_date) > today_mauritius():
+        errors['PaymentDate'] = 'Payment date cannot be in the future.'
     else:
         parsed['PaymentDate'] = pay_date
 
-    amount_raw = form_data.get('AmountPaid', '').strip()
-    if not amount_raw:
-        errors['AmountPaid'] = 'Amount paid is required.'
-    elif not is_positive_number(amount_raw) or float(amount_raw) <= 0:
-        errors['AmountPaid'] = 'Amount paid must be a number greater than 0.'
-    else:
-        amount_paid = float(amount_raw)
-
-        if (reference_type == 'sale' and sale_id and sale_total is not None
-                and 'Sale_SaleID' not in errors):
-            total_paid_so_far = _get_sale_total_paid(sale_id, exclude_payment_id=current_payment_id)
-            remaining = max(0.0, sale_total - total_paid_so_far)
-            if amount_paid > remaining + 0.001:
-                errors['AmountPaid'] = (
-                    f'Amount paid (Rs. {amount_paid:,.2f}) exceeds the remaining '
-                    f'balance of Rs. {remaining:,.2f} for this sale. '
-                    f'The sale total is Rs. {sale_total:,.2f} and '
-                    f'Rs. {total_paid_so_far:,.2f} has already been paid.'
-                )
-            else:
-                parsed['AmountPaid'] = amount_paid
-
-        elif (reference_type == 'appointment' and appt_id and appt_total is not None
-                and 'Appointment_AppointmentID' not in errors):
-            total_paid_so_far = _get_appointment_total_paid(appt_id, exclude_payment_id=current_payment_id)
-            remaining = max(0.0, appt_total - total_paid_so_far)
-            if remaining <= 0.001:
-                errors['AmountPaid'] = (
-                    f'This appointment has already been fully paid '
-                    f'(Rs. {appt_total:,.2f} total, Rs. {total_paid_so_far:,.2f} paid).'
-                )
-            elif amount_paid > remaining + 0.001:
-                errors['AmountPaid'] = (
-                    f'Amount paid (Rs. {amount_paid:,.2f}) exceeds the remaining '
-                    f'balance of Rs. {remaining:,.2f} for this appointment. '
-                    f'The appointment total is Rs. {appt_total:,.2f} and '
-                    f'Rs. {total_paid_so_far:,.2f} has already been paid.'
-                )
-            else:
-                parsed['AmountPaid'] = amount_paid
-        else:
-            parsed['AmountPaid'] = amount_paid
-
-    method_value = form_data.get('PaymentMethod', '').strip()
+    method_value = (form_data.get('PaymentMethod') or '').strip()
     if not method_value:
         errors['PaymentMethod'] = 'Payment method is required.'
     elif method_value not in VALID_METHODS:
@@ -439,13 +672,30 @@ def _validate_form(form_data, current_appt_id=None, current_payment_id=None, loc
     else:
         parsed['PaymentMethod'] = method_value
 
-    type_value = form_data.get('PaymentType', '').strip()
+    type_value = (form_data.get('PaymentType') or '').strip()
     if not type_value:
         errors['PaymentType'] = 'Payment type is required.'
     elif type_value not in VALID_TYPES:
         errors['PaymentType'] = 'Please select a valid payment type.'
     else:
         parsed['PaymentType'] = type_value
+
+    amount_raw = (form_data.get('AmountPaid') or '').strip()
+    amount_paid = None
+    if not amount_raw:
+        errors['AmountPaid'] = 'Amount paid is required.'
+    elif not is_positive_number(amount_raw) or float(amount_raw) <= 0:
+        errors['AmountPaid'] = 'Amount paid must be a number greater than 0.'
+    else:
+        amount_paid = round(float(amount_raw), 2)
+        parsed['AmountPaid'] = amount_paid
+
+    # DEC-5 rules, with balances read fresh at save time.
+    if (history is not None and amount_paid is not None and 'PaymentType' not in errors
+            and 'reference' not in errors):
+        broken = check_payment_rules(type_value, amount_paid, total, history, current_payment, noun)
+        if broken:
+            errors[broken[0]] = broken[1]
 
     return errors, parsed
 
@@ -455,24 +705,11 @@ def _validate_form(form_data, current_appt_id=None, current_payment_id=None, loc
 def sale_info(sale_id):
     exclude_payment_id = request.args.get('exclude_payment_id', type=int)
     try:
-        sale_r = (
-            supabase.table('Sale')
-            .select('SaleDate, TotalAmount')
-            .eq('SaleID', sale_id)
-            .single()
-            .execute()
-        )
-        total      = float(sale_r.data.get('TotalAmount') or 0)
-        total_paid = _get_sale_total_paid(sale_id, exclude_payment_id=exclude_payment_id)
-        remaining  = max(0.0, total - total_paid)
-        return jsonify({
-            'sale_date':    sale_r.data.get('SaleDate', ''),
-            'total_amount': total,
-            'total_paid':   total_paid,
-            'remaining':    remaining,
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 404
+        return jsonify(_sale_context(sale_id, exclude_payment_id))
+    except LookupError:
+        return jsonify({'error': 'Sale not found.'}), 404
+    except Exception:
+        return jsonify({'error': 'Could not load the sale.'}), 500
 
 
 @bp.route('/appointment-info/<int:appt_id>')
@@ -480,16 +717,11 @@ def sale_info(sale_id):
 def appointment_info(appt_id):
     exclude_payment_id = request.args.get('exclude_payment_id', type=int)
     try:
-        total      = _get_appointment_total(appt_id)
-        total_paid = _get_appointment_total_paid(appt_id, exclude_payment_id=exclude_payment_id)
-        remaining  = max(0.0, total - total_paid)
-        return jsonify({
-            'total_amount': total,
-            'total_paid':   total_paid,
-            'remaining':    remaining,
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 404
+        return jsonify(_appointment_context(appt_id, exclude_payment_id))
+    except LookupError:
+        return jsonify({'error': 'Appointment not found.'}), 404
+    except Exception:
+        return jsonify({'error': 'Could not load the appointment.'}), 500
 
 
 @bp.route('/')
@@ -529,45 +761,84 @@ def index():
     )
 
 
+def _render_form(**ctx):
+    return render_template(
+        'modules/payment/form.html',
+        method_options=PAYMENT_METHOD_OPTIONS,
+        type_options=PAYMENT_TYPE_OPTIONS,
+        type_help=PAYMENT_TYPE_HELP,
+        **ctx
+    )
+
+
+def _safe_appointment_context(appt_id, exclude_payment_id=None):
+    appt_id = _int_or_none(appt_id)
+    if appt_id is None:
+        return None
+    try:
+        return _appointment_context(appt_id, exclude_payment_id)
+    except Exception:
+        return None
+
+
 @bp.route('/create', methods=['GET', 'POST'])
 @login_required
 def create():
-    form_data    = {}
-    errors       = {}
-    sale_options = _get_sale_options()
-    appt_options = _get_appointment_options()
+    """
+    Two contextual modes (ISS-04): /payments/create records an appointment
+    payment; /payments/create?sale=<id> records a payment for that sale only
+    (opened from the sale page). The mode comes from the URL, on GET and POST.
+    """
+    sale_ctx_id = None
+    if 'sale' in request.args:
+        sale_ctx_id = _int_or_none(request.args.get('sale'))
+        if sale_ctx_id is None:
+            flash_error('That sale link is not valid.')
+            return redirect(url_for('sale.index'))
+    mode = 'sale' if sale_ctx_id else 'appointment'
 
-    prefill_appt = request.args.get('prefill_appt', type=int)
+    sale_ctx = None
+    if mode == 'sale':
+        try:
+            sale_ctx = _sale_context(sale_ctx_id)
+        except LookupError:
+            flash_error(f'Sale ID {sale_ctx_id} was not found.')
+            return redirect(url_for('sale.index'))
+        except Exception:
+            flash_error('Could not load the sale. Please try again.')
+            return redirect(url_for('sale.view', sale_id=sale_ctx_id))
+        if request.method == 'GET' and sale_ctx['remaining'] <= CENT:
+            flash_error(f'SALE-{sale_ctx_id} is already fully paid.')
+            return redirect(url_for('sale.view', sale_id=sale_ctx_id))
+
+    done_url = (url_for('sale.view', sale_id=sale_ctx_id) if mode == 'sale'
+                else url_for('payment.index'))
+    errors = {}
 
     if request.method == 'GET':
         form_token = str(uuid.uuid4())
         session['payment_form_token'] = form_token
-        if prefill_appt:
-            form_data = {
-                'reference_type': 'appointment',
-                'Appointment_AppointmentID': str(prefill_appt),
-            }
+        form_data = {'reference_type': mode, 'PaymentDate': today_mauritius().isoformat()}
+        if mode == 'sale':
+            form_data['Sale_SaleID'] = str(sale_ctx_id)
+        else:
+            prefill_appt = request.args.get('prefill_appt', type=int)
+            if prefill_appt:
+                form_data['Appointment_AppointmentID'] = str(prefill_appt)
     else:
-        form_token = ''
-
-    if request.method == 'POST':
         submitted_token = request.form.get('form_token', '')
-        session_token   = session.get('payment_form_token')
+        session_token   = session.pop('payment_form_token', None)
 
-        if session_token is not None and (
-            not submitted_token or submitted_token != session_token
-        ):
+        # One-time token: a resubmitted form (token already used) is refused.
+        if not submitted_token or submitted_token != session_token:
             flash_error(
                 'This payment appears to have already been submitted. '
-                'Please check the Payments list before trying again.'
+                'Please check the payments before trying again.'
             )
-            return redirect(url_for('payment.index'))
-
-        if session_token is not None:
-            session.pop('payment_form_token', None)
+            return redirect(done_url)
 
         form_data      = request.form.to_dict()
-        errors, parsed = _validate_form(form_data)
+        errors, parsed = _validate_form(form_data, mode, context_sale_id=sale_ctx_id)
 
         if not errors:
             try:
@@ -580,7 +851,7 @@ def create():
                     'PaymentType':               parsed['PaymentType'],
                 }).execute()
                 flash_success('Payment was recorded successfully.')
-                return redirect(url_for('payment.index'))
+                return redirect(done_url)
             except Exception as e:
                 error_msg = str(e)
                 if 'duplicate' in error_msg.lower() or 'unique' in error_msg.lower():
@@ -592,19 +863,31 @@ def create():
 
         form_token = str(uuid.uuid4())
         session['payment_form_token'] = form_token
+        if mode == 'sale':
+            form_data['Sale_SaleID'] = str(sale_ctx_id)
+            try:
+                sale_ctx = _sale_context(sale_ctx_id)   # fresh balance after a refused save
+            except Exception:
+                pass
 
-    return render_template(
-        'modules/payment/form.html',
+    if mode == 'sale':
+        context = sale_ctx
+        appt_options = []
+    else:
+        context = _safe_appointment_context(form_data.get('Appointment_AppointmentID'))
+        appt_options = _get_appointment_options()
+
+    return _render_form(
         form_data=form_data,
         errors=errors,
         is_edit=False,
         record=None,
-        sale_options=sale_options,
+        mode=mode,
+        context=context,
+        sale_options=[],
         appt_options=appt_options,
-        method_options=PAYMENT_METHOD_OPTIONS,
-        type_options=PAYMENT_TYPE_OPTIONS,
         form_token=form_token,
-        locked_ref_type=None
+        cancel_url=done_url,
     )
 
 
@@ -631,23 +914,16 @@ def edit(payment_id):
 
     current_appt_id = record.get('Appointment_AppointmentID')
     current_sale_id = record.get('Sale_SaleID')
-    locked_ref_type  = 'appointment' if current_appt_id else 'sale'
+    mode = 'appointment' if current_appt_id else 'sale'
 
     errors    = {}
     form_data = record.copy()
-    form_data['reference_type'] = locked_ref_type
-
-    sale_options = _get_sale_options(exclude_sale_id=current_sale_id)
-    appt_options = _get_appointment_options(exclude_appt_id=current_appt_id)
+    form_data['reference_type'] = mode
 
     if request.method == 'POST':
         form_data      = request.form.to_dict()
-        errors, parsed = _validate_form(
-            form_data,
-            current_appt_id=current_appt_id,
-            current_payment_id=payment_id,
-            locked_ref_type=locked_ref_type
-        )
+        form_data['reference_type'] = mode
+        errors, parsed = _validate_form(form_data, mode, current_payment=record)
 
         if not errors:
             try:
@@ -670,18 +946,28 @@ def edit(payment_id):
                 else:
                     flash_error(f'Could not update payment: {error_msg}')
 
-    return render_template(
-        'modules/payment/form.html',
+    context = None
+    if mode == 'sale':
+        sale_id = _int_or_none(form_data.get('Sale_SaleID'))
+        if sale_id is not None:
+            try:
+                context = _sale_context(sale_id, exclude_payment_id=payment_id)
+            except Exception:
+                context = None
+    else:
+        context = _safe_appointment_context(form_data.get('Appointment_AppointmentID'), payment_id)
+
+    return _render_form(
         form_data=form_data,
         errors=errors,
         is_edit=True,
         record=record,
-        sale_options=sale_options,
-        appt_options=appt_options,
-        method_options=PAYMENT_METHOD_OPTIONS,
-        type_options=PAYMENT_TYPE_OPTIONS,
+        mode=mode,
+        context=context,
+        sale_options=_get_sale_options(exclude_sale_id=current_sale_id) if mode == 'sale' else [],
+        appt_options=_get_appointment_options(current_appt_id=current_appt_id) if mode == 'appointment' else [],
         form_token=None,
-        locked_ref_type=locked_ref_type
+        cancel_url=url_for('payment.index'),
     )
 
 
