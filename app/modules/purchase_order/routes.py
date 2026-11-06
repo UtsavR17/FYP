@@ -98,16 +98,69 @@ def _line_lock_redirect(po_id):
     return None
 
 
-def _receive_block_redirect(po_id):
-    """Redirect with a flash when this PO's lines may not be received, else None."""
+NOT_ACCEPTED_MSG = 'This order has not been accepted by the supplier.'
+NOT_SHIPPED_MSG = 'The supplier has not shipped this item yet.'
+# Header statuses computed from the lines; a portal supplier's order never takes them by hand.
+COMPUTED_PO_STATUSES = ('Received', 'Partially Received')
+
+
+def _receive_refusal(stage, po_status, portal, shipped=None):
+    """
+    Why a line of this order may not be received, or None.
+
+    Every order: not while Sent, not when Cancelled. Portal suppliers (with a
+    login) also need an Accepted, still open order and a line the supplier has
+    shipped (ISS-06). shipped=None skips the line check (order-level check only).
+    Offline suppliers keep the old behaviour.
+    """
+    if stage == STAGE_SENT:
+        return 'Wait for the supplier to accept this order before receiving.'
+    if po_status == 'Cancelled':
+        return 'This purchase order is cancelled, so its lines cannot be received.'
+    if portal:
+        if stage != STAGE_ACCEPTED:
+            return NOT_ACCEPTED_MSG
+        if po_status == 'Received':
+            return 'This purchase order is already fully received.'
+        if shipped is False:
+            return NOT_SHIPPED_MSG
+    return None
+
+
+def _supplier_has_portal(supplier_id):
+    """True when the supplier has a portal login. A failed lookup counts as True (the safe side)."""
+    if not supplier_id:
+        return False
+    try:
+        rows = (
+            supabase.table('Supplier').select('AuthUserID')
+            .eq('SupplierID', supplier_id).execute()
+        ).data or []
+    except Exception:
+        return True
+    return bool(rows and rows[0].get('AuthUserID'))
+
+
+def _edit_status_options(record):
+    """
+    PO Status choices on Edit. For a portal supplier, Received and Partially
+    Received are computed from the lines and only listed when the order already
+    has that status (so it can be saved unchanged).
+    """
+    if not _supplier_has_portal(record.get('Supplier_SupplierID')):
+        return PO_STATUS_OPTIONS
+    current = record.get('Status')
+    return [(v, l) for v, l in PO_STATUS_OPTIONS if v not in COMPUTED_PO_STATUSES or v == current]
+
+
+def _receive_block_redirect(po_id, shipped=None):
+    """Redirect with a flash when this PO (or line, when shipped is given) may not be received, else None."""
     header = _get_po_header(po_id)
     if header is None:
         return None   # the line lookup reports a missing order
-    if header['_stage'] == STAGE_SENT:
-        flash_error('Wait for the supplier to accept this order before receiving.')
-        return redirect(url_for('purchase_order.view', po_id=po_id))
-    if header.get('Status') == 'Cancelled':
-        flash_error('This purchase order is cancelled, so its lines cannot be received.')
+    reason = _receive_refusal(header['_stage'], header.get('Status'), bool(header['_auth_user_id']), shipped)
+    if reason:
+        flash_error(reason)
         return redirect(url_for('purchase_order.view', po_id=po_id))
     return None
 
@@ -348,6 +401,12 @@ def edit(po_id):
             errors['Status'] = 'Status is required.'
         elif status_value not in valid_statuses:
             errors['Status'] = 'Please select a valid status.'
+        elif (status_value in COMPUTED_PO_STATUSES and status_value != record.get('Status')
+              and _supplier_has_portal(supplier_id or record.get('Supplier_SupplierID'))):
+            errors['Status'] = (
+                f'{status_value} is set automatically when the lines are received, '
+                f'so it cannot be chosen by hand for this supplier.'
+            )
 
         if not errors:
             try:
@@ -373,7 +432,7 @@ def edit(po_id):
         is_edit=True,
         record=record,
         supplier_options=supplier_options,
-        status_options=PO_STATUS_OPTIONS,
+        status_options=_edit_status_options(record),
         supplier_locked=supplier_locked,
         supplier_name=supplier_name,
         status_locked=status_locked
@@ -438,9 +497,12 @@ def view(po_id):
 
     except Exception:
         pass
+    stage = record.get('SupplierStage') or STAGE_DRAFT
     for item in po_items:
         item['_sp_name'] = sp_lookup_view.get(item.get('SP_id'), f"SP-{item.get('SP_id')}")
         item['_shipped_on'] = _format_shipped_date(item.get('DateShipped'))
+        item['_receive_block'] = _receive_refusal(
+            stage, record.get('Status'), has_portal_login, bool(item.get('DateShipped')))
 
     # Fetch linked New_MotorBike procurement rows
     po_motorbikes = []
@@ -452,6 +514,9 @@ def view(po_id):
         po_motorbikes = _enrich_po_motorbikes(mb_result.data or [])
     except Exception:
         pass
+    for mb in po_motorbikes:
+        mb['_receive_block'] = _receive_refusal(
+            stage, record.get('Status'), has_portal_login, mb.get('Status') == 'Shipped')
 
     po_items_total = sum(
         float(i.get('BuyingPrice') or 0) * int(i.get('Quantity_Ordered') or 0)
@@ -461,7 +526,6 @@ def view(po_id):
     po_total = po_items_total + po_bikes_total
 
     # Supplier workflow (Task 36)
-    stage = record.get('SupplierStage') or STAGE_DRAFT
     line_count = len(po_items) + len(po_motorbikes)
     can_send = (
         stage == STAGE_DRAFT and record.get('Status') == 'Pending'
@@ -1111,7 +1175,13 @@ def receive_item(po_id, item_id):
         flash_error(f'Item #{item_id} has already been received.')
         return redirect(url_for('purchase_order.view', po_id=po_id))
 
+    # Portal suppliers: only items the supplier has shipped (DateShipped set)
+    blocked = _receive_block_redirect(po_id, shipped=bool(item.get('DateShipped')))
+    if blocked:
+        return blocked
+
     sp_id = item.get('SP_id')
+
 
     # Brand is fixed by the supplier catalogue row this item was ordered from
     locked_brand_id, locked_brand_name = None, None
@@ -1394,7 +1464,7 @@ def receive_item(po_id, item_id):
         errors=errors,
         po_id=po_id,
         item_id=item_id,
-        locked_brand_name=locked_brand_name
+        locked_brand_name=locked_brand_name,
     )
 
 def _get_model_catalog_for_po(po_id):
@@ -1705,6 +1775,10 @@ def receive_motorbike(po_id, pobike_id):
     if line.get('Status') not in ('Ordered', 'Shipped'):
         flash_error('This motorcycle line cannot be received in its current status.')
         return redirect(url_for('purchase_order.view', po_id=po_id))
+    # Portal suppliers: only lines the supplier has shipped (Status Shipped)
+    blocked = _receive_block_redirect(po_id, shipped=line.get('Status') == 'Shipped')
+    if blocked:
+        return blocked
 
     line = _enrich_po_motorbikes([dict(line)])[0]
     shipped = bool(line.get('ShippedVIN'))
