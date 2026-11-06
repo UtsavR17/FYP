@@ -35,7 +35,7 @@
     {% endif %}
 
     {% call data_table(
-        ['Sale ID', 'Customer', 'Bike', 'Salesperson', 'Sale Date', 'Total Amount'],
+        ['Sale ID', 'Customer', 'Bike', 'Salesperson', 'Sale Date', 'Total Amount', 'Payment'],
         total=pagination.total,
         empty_message='No sales recorded yet. Use Record Sale to add a new sale.'
     ) %}
@@ -54,6 +54,11 @@
             <td>{{ row.SaleDate if row.SaleDate else '-' }}</td>
             <td>
                 <strong>Rs. {{ '%.2f' | format(row.TotalAmount | float) }}</strong>
+            </td>
+            <td>
+                {% if row._pay %}
+                <span class="pay-status-badge pay-status-{{ row._pay.status | lower | replace(' ', '-') }}">{{ row._pay.status }}</span>
+                {% else %}-{% endif %}
             </td>
             <td class="text-end">
                 <div class="action-btn-group">

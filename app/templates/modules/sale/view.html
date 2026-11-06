@@ -62,39 +62,59 @@
     </div>
 </div>
 
-<!-- Payment — Task 26 will populate this fully -->
+<!-- Payments (ISS-01) -->
 <div class="admin-card">
-    <div class="d-flex align-items-center justify-content-between mb-3">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
         <div>
             <h3 style="font-size:1rem;font-weight:600;margin:0;">
-                Payment
+                Payments
+                <span class="record-count-badge">{{ payments | length }}</span>
             </h3>
             <p style="font-size:0.8rem;color:var(--text-muted);margin:4px 0 0;">
-                Payment record associated with this sale
+                Payments recorded for this sale
             </p>
         </div>
+        {% if can_record_payment %}
+        <a href="{{ url_for('payment.create', sale=sale_id) }}" class="btn btn-sm btn-accent">
+            <i class="fa-solid fa-plus me-1"></i>Record payment
+        </a>
+        {% endif %}
     </div>
 
-    {% if payment %}
+    {% if pay_summary %}
+    <div class="payment-context mb-3">
+        <dl class="payment-context-grid">
+            <div><dt>Sale total</dt><dd>Rs. {{ '{:,.2f}'.format(pay_summary.total) }}</dd></div>
+            <div><dt>Total paid</dt><dd>Rs. {{ '{:,.2f}'.format(pay_summary.paid) }}</dd></div>
+            <div><dt>Balance</dt><dd class="payment-context-remaining">Rs. {{ '{:,.2f}'.format(pay_summary.balance) }}</dd></div>
+            <div><dt>Status</dt><dd><span class="pay-status-badge pay-status-{{ pay_summary.status | lower | replace(' ', '-') }}">{{ pay_summary.status }}</span></dd></div>
+        </dl>
+    </div>
+    {% endif %}
+
+    {% if payments %}
     <div class="table-responsive">
         <table class="table admin-table">
             <thead>
                 <tr>
-                    <th>Payment ID</th>
                     <th>Date</th>
-                    <th>Amount Paid</th>
-                    <th>Method</th>
                     <th>Type</th>
+                    <th>Method</th>
+                    <th class="text-end">Amount</th>
                 </tr>
             </thead>
             <tbody>
+                {% for pay in payments %}
                 <tr>
-                    <td><strong>PAY-{{ payment.PaymentID }}</strong></td>
-                    <td>{{ payment.PaymentDate if payment.PaymentDate else '' }}</td>
-                    <td>Rs. {{ '%.2f' | format(payment.AmountPaid | float) }}</td>
-                    <td>{{ payment.PaymentMethod }}</td>
-                    <td>{{ payment.PaymentType }}</td>
+                    <td>{{ pay.PaymentDate or '-' }}</td>
+                    <td>{{ pay.PaymentType or '-' }}</td>
+                    <td>
+                        {{ pay.PaymentMethod or '-' }}
+                        {% if pay._online %}<span class="text-muted small ms-1">(Online, locked)</span>{% endif %}
+                    </td>
+                    <td class="text-end">Rs. {{ '{:,.2f}'.format(pay.AmountPaid | float) }}</td>
                 </tr>
+                {% endfor %}
             </tbody>
         </table>
     </div>
@@ -103,10 +123,7 @@
         <div class="table-empty-icon-wrap">
             <i class="fa-solid fa-credit-card"></i>
         </div>
-        <p class="table-empty-text">
-            No payment recorded for this sale yet.
-            Payment management will be available in the next update.
-        </p>
+        <p class="table-empty-text">No payment recorded for this sale yet.</p>
     </div>
     {% endif %}
 </div>
