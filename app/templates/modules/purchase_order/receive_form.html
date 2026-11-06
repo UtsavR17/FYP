@@ -42,6 +42,9 @@
             {{ readonly_field('Brand', locked_brand_name) }}
         </div>
         {% endif %}
+        <div class="col-md-3">
+            {{ readonly_field('Supplier', supplier_name or '-') }}
+        </div>
     </div>
 </div>
 

@@ -1182,6 +1182,21 @@ def receive_item(po_id, item_id):
 
     sp_id = item.get('SP_id')
 
+    # Supplier of this order, shown in the item summary (DEC-1 A: stock is per
+    # part, brand and size; the supplier is traced through the order line)
+    supplier_name = None
+    try:
+        po_row = (
+            supabase.table('PurchaseOrder').select('Supplier_SupplierID')
+            .eq('PurchaseOrderID', po_id).single().execute()
+        ).data
+        sup_row = (
+            supabase.table('Supplier').select('SupplierName')
+            .eq('SupplierID', po_row.get('Supplier_SupplierID')).single().execute()
+        ).data
+        supplier_name = sup_row.get('SupplierName')
+    except Exception:
+        pass
 
     # Brand is fixed by the supplier catalogue row this item was ordered from
     locked_brand_id, locked_brand_name = None, None
@@ -1465,6 +1480,7 @@ def receive_item(po_id, item_id):
         po_id=po_id,
         item_id=item_id,
         locked_brand_name=locked_brand_name,
+        supplier_name=supplier_name,
     )
 
 def _get_model_catalog_for_po(po_id):
