@@ -3,9 +3,53 @@ from app.modules.compatibility import bp
 from app.auth.decorators import login_required
 from app.supabase_client import supabase
 from app.utils.pagination import paginate
-from app.utils.flash_messages import flash_success, flash_error
+from app.utils.flash_messages import flash_success, flash_error, flash_warning
 from app.utils.validators import required_fields
 from app.utils.text import norm
+
+
+DUPLICATE_MSG = 'A compatibility record for this stock item, model and year range already exists.'
+NONE_CREATED_MSG = (
+    'No compatibility records were created because every selected combination already exists.'
+)
+CHECK_FAILED_MSG = 'Could not check the existing compatibility records. Please try again.'
+
+
+def _combo_key(model_no, year_from, year_to):
+    """Comparison key; Python compares None == None, so blank years equal blank years."""
+    return (model_no, year_from, year_to)
+
+
+def _existing_combos(stock_id, exclude_com_id=None):
+    """
+    {(model, year_from, year_to)} already recorded for this stock item, leaving
+    out exclude_com_id. Raises on a database error so nothing is inserted blind.
+    """
+    rows = (
+        supabase.table('Compatibility')
+        .select('Com_ID, Model_Model_No, Year_From, Year_To')
+        .eq('Stock_Stock_ID', stock_id)
+        .execute()
+    ).data or []
+    return {
+        _combo_key(r.get('Model_Model_No'), r.get('Year_From'), r.get('Year_To'))
+        for r in rows if r.get('Com_ID') != exclude_com_id
+    }
+
+
+def _years_text(year_from, year_to):
+    if year_from is None and year_to is None:
+        return 'any year'
+    if year_to is None:
+        return f'from {year_from}'
+    if year_from is None:
+        return f'up to {year_to}'
+    return f'{year_from} to {year_to}'
+
+
+def _is_unique_violation(error):
+    text = str(error).lower()
+    return '23505' in text or 'duplicate' in text or 'unique' in text
 
 
 def _build_stock_label(sp_name, size, brand_name):
@@ -265,47 +309,59 @@ def create():
                 and year_to < year_from):
             errors['Year_To'] = 'Year To must be equal to or after Year From.'
 
+        existing = None
         if not errors:
-            success_count   = 0
-            duplicate_count = 0
-            fail_count      = 0
+            try:
+                existing = _existing_combos(stock_id)
+            except Exception:
+                flash_error(CHECK_FAILED_MSG)
 
-            for model_no_str in selected_model_nos:
+        if not errors and existing is not None:
+            stock_label = dict(stock_options).get(stock_id, f'Stock ID {stock_id}')
+            model_labels = dict(model_options)
+            created, skipped, fail_count = 0, [], 0
+
+            for model_no_str in dict.fromkeys(selected_model_nos):   # each model once
                 try:
                     model_no = int(model_no_str)
+                except ValueError:
+                    fail_count += 1
+                    continue
+                label = (f"{stock_label} with {model_labels.get(model_no, f'Model ID {model_no}')} "
+                         f"({_years_text(year_from, year_to)})")
+                key = _combo_key(model_no, year_from, year_to)
+                if key in existing:
+                    skipped.append(label)          # never sent to the database
+                    continue
+                try:
                     supabase.table('Compatibility').insert({
                         'Stock_Stock_ID': stock_id,
                         'Model_Model_No': model_no,
                         'Year_From':      year_from,
                         'Year_To':        year_to,
                     }).execute()
-                    success_count += 1
+                    existing.add(key)
+                    created += 1
                 except Exception as e:
-                    error_msg = str(e)
-                    if 'duplicate' in error_msg.lower() or 'unique' in error_msg.lower():
-                        duplicate_count += 1
+                    if _is_unique_violation(e):    # created meanwhile by someone else
+                        skipped.append(label)
                     else:
                         fail_count += 1
 
-            if success_count > 0:
-                msg = (
-                    f'{success_count} compatibility '
-                    f'record{"s" if success_count != 1 else ""} added successfully.'
-                )
-                if duplicate_count > 0:
-                    msg += (
-                        f' {duplicate_count} '
-                        f'duplicate{"s" if duplicate_count != 1 else ""} skipped.'
-                    )
-                flash_success(msg)
-
-            if fail_count > 0:
+            if created:
+                flash_success(f'{created} compatibility record{"s" if created != 1 else ""} added successfully.')
+            elif skipped and not fail_count:
+                flash_error(NONE_CREATED_MSG)
+                errors['Model_Model_No'] = NONE_CREATED_MSG
+            if skipped:
+                flash_warning('Already exists: ' + '; '.join(skipped) + '.')
+            if fail_count:
                 flash_error(
                     f'{fail_count} record{"s" if fail_count != 1 else ""} '
                     f'could not be saved due to an unexpected error.'
                 )
 
-            if success_count > 0:
+            if created:
                 return redirect(url_for('compatibility.index'))
 
     return render_template(
@@ -381,6 +437,13 @@ def edit(com_id):
 
         if not errors:
             try:
+                if _combo_key(model_no, year_from, year_to) in _existing_combos(stock_id, exclude_com_id=com_id):
+                    errors['Model_Model_No'] = DUPLICATE_MSG
+            except Exception:
+                errors['Model_Model_No'] = CHECK_FAILED_MSG
+
+        if not errors:
+            try:
                 supabase.table('Compatibility').update({
                     'Stock_Stock_ID': stock_id,
                     'Model_Model_No': model_no,
@@ -390,14 +453,10 @@ def edit(com_id):
                 flash_success(f'Compatibility record ID {com_id} was updated successfully.')
                 return redirect(url_for('compatibility.index'))
             except Exception as e:
-                error_msg = str(e)
-                if 'duplicate' in error_msg.lower() or 'unique' in error_msg.lower():
-                    flash_error(
-                        'A compatibility record for this stock item, model, '
-                        'and year range already exists.'
-                    )
+                if _is_unique_violation(e):
+                    errors['Model_Model_No'] = DUPLICATE_MSG
                 else:
-                    flash_error(f'Could not update compatibility record: {error_msg}')
+                    flash_error(f'Could not update compatibility record: {str(e)}')
 
     return render_template(
         'modules/compatibility/form.html',

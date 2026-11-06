@@ -58,8 +58,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // -------------------------------------------------------------------------
     // AUTO-DISMISS FLASH ALERTS after 5 seconds
+    // Only success and info messages hide themselves; errors (danger) and
+    // warnings stay until the user closes them, so they can always be read.
     // -------------------------------------------------------------------------
-    const alerts = document.querySelectorAll('.flash-container .alert');
+    const alerts = document.querySelectorAll('.flash-container .alert-success, .flash-container .alert-info');
     alerts.forEach(function (alert) {
         setTimeout(function () {
             const instance = bootstrap.Alert.getOrCreateInstance(alert);
