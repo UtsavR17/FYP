@@ -40,6 +40,10 @@
         <!-- Row 1: Bike | Employee -->
         <div class="row">
             <div class="col-md-6">
+                {% if is_edit %}
+                {{ readonly_field('Customer Bike', bike_label,
+                    help_text='The bike cannot be changed. To use another bike, cancel this appointment and create a new one.') }}
+                {% else %}
                 {{ select_field(
                     name        = 'Customer_bike_BikeID',
                     label       = 'Customer Bike',
@@ -49,6 +53,7 @@
                     error       = errors.get('Customer_bike_BikeID', ''),
                     empty_label = 'Select a Customer Bike'
                 ) }}
+                {% endif %}
             </div>
             <div class="col-md-6">
                 {% if is_edit %}
@@ -62,7 +67,7 @@
                     required    = False,
                     error       = errors.get('Employee_EmployeeID', ''),
                     empty_label = 'Unassigned',
-                    help_text   = 'Required for ' ~ (employee_required_statuses | join(', ')) ~ '.'
+                    help_text   = 'Required for every status except Cancelled.'
                 ) }}
                 {% else %}
                 {{ select_field(
