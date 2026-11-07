@@ -8,6 +8,7 @@ from app.utils.flash_messages import flash_success, flash_error
 from app.utils.validators import required_fields, is_positive_integer
 from datetime import date as date_type
 from app.utils.text import norm
+from app.modules.payment.routes import PAYABLE_APPOINTMENT_STATUSES
 
 
 # -- Predefined option lists -----------------------
@@ -30,7 +31,23 @@ STATUS_OPTIONS = [
 
 VALID_TYPES    = [v for v, _ in APPOINTMENT_TYPE_OPTIONS]
 VALID_STATUSES = [v for v, _ in STATUS_OPTIONS]
-LOCKED_STATUSES = ('Completed', 'Cancelled')
+LOCKED_STATUSES = ('Completed', 'Cancelled', 'No Show')
+
+# Allowed status changes (DEC-12). Used by the Edit form (only these targets
+# are offered) and enforced on every save, confirm and cancel.
+ALLOWED_TRANSITIONS = {
+    'Pending':     ('Confirmed', 'Cancelled'),
+    'Confirmed':   ('In Progress', 'Completed', 'Cancelled', 'No Show'),
+    'In Progress': ('Completed', 'Cancelled'),
+    'Completed':   (),
+    'Cancelled':   (),
+    'No Show':     (),
+}
+TRANSITION_REFUSED_MSG = 'This status change is not allowed.'
+
+# Services, parts (stock) and their changes only once confirmed (DEC-7).
+LINE_EDIT_STATUSES = ('Confirmed', 'In Progress')
+CONFIRM_FIRST_MSG = 'Confirm the appointment first.'
 
 # Online bookings (Task 44) are created Pending with no employee. An employee must be
 # assigned before the appointment is confirmed or moves further; Pending and Cancelled
@@ -50,6 +67,27 @@ LIST_FILTERS = {FILTER_NEEDS_CONFIRMATION: 'Needs confirmation'}
 def employee_required(status):
     """True when an appointment with this status must have an employee."""
     return status in EMPLOYEE_REQUIRED_STATUSES
+
+
+def can_transition(current, target):
+    """True when the status may change from current to target (unchanged is always allowed)."""
+    return target == current or target in ALLOWED_TRANSITIONS.get(current, ())
+
+
+def status_choices(current):
+    """Edit form options: the current status first, then the allowed targets."""
+    allowed = set(ALLOWED_TRANSITIONS.get(current, ()))
+    return [(v, l) for v, l in STATUS_OPTIONS if v == current or v in allowed]
+
+
+def _lines_refusal(record):
+    """Why services or parts of this appointment cannot be changed, or None."""
+    status = record.get('Status')
+    if status in LINE_EDIT_STATUSES:
+        return None
+    if status == 'Pending':
+        return CONFIRM_FIRST_MSG
+    return f'Services and parts cannot be changed on a {status} appointment.'
 
 
 def needs_confirmation(appt):
@@ -106,47 +144,69 @@ def _validate_time(raw_value):
     return None, 'Appointment time must be a valid time in HH:MM format.'
 
 
-def _get_form_options():
-    """
-    Fetch Customer_bike and Employee dropdown options for appointment forms.
+def _chunks(ids, size=100):
+    ids = sorted({i for i in ids if i is not None})
+    for start in range(0, len(ids), size):
+        yield ids[start:start + size]
 
-    Customer_bike label: 'RegistrationNumber - FirstName LastName'
-    Employee label:      'FirstName LastName'
-    """
-    bike_options     = []
-    employee_options = []
 
-    # Customer lookup for bike labels
-    customer_lookup = {}
+def _rows_in(table, columns, key, ids):
+    """Rows of table whose key is in ids, with one query per 100 ids; errors give no rows."""
+    rows = []
+    for chunk in _chunks(ids):
+        try:
+            rows += supabase.table(table).select(columns).in_(key, chunk).execute().data or []
+        except Exception:
+            continue
+    return rows
+
+
+def _bike_labels(bike_ids=None):
+    """
+    {BikeID: {'label': 'REG, Brand Model (Year)', 'customer': 'First Last' or None,
+    'full': label plus ', Customer'}} with batched lookups (Customer_bike, Model,
+    Brand, Customer), null-safe. bike_ids=None loads every bike (create dropdown).
+    """
     try:
-        cust_result = (
-            supabase.table('Customer')
-            .select('CustomerID, FirstName, LastName')
-            .execute()
-        )
-        customer_lookup = {
-            r['CustomerID']: f"{r['FirstName']} {r['LastName']}"
-            for r in (cust_result.data or [])
+        query = supabase.table('Customer_bike').select(
+            'BikeID, RegistrationNumber, Year, Model_Model_No, Customer_CustomerID')
+        if bike_ids is None:
+            bikes = query.order('RegistrationNumber').execute().data or []
+        else:
+            bikes = []
+            for chunk in _chunks(bike_ids):
+                bikes += supabase.table('Customer_bike').select(
+                    'BikeID, RegistrationNumber, Year, Model_Model_No, Customer_CustomerID'
+                ).in_('BikeID', chunk).execute().data or []
+    except Exception:
+        return {}
+
+    models = {m['Model_No']: m for m in _rows_in(
+        'Model', 'Model_No, Description, Brand_Brand_ID', 'Model_No', (b.get('Model_Model_No') for b in bikes))}
+    brands = {r['Brand_ID']: r.get('Brand_Name') for r in _rows_in(
+        'Brand', 'Brand_ID, Brand_Name', 'Brand_ID', (m.get('Brand_Brand_ID') for m in models.values()))}
+    customers = {r['CustomerID']: f"{r.get('FirstName') or ''} {r.get('LastName') or ''}".strip() or None
+                 for r in _rows_in('Customer', 'CustomerID, FirstName, LastName', 'CustomerID',
+                                   (b.get('Customer_CustomerID') for b in bikes))}
+
+    labels = {}
+    for b in bikes:
+        model = models.get(b.get('Model_Model_No')) or {}
+        name = ' '.join(x for x in (brands.get(model.get('Brand_Brand_ID')), model.get('Description')) if x)
+        if b.get('Year'):
+            name = f"{name} ({b['Year']})" if name else f"({b['Year']})"
+        label = ', '.join(x for x in (b.get('RegistrationNumber') or 'No registration', name) if x)
+        customer = customers.get(b.get('Customer_CustomerID'))
+        labels[b['BikeID']] = {
+            'label': label,
+            'customer': customer,
+            'full': f'{label}, {customer}' if customer else label,
         }
-    except Exception:
-        pass
+    return labels
 
-    try:
-        bike_result = (
-            supabase.table('Customer_bike')
-            .select('BikeID, RegistrationNumber, Customer_CustomerID')
-            .order('RegistrationNumber')
-            .execute()
-        )
-        for b in (bike_result.data or []):
-            customer_name = customer_lookup.get(
-                b.get('Customer_CustomerID'), 'Unknown Customer'
-            )
-            label = f"{b['RegistrationNumber']} \u2014 {customer_name}"
-            bike_options.append((b['BikeID'], label))
-    except Exception:
-        pass
 
+def _employee_options():
+    """(EmployeeID, 'First Last') ordered by last name."""
     try:
         emp_result = (
             supabase.table('Employee')
@@ -154,14 +214,21 @@ def _get_form_options():
             .order('LastName')
             .execute()
         )
-        employee_options = [
-            (r['EmployeeID'], f"{r['FirstName']} {r['LastName']}")
-            for r in (emp_result.data or [])
-        ]
     except Exception:
-        pass
+        return []
+    return [
+        (r['EmployeeID'], f"{r['FirstName']} {r['LastName']}")
+        for r in (emp_result.data or [])
+    ]
 
-    return bike_options, employee_options
+
+def _get_form_options():
+    """
+    Customer bike and employee dropdown options for the appointment forms.
+    Bike label: 'REG, Brand Model (Year), Customer'.
+    """
+    bike_options = [(bid, info['full']) for bid, info in _bike_labels().items()]
+    return bike_options, _employee_options()
 
 
 def _get_appointment_or_redirect(appt_id):
@@ -185,36 +252,8 @@ def _get_appointment_or_redirect(appt_id):
 
 def _enrich_appointments(all_records):
     """Build lookup dicts and enrich appointment records for list display."""
-    customer_lookup = {}
-    try:
-        cust_result = (
-            supabase.table('Customer')
-            .select('CustomerID, FirstName, LastName')
-            .execute()
-        )
-        customer_lookup = {
-            r['CustomerID']: f"{r['FirstName']} {r['LastName']}"
-            for r in (cust_result.data or [])
-        }
-    except Exception:
-        pass
-
-    bike_lookup = {}
-    try:
-        bike_result = (
-            supabase.table('Customer_bike')
-            .select('BikeID, RegistrationNumber, Customer_CustomerID')
-            .execute()
-        )
-        for b in (bike_result.data or []):
-            customer_name = customer_lookup.get(
-                b.get('Customer_CustomerID'), 'Unknown'
-            )
-            bike_lookup[b['BikeID']] = (
-                f"{b['RegistrationNumber']} \u2014 {customer_name}"
-            )
-    except Exception:
-        pass
+    bike_lookup = {bid: info['full'] for bid, info in
+                   _bike_labels(a.get('Customer_bike_BikeID') for a in all_records).items()}
 
     emp_lookup = _employee_names(a.get('Employee_EmployeeID') for a in all_records)
 
@@ -369,32 +408,33 @@ def edit(appt_id):
     if redir:
         return redir
 
+    previous_status = record.get('Status')
+    # A Pending booking is confirmed (or cancelled) from the panel on its view page,
+    # so no path saves it as "updated" without confirming it (ISS-13).
+    if previous_status == 'Pending':
+        return redirect(url_for('appointment.view', appt_id=appt_id, _anchor='confirm'))
+    if previous_status in LOCKED_STATUSES:
+        flash_error(f'A {previous_status} appointment cannot be edited.')
+        return redirect(url_for('appointment.view', appt_id=appt_id))
+
     errors    = {}
     form_data = record.copy()
     # Truncate time for HTML time input pre-population
     form_data['Appointment_time'] = _truncate_time(
         form_data.get('Appointment_time', '')
     )
-    bike_options, employee_options = _get_form_options()
+    employee_options = _employee_options()
+    bike_id = record.get('Customer_bike_BikeID')     # locked on edit (DEC-9)
+    bike_label = _bike_labels([bike_id]).get(bike_id, {}).get('full', '-')
 
     if request.method == 'POST':
         form_data = request.form.to_dict()
 
-        bike_id_raw  = form_data.get('Customer_bike_BikeID', '').strip()
         emp_id_raw   = form_data.get('Employee_EmployeeID', '').strip()
         date_raw     = form_data.get('Appointment_Date', '').strip()
         time_raw     = form_data.get('Appointment_time', '').strip()
         appt_type    = form_data.get('AppointmentType', '').strip()
         status_value = form_data.get('Status', '').strip()
-
-        bike_id = None
-        if not bike_id_raw:
-            errors['Customer_bike_BikeID'] = 'Customer bike is required.'
-        else:
-            try:
-                bike_id = int(bike_id_raw)
-            except ValueError:
-                errors['Customer_bike_BikeID'] = 'Please select a valid bike.'
 
         emp_id = None
         if emp_id_raw:
@@ -420,6 +460,8 @@ def edit(appt_id):
             errors['Status'] = 'Status is required.'
         elif status_value not in VALID_STATUSES:
             errors['Status'] = 'Please select a valid status.'
+        elif not can_transition(previous_status, status_value):
+            errors['Status'] = TRANSITION_REFUSED_MSG
 
         # Online bookings start unassigned: an employee is optional only while the
         # appointment is Pending or Cancelled (server-side rule, not just the form).
@@ -427,7 +469,6 @@ def edit(appt_id):
                 and 'Employee_EmployeeID' not in errors):
             errors['Employee_EmployeeID'] = EMPLOYEE_REQUIRED_MSG
 
-        previous_status = record.get('Status')
         # The customer may have cancelled the booking since this form was opened.
         expected_status = form_data.get('expected_status', '').strip()
         if not errors and expected_status and expected_status != previous_status:
@@ -472,10 +513,11 @@ def edit(appt_id):
         errors=errors,
         is_edit=True,
         record=record,
-        bike_options=bike_options,
+        bike_options=[],
+        bike_label=bike_label,
         employee_options=employee_options,
         type_options=APPOINTMENT_TYPE_OPTIONS,
-        status_options=STATUS_OPTIONS,
+        status_options=status_choices(previous_status),
         employee_required_statuses=EMPLOYEE_REQUIRED_STATUSES,
     )
 
@@ -486,32 +528,109 @@ def view(appt_id):
     record, redir = _get_appointment_or_redirect(appt_id)
     if redir:
         return redir
+    return _render_view(appt_id, record)
 
-    # Resolve bike label
-    bike_label = '—'
+
+def _confirm_defaults(record):
+    return {
+        'Employee_EmployeeID': record.get('Employee_EmployeeID') or '',
+        'AppointmentType':     record.get('AppointmentType') or '',
+        'Appointment_Date':    record.get('Appointment_Date') or '',
+        'Appointment_time':    _truncate_time(record.get('Appointment_time') or ''),
+    }
+
+
+@bp.route('/<int:appt_id>/confirm', methods=['POST'])
+@login_required
+def confirm(appt_id):
+    """
+    Confirm a Pending booking (ISS-13): employee required, type, date and time
+    editable, bike unchanged. One conditional update (expected status Pending).
+    """
+    record, redir = _get_appointment_or_redirect(appt_id)
+    if redir:
+        return redir
+    if record.get('Status') != 'Pending':
+        flash_error(APPOINTMENT_CHANGED_MSG)
+        return redirect(url_for('appointment.view', appt_id=appt_id))
+
+    form = request.form.to_dict()
+    errors = {}
+
+    emp_id, employee_name = None, None
+    emp_raw = (form.get('Employee_EmployeeID') or '').strip()
+    if not emp_raw:
+        errors['Employee_EmployeeID'] = 'Choose the employee who will handle this appointment.'
+    else:
+        try:
+            emp_id = int(emp_raw)
+        except ValueError:
+            errors['Employee_EmployeeID'] = 'Please select a valid employee.'
+        else:
+            employee_name = _employee_names([emp_id]).get(emp_id)
+            if not employee_name:
+                errors['Employee_EmployeeID'] = 'Please select a valid employee.'
+
+    appt_type = (form.get('AppointmentType') or '').strip()
+    if appt_type not in VALID_TYPES:
+        errors['AppointmentType'] = 'Please select a valid appointment type.'
+    appt_date, date_err = _validate_date(form.get('Appointment_Date'), 'Appointment Date')
+    if date_err:
+        errors['Appointment_Date'] = date_err
+    appt_time, time_err = _validate_time(form.get('Appointment_time'))
+    if time_err:
+        errors['Appointment_time'] = time_err
+
+    if errors:
+        return _render_view(appt_id, record, confirm_form=form, confirm_errors=errors)
+
     try:
-        bike_result = (
-            supabase.table('Customer_bike')
-            .select('RegistrationNumber, Customer_CustomerID')
-            .eq('BikeID', record.get('Customer_bike_BikeID'))
-            .single()
-            .execute()
+        updated = supabase.table('Appointment').update({
+            'Employee_EmployeeID': emp_id,
+            'AppointmentType':     appt_type,
+            'Appointment_Date':    appt_date,
+            'Appointment_time':    appt_time,
+            'Status':              'Confirmed',
+        }).eq('AppointmentID', appt_id).eq('Status', 'Pending').execute()
+    except Exception as e:
+        flash_error(f'Could not confirm the appointment: {str(e)}')
+        return _render_view(appt_id, record, confirm_form=form, confirm_errors={})
+    if not updated.data:
+        flash_error(APPOINTMENT_CHANGED_MSG)          # e.g. the customer cancelled meanwhile
+        return redirect(url_for('appointment.view', appt_id=appt_id))
+    flash_success(f'Appointment #{appt_id} confirmed with {employee_name}.')
+    return redirect(url_for('appointment.view', appt_id=appt_id))
+
+
+@bp.route('/<int:appt_id>/cancel', methods=['POST'])
+@login_required
+def cancel(appt_id):
+    """Cancel an appointment when the transition table allows it (no employee needed)."""
+    record, redir = _get_appointment_or_redirect(appt_id)
+    if redir:
+        return redir
+    current = record.get('Status')
+    if 'Cancelled' not in ALLOWED_TRANSITIONS.get(current, ()):
+        flash_error(TRANSITION_REFUSED_MSG)
+        return redirect(url_for('appointment.view', appt_id=appt_id))
+    try:
+        updated = (
+            supabase.table('Appointment').update({'Status': 'Cancelled'})
+            .eq('AppointmentID', appt_id).eq('Status', current).execute()
         )
-        bike_data = bike_result.data
-        cust_result = (
-            supabase.table('Customer')
-            .select('FirstName, LastName')
-            .eq('CustomerID', bike_data.get('Customer_CustomerID'))
-            .single()
-            .execute()
-        )
-        cust = cust_result.data
-        bike_label = (
-            f"{bike_data['RegistrationNumber']} \u2014 "
-            f"{cust['FirstName']} {cust['LastName']}"
-        )
-    except Exception:
-        pass
+    except Exception as e:
+        flash_error(f'Could not cancel the appointment: {str(e)}')
+        return redirect(url_for('appointment.view', appt_id=appt_id))
+    if not updated.data:
+        flash_error(APPOINTMENT_CHANGED_MSG)
+        return redirect(url_for('appointment.view', appt_id=appt_id))
+    flash_success(f'Appointment #{appt_id} was cancelled.')
+    return redirect(url_for('appointment.view', appt_id=appt_id))
+
+
+def _render_view(appt_id, record, confirm_form=None, confirm_errors=None):
+    bike_id = record.get('Customer_bike_BikeID')
+    bike_label = _bike_labels([bike_id]).get(bike_id, {}).get('full', '-')
 
     # Resolve employee name (online bookings start unassigned)
     emp_id = record.get('Employee_EmployeeID')
@@ -623,6 +742,7 @@ def view(appt_id):
 
     appt_status = record.get('Status', '')
     is_locked   = appt_status in LOCKED_STATUSES
+    lines_refusal = _lines_refusal(record)
 
     # return render_template(
     #     'modules/appointment/view.html',
@@ -677,6 +797,16 @@ def view(appt_id):
         appt_stock=appt_stock,
         appt_status=appt_status,
         is_locked=is_locked,
+        lines_editable=lines_refusal is None,
+        lines_refusal=lines_refusal,
+        can_pay=appt_status in PAYABLE_APPOINTMENT_STATUSES,
+        can_cancel='Cancelled' in ALLOWED_TRANSITIONS.get(appt_status, ()),
+        can_edit=appt_status in ('Confirmed', 'In Progress'),
+        is_pending=appt_status == 'Pending',
+        confirm_form=confirm_form or _confirm_defaults(record),
+        confirm_errors=confirm_errors or {},
+        employee_options=_employee_options() if appt_status == 'Pending' else [],
+        type_options=APPOINTMENT_TYPE_OPTIONS,
         is_unassigned=emp_id is None,
         needs_confirmation=needs_confirmation(record),
         appt_payments=appt_payments,
@@ -717,10 +847,9 @@ def add_service(appt_id):
     if redir:
         return redir
 
-    if record.get('Status') in LOCKED_STATUSES:
-        flash_error(
-            f'Cannot add services to a {record.get("Status")} appointment.'
-        )
+    refusal = _lines_refusal(record)
+    if refusal:
+        flash_error(refusal)
         return redirect(url_for('appointment.view', appt_id=appt_id))
 
     # Get services already in this appointment
@@ -813,10 +942,9 @@ def edit_service(appt_id, service_id):
     if redir:
         return redir
 
-    if record.get('Status') in LOCKED_STATUSES:
-        flash_error(
-            f'Cannot edit services on a {record.get("Status")} appointment.'
-        )
+    refusal = _lines_refusal(record)
+    if refusal:
+        flash_error(refusal)
         return redirect(url_for('appointment.view', appt_id=appt_id))
 
     # Fetch existing appointment_service row
@@ -892,6 +1020,13 @@ def edit_service(appt_id, service_id):
 )
 @login_required
 def delete_service(appt_id, service_id):
+    record, redir = _get_appointment_or_redirect(appt_id)
+    if redir:
+        return redir
+    refusal = _lines_refusal(record)
+    if refusal:
+        flash_error(refusal)
+        return redirect(url_for('appointment.view', appt_id=appt_id))
     try:
         supabase.table('appointment_service').delete(
         ).eq('Appointment_AppointmentID', appt_id).eq(
@@ -952,10 +1087,9 @@ def add_stock(appt_id):
     if redir:
         return redir
 
-    if record.get('Status') in LOCKED_STATUSES:
-        flash_error(
-            f'Cannot add stock to a {record.get("Status")} appointment.'
-        )
+    refusal = _lines_refusal(record)
+    if refusal:
+        flash_error(refusal)
         return redirect(url_for('appointment.view', appt_id=appt_id))
 
     # Get stock already in this appointment
@@ -1071,10 +1205,9 @@ def edit_stock(appt_id, stock_id):
     if redir:
         return redir
 
-    if record.get('Status') in LOCKED_STATUSES:
-        flash_error(
-            f'Cannot edit stock on a {record.get("Status")} appointment.'
-        )
+    refusal = _lines_refusal(record)
+    if refusal:
+        flash_error(refusal)
         return redirect(url_for('appointment.view', appt_id=appt_id))
 
     try:
@@ -1171,6 +1304,13 @@ def edit_stock(appt_id, stock_id):
 )
 @login_required
 def delete_stock(appt_id, stock_id):
+    record, redir = _get_appointment_or_redirect(appt_id)
+    if redir:
+        return redir
+    refusal = _lines_refusal(record)
+    if refusal:
+        flash_error(refusal)
+        return redirect(url_for('appointment.view', appt_id=appt_id))
     try:
         supabase.table('Appointment_Stock').delete(
         ).eq('Appointment_AppointmentID', appt_id).eq(
