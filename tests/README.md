@@ -23,5 +23,9 @@ venv/Scripts/python tests/fix5_mutate.py
 | `test_empty_fields.py` | Empty optional fields render empty, never "None" |
 | `test_fix5.py` | Fix Phase 5: customer history, delete rules, online account deactivation |
 | `fix5_mutate.py` | Breaks each Phase 5 rule in turn; every change must fail a test |
+| `test_fix7_ids.py` | Fix Phase 7: plain numeric ids on every page, type badges, flash and modal texts, searches by number and old forms |
+| `test_fix7_ui.py` | Fix Phase 7: collapsible sidebar markup and logic, unpaid online order wording, portal brand hint |
+| `fixtures_ids.py`, `record_searches.py` | Search dataset, and the search results recorded on main before Phase 7 |
+| `fix7_mutate.py` | Breaks the id helper, the search normaliser and the Phase 7 wording in turn |
 
 Set `REPO=<other checkout>` to run the suites against another worktree.
