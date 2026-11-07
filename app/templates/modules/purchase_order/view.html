@@ -187,7 +187,9 @@
                         {% else %}
                         <span class="po-status-badge po-status-ordered">Ordered</span>
                         {% if item._shipped_on %}
-                        <div class="sp-shipped-note">Shipped {{ item._shipped_on }}</div>
+                        <div class="sp-shipped-note">Shipped on {{ item._shipped_on }}</div>
+                        {% elif has_portal_login %}
+                        <div class="sp-shipped-note">Awaiting shipment</div>
                         {% endif %}
                         {% endif %}
                     </td>
@@ -198,11 +200,17 @@
                     <td class="text-end">
                         {% if item.Status == 'Ordered' %}
                         <div class="action-btn-group">
-                            {% if can_receive %}
+                            {% if not item._receive_block %}
                             <a href="{{ url_for('purchase_order.receive_item', po_id=po_id, item_id=item.POItem_ID) }}"
                                 class="btn btn-sm btn-accent">
                                 <i class="fa-solid fa-box-open me-1"></i>Receive
                             </a>
+                            {% elif has_portal_login %}
+                            <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true"
+                                  title="{{ item._receive_block }}" style="pointer-events:none;opacity:0.65;">
+                                <i class="fa-solid fa-box-open me-1"></i>Receive
+                            </span>
+                            <span class="sp-lock-hint">{{ item._receive_block }}</span>
                             {% endif %}
                             {% if not lines_locked %}
                             <a href="{{ url_for('purchase_order.edit_item', po_id=po_id, item_id=item.POItem_ID) }}"
@@ -296,10 +304,13 @@
                         {% elif mb.Status == 'Shipped' %}
                             <span class="po-status-badge po-status-shipped">Shipped</span>
                             {% if mb._shipped_on %}
-                            <div class="sp-shipped-note">Shipped {{ mb._shipped_on }}</div>
+                            <div class="sp-shipped-note">Shipped on {{ mb._shipped_on }}</div>
                             {% endif %}
                         {% else %}
                             <span class="po-status-badge po-status-ordered">Ordered</span>
+                            {% if has_portal_login %}
+                            <div class="sp-shipped-note">Awaiting shipment</div>
+                            {% endif %}
                         {% endif %}
                     </td>
                     <td class="text-muted" style="font-size:0.8rem;">{{ mb._vin if mb._vin else '—' }}</td>
@@ -307,9 +318,15 @@
                     <td class="text-end">
                         {% if mb.Status == 'Shipped' %}
                         <div class="action-btn-group">
-                            {% if can_receive %}
+                            {% if not mb._receive_block %}
                             <a href="{{ url_for('purchase_order.receive_motorbike', po_id=po_id, pobike_id=mb.POBike_ID) }}"
                                class="btn btn-sm btn-accent"><i class="fa-solid fa-box-open me-1"></i>Receive</a>
+                            {% elif has_portal_login %}
+                            <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true"
+                                  title="{{ mb._receive_block }}" style="pointer-events:none;opacity:0.65;">
+                                <i class="fa-solid fa-box-open me-1"></i>Receive
+                            </span>
+                            <span class="sp-lock-hint">{{ mb._receive_block }}</span>
                             {% endif %}
                             <form method="POST" class="d-inline"
                                   action="{{ url_for('purchase_order.unship_motorbike', po_id=po_id, pobike_id=mb.POBike_ID) }}"
@@ -321,9 +338,15 @@
                         </div>
                         {% elif mb.Status == 'Ordered' %}
                         <div class="action-btn-group">
-                            {% if can_receive %}
+                            {% if not mb._receive_block %}
                             <a href="{{ url_for('purchase_order.receive_motorbike', po_id=po_id, pobike_id=mb.POBike_ID) }}"
                                class="btn btn-sm btn-accent"><i class="fa-solid fa-box-open me-1"></i>Receive</a>
+                            {% elif has_portal_login %}
+                            <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true"
+                                  title="{{ mb._receive_block }}" style="pointer-events:none;opacity:0.65;">
+                                <i class="fa-solid fa-box-open me-1"></i>Receive
+                            </span>
+                            <span class="sp-lock-hint">{{ mb._receive_block }}</span>
                             {% endif %}
                             {% if not lines_locked %}
                             <a href="{{ url_for('purchase_order.edit_motorbike', po_id=po_id, pobike_id=mb.POBike_ID) }}"
