@@ -153,5 +153,27 @@ class UnpaidOrderWording(Base):
         self.assertEqual(self.rows('Stock', Stock_ID=1)[0]['QOH'], 7)
 
 
+class SupplierPortalBrandHint(unittest.TestCase):
+    """ISS-24: one help line under the brand field on the portal's Add product page."""
+    HINT = 'Brand not listed? Contact the dealership to have it added.'
+
+    def render(self, is_edit):
+        from flask import render_template
+        from harness import APP
+        with APP.test_request_context('/supplier-portal/products/add'):
+            return render_template('supplier_portal/product_form.html', is_edit=is_edit, form_data={}, errors={},
+                                   sp_options=[(1, 'Brake Pad')], brand_options=[(1, 'Honda')],
+                                   product_label='Brake Pad - Honda', product_id=1)
+
+    def test_hint_under_brand_on_add(self):
+        body = re.sub(r'\s+', ' ', self.render(False))
+        brand = body.index('name="Brand_Brand_ID"')
+        self.assertIn(self.HINT, body[brand:])
+        self.assertEqual(body.count(self.HINT), 1)
+
+    def test_no_hint_on_edit(self):
+        self.assertNotIn(self.HINT, self.render(True))      # brand cannot change when editing
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=1)
