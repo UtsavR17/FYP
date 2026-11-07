@@ -19,6 +19,9 @@
        data-delete-url="{{ url_for('module.delete', id=row.ID) }}"
        data-record-name="{{ row.FieldName }}"
 
+  Optional: data-delete-details="..." on the button shows that text under the
+  record name (what exactly will be removed). Without it nothing extra is shown.
+
   The modal ID is fixed as 'deleteModal'.
   The form ID is fixed as 'deleteModalForm'.
   JavaScript in admin.js handles the rest automatically.
@@ -56,6 +59,7 @@
                     <span class="modal-record-label">Record:</span>
                     <span class="modal-record-name" id="deleteModalRecordName"></span>
                 </div>
+                <p class="modal-body-text small mt-3 mb-0" id="deleteModalDetails" hidden></p>
             </div>
 
             <div class="modal-footer border-0 pt-0">

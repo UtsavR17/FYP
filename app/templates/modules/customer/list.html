@@ -44,6 +44,9 @@
             <td class="text-muted" style="width:60px;">{{ row.CustomerID }}</td>
             <td>
                 <strong>{{ row.FirstName }} {{ row.LastName }}</strong>
+                {% if row.AuthUserID %}
+                <span class="po-status-badge po-status-partially-received ms-1">Online account</span>
+                {% endif %}
             </td>
             <td>{{ row.PhoneNumber }}</td>
             <td>
@@ -65,7 +68,8 @@
                             data-bs-toggle="modal"
                             data-bs-target="#deleteModal"
                             data-delete-url="{{ url_for('customer.delete', customer_id=row.CustomerID) }}"
-                            data-record-name="{{ row.FirstName }} {{ row.LastName }}">
+                            data-record-name="{{ row.FirstName }} {{ row.LastName }}"
+                            data-delete-details="This removes the customer record and their garage bikes that have no appointments{% if row.AuthUserID %}, and deletes their online login so they can no longer sign in (a login also used by staff or a supplier is kept){% endif %}. A customer with appointments, sales or online orders is not deleted; deactivate their online account instead.">
                         <i class="fa-solid fa-trash me-1"></i>Delete
                     </button>
                 </div>
