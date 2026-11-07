@@ -94,9 +94,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const modalForm      = document.getElementById('deleteModalForm');
             const recordNameSpan = document.getElementById('deleteModalRecordName');
+            const detailsText    = triggerButton.getAttribute('data-delete-details');
+            const detailsPara    = document.getElementById('deleteModalDetails');
 
             if (modalForm)      { modalForm.action          = deleteUrl  || ''; }
             if (recordNameSpan) { recordNameSpan.textContent = recordName || ''; }
+            if (detailsPara) {
+                detailsPara.textContent = detailsText || '';
+                detailsPara.hidden      = !detailsText;
+            }
 
             console.log('[MotoAdmin] Delete modal opened for:', recordName, '| URL:', deleteUrl);
         });

@@ -3,7 +3,10 @@ from app.modules.customer import bp
 from app.auth.decorators import login_required
 from app.supabase_client import supabase
 from app.utils.pagination import paginate
-from app.utils.flash_messages import flash_success, flash_error
+from app.utils.flash_messages import flash_success, flash_error, flash_warning, flash_info
+from app.modules.customer.accounts import (
+    customer_history, get_service_client, is_not_found_error, login_is_protected,
+)
 from app.utils.validators import required_fields, is_valid_email
 from app.utils.text import norm
 
@@ -300,25 +303,66 @@ def edit(customer_id):
 @bp.route('/delete/<int:customer_id>', methods=['POST'])
 @login_required
 def delete(customer_id):
+    """
+    DEC-4 A: delete only a customer without history (no appointments, sales or online
+    orders). Their unused garage bikes go first, then the Customer row, then the online
+    login, unless it is a staff or supplier login. With history nothing is deleted and the
+    admin is pointed to Deactivate online account instead.
+    """
     try:
-        result = (
+        data = (
             supabase.table('Customer')
-            .select('FirstName, LastName')
+            .select('FirstName, LastName, Email, AuthUserID')
             .eq('CustomerID', customer_id)
             .single()
             .execute()
-        )
-        data = result.data
-        full_name = (
-            f"{data.get('FirstName', '')} {data.get('LastName', '')}".strip()
-            or f'ID {customer_id}'
-        )
+        ).data or {}
     except Exception:
-        full_name = f'ID {customer_id}'
+        flash_error(f'Customer ID {customer_id} was not found. Nothing was deleted.')
+        return redirect(url_for('customer.index'))
+
+    full_name = (
+        f"{data.get('FirstName') or ''} {data.get('LastName') or ''}".strip()
+        or f'ID {customer_id}'
+    )
+    auth_user_id = data.get('AuthUserID')
 
     try:
-        supabase.table('Customer').delete().eq('CustomerID', customer_id).execute()
-        flash_success(f'Customer "{full_name}" was deleted successfully.')
+        history = customer_history(customer_id)
+    except Exception:
+        flash_error(
+            f'Could not check the history of "{full_name}", so nothing was deleted. '
+            f'Please try again.'
+        )
+        return redirect(url_for('customer.index'))
+
+    if history.has_history:
+        message = (
+            f'Cannot delete "{full_name}". This customer has {history.summary()}. '
+            f'Deleting would erase history. Nothing was deleted.'
+        )
+        if auth_user_id:
+            flash_error(
+                message + ' To stop them signing in online, use Deactivate online account below.'
+            )
+            return redirect(url_for('customer.edit', customer_id=customer_id, _anchor='online-account'))
+        flash_error(message)
+        return redirect(url_for('customer.index'))
+
+    # Decided before any row is deleted: a staff or supplier login must survive (rule 3)
+    admin_client = get_service_client() if auth_user_id else None
+    login_protected = bool(auth_user_id and admin_client and login_is_protected(auth_user_id, admin_client))
+
+    try:
+        if history.unused_bike_ids:
+            (
+                supabase.table('Customer_bike')
+                .delete()
+                .in_('BikeID', history.unused_bike_ids)
+                .eq('Customer_CustomerID', customer_id)
+                .execute()
+            )
+        deleted = supabase.table('Customer').delete().eq('CustomerID', customer_id).execute()
     except Exception as e:
         error_msg = str(e)
         if 'foreign key' in error_msg.lower() or 'violates' in error_msg.lower():
@@ -328,5 +372,41 @@ def delete(customer_id):
             )
         else:
             flash_error(f'Could not delete customer: {error_msg}')
+        return redirect(url_for('customer.index'))
+
+    if not deleted.data:
+        flash_error(f'Customer "{full_name}" was not deleted. Reload the page and try again.')
+        return redirect(url_for('customer.index'))
+
+    bikes_removed = len(history.unused_bike_ids)
+    bikes_note = ''
+    if bikes_removed:
+        bikes_note = f' with {bikes_removed} garage bike{"" if bikes_removed == 1 else "s"}'
+    flash_success(f'Customer "{full_name}" was deleted successfully{bikes_note}.')
+
+    if auth_user_id:
+        if login_protected:
+            flash_info(
+                'The online login was kept because it is also used by staff or a supplier.'
+            )
+        elif _delete_login(admin_client, auth_user_id):
+            flash_success('Their online login was removed, so they can no longer sign in.')
+        else:
+            flash_warning(
+                'Customer deleted, but the online login could not be removed. '
+                'Deactivate or remove it in Supabase Authentication. '
+                f'Email: {data.get("Email") or "not recorded"}.'
+            )
 
     return redirect(url_for('customer.index'))
+
+
+def _delete_login(admin_client, auth_user_id):
+    """True when the login is gone (deleted now, or already missing)."""
+    if admin_client is None:
+        return False
+    try:
+        admin_client.auth.admin.delete_user(auth_user_id)
+    except Exception as e:
+        return is_not_found_error(e)
+    return True
