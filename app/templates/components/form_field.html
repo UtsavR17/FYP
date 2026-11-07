@@ -13,6 +13,9 @@
                     selected=form_data.get('Role_Role_ID',''),
                     required=True, error=errors.get('Role_Role_ID','')) }}
 
+  A value of None (a database NULL) renders as an empty field, never as the text
+  "None", so saving an unchanged form keeps the NULL.
+
   options format for select_field:
     A list of (value, label) tuples, e.g.:
     [(1, 'Manager'), (2, 'Mechanic')]
@@ -35,7 +38,7 @@
         class="form-control {% if error %}is-invalid{% endif %}"
         id="{{ name }}"
         name="{{ name }}"
-        value="{{ value }}"
+        value="{{ '' if value is none else value }}"
         placeholder="{{ placeholder }}"
         {% if required %}required{% endif %}>
     {% if error %}
@@ -65,7 +68,7 @@
         class="form-control {% if error %}is-invalid{% endif %}"
         id="{{ name }}"
         name="{{ name }}"
-        value="{{ value }}"
+        value="{{ '' if value is none else value }}"
         placeholder="{{ placeholder }}"
         step="{{ step }}"
         min="{{ min_val }}"
@@ -133,7 +136,7 @@
         name="{{ name }}"
         rows="{{ rows }}"
         placeholder="{{ placeholder }}"
-        {% if required %}required{% endif %}>{{ value }}</textarea>
+        {% if required %}required{% endif %}>{{ '' if value is none else value }}</textarea>
     {% if error %}
     <div class="invalid-feedback">{{ error }}</div>
     {% endif %}
@@ -178,7 +181,7 @@
         class="form-control {% if error %}is-invalid{% endif %}"
         id="{{ name }}"
         name="{{ name }}"
-        value="{{ value }}"
+        value="{{ '' if value is none else value }}"
         {% if min %}min="{{ min }}"{% endif %}
         {% if required %}required{% endif %}>
     {% if error %}
@@ -210,7 +213,7 @@
         class="form-control {% if error %}is-invalid{% endif %}"
         id="{{ name }}"
         name="{{ name }}"
-        value="{{ value }}"
+        value="{{ '' if value is none else value }}"
         {% if required %}required{% endif %}>
     {% if error %}
     <div class="invalid-feedback">{{ error }}</div>
