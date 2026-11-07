@@ -9,10 +9,17 @@ from app.utils.validators import required_fields, is_positive_number
 from app.utils.order_ref import format_order_ref
 from datetime import date as date_type
 from app.utils.text import norm
+from app.modules.online_order.routes import today_mauritius
+from app.modules.payment.routes import CENT, payment_summary, _is_online_payment
 
 
 # Shown wherever a sale has no salesperson (online reservations have none).
 NO_EMPLOYEE_LABEL = 'Not assigned'
+
+# Only employees with this role are offered as the salesperson (DEC-13), compared trimmed
+# and case-insensitively.
+SALESPERSON_ROLE = 'Salesperson'
+NO_SALESPERSON_HELP = 'Create a role named Salesperson and assign it to employees.'
 
 
 # Helpers -----------------------------------
@@ -29,9 +36,51 @@ def _validate_date(raw_value, field_label):
         return None, f'{field_label} must be a valid date.'
 
 
-def _build_bike_label(nb_id, year, model_desc, brand_name):
-    """Build a consistent display label for a New_MotorBike record."""
-    return f"NB-{nb_id} \u2014 {brand_name} {model_desc} ({year})"
+def _build_bike_label(nb_id, year, model_desc, brand_name, colour=None):
+    """Display label for a New_MotorBike record: 'NB-x - Brand Model (Year), Colour'."""
+    label = f"NB-{nb_id} - {brand_name} {model_desc} ({year})"
+    return f"{label}, {colour}" if colour else label
+
+
+def _bike_label_from_row(b, model_lookup):
+    m_info = model_lookup.get(b.get('Model_Model_No'), {})
+    return _build_bike_label(
+        b['NB_ID'],
+        b.get('Year', '?'),
+        m_info.get('description', 'Unknown Model'),
+        m_info.get('brand_name', 'Unknown Brand'),
+        b.get('Color_Color'),
+    )
+
+
+def _salesperson_options(current_employee_id=None):
+    """
+    (options, has_salespeople): employees whose role is SALESPERSON_ROLE. On Edit,
+    a saved employee who is not a salesperson is still listed, marked, so the
+    sale can be saved unchanged.
+    """
+    try:
+        roles = supabase.table('Role').select('Role_ID, Role_Name').execute().data or []
+        role_ids = [r['Role_ID'] for r in roles if norm(r.get('Role_Name')) == norm(SALESPERSON_ROLE)]
+        employees = (
+            supabase.table('Employee')
+            .select('EmployeeID, FirstName, LastName, Role_Role_ID')
+            .order('LastName')
+            .execute()
+        ).data or []
+    except Exception:
+        return [], False
+    options = [
+        (e['EmployeeID'], f"{e['FirstName']} {e['LastName']}")
+        for e in employees if e.get('Role_Role_ID') in role_ids
+    ]
+    has_salespeople = bool(options)
+    if current_employee_id and current_employee_id not in {eid for eid, _ in options}:
+        current = next((e for e in employees if e['EmployeeID'] == current_employee_id), None)
+        if current:
+            options.insert(0, (current['EmployeeID'],
+                               f"{current['FirstName']} {current['LastName']} (not a salesperson)"))
+    return options, has_salespeople
 
 
 def _get_brand_model_lookups():
@@ -63,7 +112,7 @@ def _get_brand_model_lookups():
     return brand_lookup, model_lookup
 
 
-def _get_form_options(current_nb_id=None):
+def _get_form_options(current_nb_id=None, current_employee_id=None):
     """
     Fetch dropdown options for the Sale Create and Edit forms.
 
@@ -123,20 +172,13 @@ def _get_form_options(current_nb_id=None):
     try:
         available_bikes = (
             supabase.table('New_MotorBike')
-            .select('NB_ID, Year, Model_Model_No, Status, Price')
+            .select('NB_ID, Year, Model_Model_No, Status, Price, Color_Color')
             .eq('Status', 'Available')
             .order('NB_ID')
             .execute()
         )
         for b in (available_bikes.data or []):
-            m_info = model_lookup.get(b.get('Model_Model_No'), {})
-            label  = _build_bike_label(
-                b['NB_ID'],
-                b.get('Year', '?'),
-                m_info.get('description', 'Unknown Model'),
-                m_info.get('brand_name', 'Unknown Brand')
-            )
-            bike_options.append((b['NB_ID'], label))
+            bike_options.append((b['NB_ID'], _bike_label_from_row(b, model_lookup)))
             bike_prices[b['NB_ID']] = float(b.get('Price') or 0)
     except Exception:
         pass
@@ -148,42 +190,24 @@ def _get_form_options(current_nb_id=None):
             try:
                 curr = (
                     supabase.table('New_MotorBike')
-                    .select('NB_ID, Year, Model_Model_No, Price')
+                    .select('NB_ID, Year, Model_Model_No, Price, Color_Color')
                     .eq('NB_ID', current_nb_id)
                     .single()
                     .execute()
                 )
-                b      = curr.data
-                m_info = model_lookup.get(b.get('Model_Model_No'), {})
-                label  = _build_bike_label(
-                    b['NB_ID'],
-                    b.get('Year', '?'),
-                    m_info.get('description', 'Unknown Model'),
-                    m_info.get('brand_name', 'Unknown Brand')
-                )
+                b = curr.data
                 # Insert at the beginning so it is pre-selected easily
-                bike_options.insert(0, (b['NB_ID'], label))
+                bike_options.insert(0, (b['NB_ID'], _bike_label_from_row(b, model_lookup)))
                 bike_prices[b['NB_ID']] = float(b.get('Price') or 0)
             except Exception:
                 pass
 
     has_available_bikes = len(bike_options) > 0
 
-    try:
-        emp = (
-            supabase.table('Employee')
-            .select('EmployeeID, FirstName, LastName')
-            .order('LastName')
-            .execute()
-        )
-        employee_options = [
-            (r['EmployeeID'], f"{r['FirstName']} {r['LastName']}")
-            for r in (emp.data or [])
-        ]
-    except Exception:
-        pass
+    employee_options, has_salespeople = _salesperson_options(current_employee_id)
 
-    return customer_options, bike_options, employee_options, has_available_bikes, bike_prices
+    return (customer_options, bike_options, employee_options, has_available_bikes, bike_prices,
+            has_salespeople)
 
 
 def _set_bike_status(nb_id, status):
@@ -265,17 +289,11 @@ def _enrich_sales(all_records):
     try:
         bikes = (
             supabase.table('New_MotorBike')
-            .select('NB_ID, Year, Model_Model_No')
+            .select('NB_ID, Year, Model_Model_No, Color_Color')
             .execute()
         )
         for b in (bikes.data or []):
-            m_info = model_lookup.get(b.get('Model_Model_No'), {})
-            bike_lookup[b['NB_ID']] = _build_bike_label(
-                b['NB_ID'],
-                b.get('Year', '?'),
-                m_info.get('description', 'Unknown Model'),
-                m_info.get('brand_name', 'Unknown Brand')
-            )
+            bike_lookup[b['NB_ID']] = _bike_label_from_row(b, model_lookup)
     except Exception:
         pass
 
@@ -290,6 +308,26 @@ def _enrich_sales(all_records):
         sale['_employee_name'] = emp_lookup.get(emp_id, '-') if emp_id else NO_EMPLOYEE_LABEL
 
     return all_records
+
+
+def _add_payment_status(sales):
+    """Sets '_pay' (payment_summary) on each sale from a single payments query; None on error."""
+    try:
+        rows = (
+            supabase.table('Payment')
+            .select('PaymentID, Sale_SaleID, AmountPaid')
+            .execute()
+        ).data or []
+    except Exception:
+        for s in sales:
+            s['_pay'] = None
+        return
+    by_sale = {}
+    for r in rows:
+        if r.get('Sale_SaleID'):
+            by_sale.setdefault(r['Sale_SaleID'], []).append(r)
+    for s in sales:
+        s['_pay'] = payment_summary(s.get('TotalAmount'), by_sale.get(s.get('SaleID'), []))
 
 
 # ─── Routes ──────────────────────────────────────────────────────────────────
@@ -313,6 +351,7 @@ def index():
         all_records = []
 
     all_records = _enrich_sales(all_records)
+    _add_payment_status(all_records)
 
     reservations = _reservation_orders_by_sale()
     for r in all_records:
@@ -350,9 +389,11 @@ def create():
     errors    = {}
 
 
-    customer_options, bike_options, employee_options, has_available_bikes, bike_prices = (
-        _get_form_options()
-    )
+    (customer_options, bike_options, employee_options, has_available_bikes, bike_prices,
+     has_salespeople) = _get_form_options()
+
+    if request.method == 'GET':
+        form_data = {'SaleDate': today_mauritius().isoformat()}
 
     if request.method == 'POST':
         form_data = request.form.to_dict()
@@ -399,6 +440,9 @@ def create():
                 employee_id = int(emp_id_raw)
             except ValueError:
                 errors['Employee_EmployeeID'] = 'Invalid salesperson selection.'
+            else:
+                if employee_id not in {eid for eid, _ in employee_options}:
+                    errors['Employee_EmployeeID'] = 'Please choose a salesperson from the list.'
 
         if not errors:
             try:
@@ -433,6 +477,8 @@ def create():
         customer_options=customer_options,
         bike_options=bike_options,
         employee_options=employee_options,
+        has_salespeople=has_salespeople,
+        no_salesperson_help=NO_SALESPERSON_HELP,
         has_available_bikes=has_available_bikes,
         bike_prices=bike_prices
     )
@@ -470,9 +516,9 @@ def edit(sale_id):
         flash_error('Could not check whether this sale belongs to an online reservation, '
                     'so the motorbike cannot be changed right now.')
 
-    customer_options, bike_options, employee_options, has_available_bikes, bike_prices = (
-        _get_form_options(current_nb_id=original_nb_id)
-    )
+    (customer_options, bike_options, employee_options, has_available_bikes, bike_prices,
+     has_salespeople) = _get_form_options(current_nb_id=original_nb_id,
+                                          current_employee_id=record.get('Employee_EmployeeID'))
 
     if request.method == 'POST':
         form_data = request.form.to_dict()
@@ -522,6 +568,9 @@ def edit(sale_id):
                 employee_id = int(emp_id_raw)
             except ValueError:
                 errors['Employee_EmployeeID'] = 'Invalid salesperson selection.'
+            else:
+                if employee_id not in {eid for eid, _ in employee_options}:
+                    errors['Employee_EmployeeID'] = 'Please choose a salesperson from the list.'
 
         if not errors:
             try:
@@ -561,6 +610,8 @@ def edit(sale_id):
         customer_options=customer_options,
         bike_options=bike_options,
         employee_options=employee_options,
+        has_salespeople=has_salespeople,
+        no_salesperson_help=NO_SALESPERSON_HELP,
         has_available_bikes=True,  
         bike_prices=bike_prices,
         bike_locked=bike_locked,
@@ -606,19 +657,12 @@ def view(sale_id):
     try:
         b = (
             supabase.table('New_MotorBike')
-            .select('NB_ID, Year, Model_Model_No, Status')
+            .select('NB_ID, Year, Model_Model_No, Status, Color_Color')
             .eq('NB_ID', record.get('New_MotorBike_NB_ID'))
             .single()
             .execute()
         )
-        bdata  = b.data
-        m_info = model_lookup.get(bdata.get('Model_Model_No'), {})
-        bike_label = _build_bike_label(
-            bdata['NB_ID'],
-            bdata.get('Year', '?'),
-            m_info.get('description', 'Unknown Model'),
-            m_info.get('brand_name', 'Unknown Brand')
-        )
+        bike_label = _bike_label_from_row(b.data, model_lookup)
     except Exception:
         pass
 
@@ -638,20 +682,21 @@ def view(sale_id):
         except Exception:
             pass
 
-    # Check for linked payment (Task 26 will expand this)
-    payment = None
+    # Every payment of this sale, oldest first, and the balance (ISS-01).
+    payments, pay_summary = [], None
     try:
-        pay_result = (
+        payments = (
             supabase.table('Payment')
             .select('*')
             .eq('Sale_SaleID', sale_id)
+            .order('PaymentID')
             .execute()
-        )
-        payments = pay_result.data or []
-        if payments:
-            payment = payments[0]
+        ).data or []
+        for pay in payments:
+            pay['_online'] = _is_online_payment(pay)
+        pay_summary = payment_summary(record.get('TotalAmount'), payments)
     except Exception:
-        pass
+        flash_error('Could not load the payments of this sale.')
 
     reservation_order_id = None
     try:
@@ -666,7 +711,9 @@ def view(sale_id):
         customer_name=customer_name,
         bike_label=bike_label,
         employee_name=employee_name,
-        payment=payment,
+        payments=payments,
+        pay_summary=pay_summary,
+        can_record_payment=bool(pay_summary and pay_summary['balance'] > CENT),
         reservation_order_id=reservation_order_id,
         reservation_ref=format_order_ref(reservation_order_id) if reservation_order_id else None,
     )

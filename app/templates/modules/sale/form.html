@@ -116,7 +116,8 @@
                     required    = False,
                     error       = errors.get('Employee_EmployeeID', ''),
                     empty_label = '- None / Not recorded',
-                    help_text   = 'The employee who processed this sale.'
+                    help_text   = ('The salesperson who processed this sale.' if has_salespeople
+                                   else no_salesperson_help)
                 ) }}
             </div>
         </div>
