@@ -2,14 +2,14 @@
 {% from 'components/form_field.html' import readonly_field, select_field, date_field, time_field %}
 {% from 'components/modal_confirm.html' import delete_modal %}
 
-{% block title %}Appointment #{{ appt_id }}{% endblock %}
+{% block title %}Appointment {{ appt_id }}{% endblock %}
 {% block page_title %}Appointment Detail{% endblock %}
 
 {% block content %}
 
 <div class="page-header">
     <div>
-        <h2 class="page-header-title">Appointment #{{ appt_id }}</h2>
+        <h2 class="page-header-title">Appointment {{ appt_id }}</h2>
         <p class="page-header-subtitle">
             Appointment details, services, stock usage and payment
         </p>
@@ -51,7 +51,7 @@
     <p class="form-section-title">Appointment Information</p>
     <div class="row">
         <div class="col-md-4">
-            {{ readonly_field('Appointment ID', '#' ~ record.AppointmentID) }}
+            {{ readonly_field('Appointment ID', record.AppointmentID | display_id) }}
         </div>
         <div class="col-md-4">
             {{ readonly_field('Customer Bike', bike_label) }}
@@ -454,7 +454,7 @@
             <tbody>
                 {% for pmt in appt_payments %}
                 <tr>
-                    <td><strong>PAY-{{ pmt.PaymentID }}</strong></td>
+                    <td><strong>{{ pmt.PaymentID | display_id }}</strong></td>
                     <td>{{ pmt.PaymentDate if pmt.PaymentDate else '-' }}</td>
                     <td><strong>Rs. {{ '%.2f' | format(pmt.AmountPaid | float) }}</strong></td>
                     <td>{{ pmt.PaymentMethod }}</td>

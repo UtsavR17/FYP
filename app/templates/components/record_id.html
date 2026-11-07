@@ -1,0 +1,14 @@
+{#
+  components/record_id.html
+  Type badge plus plain number for references whose type matters (Fix Phase 7,
+  DEC-15): payment references, dashboard recent payments. The number comes from
+  the shared display_id filter, so no letter prefix can appear.
+
+  Usage:
+    {% from 'components/record_id.html' import id_badge %}
+    {{ id_badge('Sale', row.Sale_SaleID) }}
+#}
+
+{% macro id_badge(type_word, value, css='po-stage-draft') %}
+<span class="po-status-badge {{ css }} me-1">{{ type_word }}</span>{{ value | display_id }}
+{%- endmacro %}

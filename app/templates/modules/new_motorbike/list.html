@@ -42,7 +42,7 @@
         {% for row in pagination.records %}
         <tr>
             <td class="text-muted" style="width:60px;">
-                <strong>NB-{{ row.NB_ID }}</strong>
+                <strong>{{ row.NB_ID | display_id }}</strong>
             </td>
             <td>
                 <span class="role-badge">{{ row._model_label }}</span>

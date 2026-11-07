@@ -15,6 +15,7 @@ from app.modules.new_motorbike.routes import (
     STATUS_OPTIONS as NB_STATUS_OPTIONS,
 )
 from app.utils.text import norm
+from app.utils.ids import parse_id_query
 from app.modules.stock.routes import (
     DUPLICATE_STOCK_MSG, STOCK_CHECK_FAILED_MSG,
     same_size, find_stock_variants, is_unique_violation,
@@ -249,12 +250,14 @@ def index():
     # Search
     if search_query:
         q = search_query.lower()
+        q_id = parse_id_query(search_query, 'purchase_order')   # 12, PO-12 or #12
         all_records = [
             r for r in all_records
             if q in norm(r.get('_supplier_name'))
             or q in norm(r.get('Status'))
             or q in str(r.get('POrderDate', '') or '')
             or q in str(r.get('ExpectedDate', '') or '')
+            or (q_id is not None and r.get('PurchaseOrderID') == q_id)
         ]
 
     pagination = paginate(all_records, page, per_page=10)
@@ -420,7 +423,7 @@ def edit(po_id):
                 if not updated.data:
                     flash_error(ORDER_CHANGED_MSG)
                     return redirect(url_for('purchase_order.view', po_id=po_id))
-                flash_success(f'Purchase order PO-{po_id} was updated successfully.')
+                flash_success(f'Purchase order {po_id} was updated successfully.')
                 return redirect(url_for('purchase_order.index'))
             except Exception as e:
                 flash_error(f'Could not update purchase order: {str(e)}')
@@ -499,7 +502,7 @@ def view(po_id):
         pass
     stage = record.get('SupplierStage') or STAGE_DRAFT
     for item in po_items:
-        item['_sp_name'] = sp_lookup_view.get(item.get('SP_id'), f"SP-{item.get('SP_id')}")
+        item['_sp_name'] = sp_lookup_view.get(item.get('SP_id'), f"Spare part {item.get('SP_id')}")
         item['_shipped_on'] = _format_shipped_date(item.get('DateShipped'))
         item['_receive_block'] = _receive_refusal(
             stage, record.get('Status'), has_portal_login, bool(item.get('DateShipped')))
@@ -579,14 +582,14 @@ def delete(po_id):
             .eq('PurchaseOrderID', po_id).eq('SupplierStage', STAGE_DRAFT).execute()
         )
         if deleted.data:
-            flash_success(f'Purchase order PO-{po_id} was deleted successfully.')
+            flash_success(f'Purchase order {po_id} was deleted successfully.')
         else:
             flash_error(ORDER_CHANGED_MSG)
     except Exception as e:
         error_msg = str(e)
         if 'foreign key' in error_msg.lower() or 'violates' in error_msg.lower():
             flash_error(
-                f'Cannot delete PO-{po_id} because it has one or more line items. '
+                f'Cannot delete purchase order {po_id} because it has one or more line items. '
                 f'Remove all items from this purchase order first.'
             )
         else:
@@ -653,7 +656,7 @@ def send_to_supplier(po_id):
         return redirect(view_url)
 
     if updated.data:
-        flash_success(f'PO-{po_id} was sent to the supplier. Its lines are locked until you recall it.')
+        flash_success(f'Purchase order {po_id} was sent to the supplier. Its lines are locked until you recall it.')
     else:
         flash_error(ORDER_CHANGED_MSG)
     return redirect(view_url)
@@ -684,7 +687,7 @@ def recall_from_supplier(po_id):
         return redirect(view_url)
 
     if updated.data:
-        flash_success(f'PO-{po_id} was recalled and is a draft again. Its lines can be changed.')
+        flash_success(f'Purchase order {po_id} was recalled and is a draft again. Its lines can be changed.')
     else:
         flash_error(ORDER_CHANGED_MSG)
     return redirect(view_url)
@@ -721,7 +724,7 @@ def reopen_po(po_id):
         return redirect(view_url)
 
     if updated.data:
-        flash_success(f'PO-{po_id} was reopened as a draft with status Pending.')
+        flash_success(f'Purchase order {po_id} was reopened as a draft with status Pending.')
     else:
         flash_error(ORDER_CHANGED_MSG)
     return redirect(view_url)
@@ -848,7 +851,7 @@ def _get_supplier_catalog_for_po(po_id):
         pass
 
     for r in rows:
-        r['_sp_name'] = sp_lookup.get(r['SP_id'], f"SP-{r['SP_id']}")
+        r['_sp_name'] = sp_lookup.get(r['SP_id'], f"Spare part {r['SP_id']}")
         r['_brand_name'] = brand_lookup.get(r['Brand_Brand_ID'], 'Unknown Brand')
 
     return rows
@@ -894,7 +897,7 @@ def add_item(po_id):
     locked_statuses = ('Received', 'Cancelled')
     if po_record.get('Status') in locked_statuses:
         flash_error(
-            f'Cannot add items to PO-{po_id} because its status is '
+            f'Cannot add items to purchase order {po_id} because its status is '
             f'"{po_record.get("Status")}". '
             f'Only Pending or Partially Received orders can have items added.'
         )
@@ -1043,9 +1046,9 @@ def edit_item(po_id, item_id):
             .single()
             .execute()
         )
-        form_data['_sp_name'] = sp_res.data.get('SP_name', f"SP-{item.get('SP_id')}")
+        form_data['_sp_name'] = sp_res.data.get('SP_name', f"Spare part {item.get('SP_id')}")
     except Exception:
-        form_data['_sp_name'] = f"SP-{item.get('SP_id')}"
+        form_data['_sp_name'] = f"Spare part {item.get('SP_id')}"
             
     errors = {}
     sp_options = _get_spare_part_options()
@@ -1085,7 +1088,7 @@ def edit_item(po_id, item_id):
                     'BuyingPrice':      price,
                     'Size_Expected':    size_value or None,
                 }).eq('POItem_ID', item_id).execute()
-                flash_success(f'Item #{item_id} was updated successfully.')
+                flash_success(f'Item {item_id} was updated successfully.')
                 return redirect(url_for('purchase_order.view', po_id=po_id))
             except Exception as e:
                 flash_error(f'Could not update item: {str(e)}')
@@ -1124,14 +1127,14 @@ def delete_item(po_id, item_id):
 
     if item_status == 'Received':
         flash_error(
-            f'Cannot delete item #{item_id} because it has already been received. '
+            f'Cannot delete item {item_id} because it has already been received. '
             f'Deleting a received item would leave stock records inconsistent.'
         )
         return redirect(url_for('purchase_order.view', po_id=po_id))
 
     try:
         supabase.table('PurchaseOrderItem').delete().eq('POItem_ID', item_id).execute()
-        flash_success(f'Item #{item_id} was removed from PO-{po_id}.')
+        flash_success(f'Item {item_id} was removed from purchase order {po_id}.')
         _auto_update_po_status(po_id)
     except Exception as e:
         flash_error(f'Could not delete item: {str(e)}')
@@ -1172,7 +1175,7 @@ def receive_item(po_id, item_id):
         return redirect(url_for('purchase_order.view', po_id=po_id))
 
     if item.get('Status') == 'Received':
-        flash_error(f'Item #{item_id} has already been received.')
+        flash_error(f'Item {item_id} has already been received.')
         return redirect(url_for('purchase_order.view', po_id=po_id))
 
     # Portal suppliers: only items the supplier has shipped (DateShipped set)
@@ -1218,7 +1221,7 @@ def receive_item(po_id, item_id):
             locked_brand_id, locked_brand_name = None, None
 
     # Resolve spare part name for display
-    sp_name = f'SP-{sp_id}'
+    sp_name = f'Spare part {sp_id}'
     try:
         sp_res = (
             supabase.table('Spare_Parts')
@@ -1264,7 +1267,7 @@ def receive_item(po_id, item_id):
         return brand_lookup_recv.get(s.get('Brand_Brand_ID'), 'Unknown Brand')
 
     def _stock_description(s):
-        return f"#{s['Stock_ID']} {sp_name} - {_stock_brand(s)} ({s.get('Size') or 'no size'})"
+        return f"Stock {s['Stock_ID']} - {sp_name} - {_stock_brand(s)} ({s.get('Size') or 'no size'})"
 
     existing_stock_options = [
         (s['Stock_ID'], f"{_stock_description(s)}, QOH: {s.get('QOH', 0)}")
@@ -1446,7 +1449,7 @@ def receive_item(po_id, item_id):
 
                 action = 'updated existing stock' if recv_mode == 'existing' else 'created new stock'
                 flash_success(
-                    f'Item #{item_id} received successfully. '
+                    f'Item {item_id} received successfully. '
                     f'Stock record was {action} (QOH adjusted by {qty_recv}).'
                 )
                 return redirect(url_for('purchase_order.view', po_id=po_id))
@@ -1513,7 +1516,7 @@ def _get_model_catalog_for_po(po_id):
         pass
 
     for r in rows:
-        r['_model_label'] = model_lookup.get(r['Model_Model_No'], f"Model #{r['Model_Model_No']}")
+        r['_model_label'] = model_lookup.get(r['Model_Model_No'], f"Model {r['Model_Model_No']}")
     return rows
 
 
@@ -1548,7 +1551,7 @@ def _enrich_po_motorbikes(rows):
             pass
 
     for r in rows:
-        r['_model_label'] = model_lookup.get(r['Model_Model_No'], f"Model #{r['Model_Model_No']}")
+        r['_model_label'] = model_lookup.get(r['Model_Model_No'], f"Model {r['Model_Model_No']}")
         if r.get('New_MotorBike_NB_ID'):
             r['_vin'] = vin_lookup.get(r.get('New_MotorBike_NB_ID')) or r.get('ShippedVIN')
         else:
@@ -1591,7 +1594,7 @@ def add_motorbike(po_id):
         flash_error(f'Purchase order ID {po_id} was not found.')
         return redirect(url_for('purchase_order.index'))
     if po_status in ('Received', 'Cancelled'):
-        flash_error(f'Cannot add motorcycles to PO-{po_id} because its status is "{po_status}".')
+        flash_error(f'Cannot add motorcycles to purchase order {po_id} because its status is "{po_status}".')
         return redirect(url_for('purchase_order.view', po_id=po_id))
 
     catalog = _get_model_catalog_for_po(po_id)
@@ -1877,7 +1880,7 @@ def receive_motorbike(po_id, pobike_id):
                         'Status':              'Received',
                     }).eq('POBike_ID', pobike_id).execute()
                     _auto_update_po_status(po_id)
-                    flash_success(f'Motorcycle received and added to inventory as NB-{nb_id}.')
+                    flash_success(f'Motorcycle received and added to inventory as motorbike {nb_id}.')
                     return redirect(url_for('purchase_order.view', po_id=po_id))
                 except Exception as e:
                     # Roll back the bike we just created so inventory stays consistent

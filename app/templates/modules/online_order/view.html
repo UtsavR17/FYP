@@ -1,7 +1,7 @@
 {% extends 'layout/admin_layout.html' %}
 {% from 'components/form_field.html' import readonly_field %}
 
-{% block title %}{{ order_ref }} Detail{% endblock %}
+{% block title %}Online Order {{ order_ref }}{% endblock %}
 {% block page_title %}Online Order Detail{% endblock %}
 
 {% block content %}
@@ -9,7 +9,7 @@
 <div class="page-header">
     <div>
         <h2 class="page-header-title">
-            {{ order_ref }}
+            Online Order {{ order_ref }}
             {% if is_reservation %}<span class="oo-type-badge oo-type-reservation">Bike reservation</span>{% endif %}
         </h2>
         <p class="page-header-subtitle">
@@ -21,12 +21,21 @@
     </a>
 </div>
 
+{% set order_unpaid = order.Status == 'Pending Payment' or (order.Status == 'Cancelled' and not order.PaidAt) %}
+
+{% if order.Status == 'Pending Payment' %}
+<div class="oo-notice oo-notice-info" role="status">
+    <i class="fa-solid fa-circle-info"></i>
+    <div><strong>This order has not been paid. Stock has not been changed.</strong></div>
+</div>
+{% endif %}
+
 {% if check_stripe %}
 <div class="oo-notice oo-notice-warning" role="status">
     <i class="fa-solid fa-triangle-exclamation"></i>
     <div>
         <strong>Check Stripe.</strong> {{ check_stripe_tooltip }}
-        Search the Stripe Dashboard for {{ order_ref }} (the order id is in the payment metadata).
+        Search the Stripe Dashboard for order id {{ order_ref }} (it is in the payment metadata).
     </div>
 </div>
 {% endif %}
@@ -75,7 +84,7 @@
             {% if sale_id %}
             <div class="mt-2">
                 <a href="{{ url_for('sale.view', sale_id=sale_id) }}" class="btn btn-sm btn-outline-primary">
-                    <i class="fa-solid fa-handshake me-1"></i>Open SALE-{{ sale_id }}
+                    <i class="fa-solid fa-handshake me-1"></i>Open Sale {{ sale_id }}
                 </a>
             </div>
             {% endif %}
@@ -147,6 +156,7 @@
                         </div>
                     </div>
                 </div>
+                <div class="col-sm-6">{{ readonly_field('Payment status', 'Not paid' if order_unpaid else 'Paid') }}</div>
                 <div class="col-sm-6">{{ readonly_field('Type', 'Bike reservation' if is_reservation else 'Parts') }}</div>
                 {% if is_reservation %}
                 <div class="col-sm-6">{{ readonly_field('Fulfilment', 'Collect from the dealership') }}</div>
@@ -216,7 +226,7 @@
         <h3 class="oo-card-title">Reservation</h3>
         {% if sale_id %}
         <a href="{{ url_for('sale.view', sale_id=sale_id) }}" class="btn btn-sm btn-outline-primary">
-            <i class="fa-solid fa-handshake me-1"></i>View SALE-{{ sale_id }}
+            <i class="fa-solid fa-handshake me-1"></i>View Sale {{ sale_id }}
         </a>
         {% endif %}
     </div>
@@ -311,7 +321,7 @@
 <div class="admin-card mt-3">
     <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
         <h3 class="oo-card-title">
-            {% if is_reservation and sale_id %}Payments on SALE-{{ sale_id }}{% else %}Payment{% endif %}
+            {% if is_reservation and sale_id %}Payments on Sale {{ sale_id }}{% else %}Payment{% endif %}
             <span class="record-count-badge">{{ payments | length }}</span>
         </h3>
         {% if missing_payment %}
@@ -341,7 +351,7 @@
             <tbody>
                 {% for p in payments %}
                 <tr>
-                    <td><a href="{{ url_for('payment.index', q=('SALE-' ~ sale_id) if is_reservation else order_ref) }}">PAY-{{ p.PaymentID }}</a></td>
+                    <td><a href="{{ url_for('payment.index', q=('sale ' ~ sale_id) if is_reservation else ('order ' ~ order.OrderID)) }}">{{ p.PaymentID | display_id }}</a></td>
                     <td>{{ p.PaymentDate or '-' }}</td>
                     <td class="text-end"><strong>Rs. {{ '%.2f' | format(p.AmountPaid | float) }}</strong></td>
                     <td>{{ p.PaymentMethod or '-' }}</td>
@@ -370,7 +380,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title" id="completeReservationModalLabel">Complete {{ order_ref }}?</h5>
+                <h5 class="modal-title" id="completeReservationModalLabel">Complete online order {{ order_ref }}?</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -400,7 +410,7 @@
             <div class="modal-header border-0 pb-0">
                 <h5 class="modal-title d-flex align-items-center gap-2" id="cancelOrderModalLabel">
                     <span class="modal-warning-icon"><i class="fa-solid fa-triangle-exclamation"></i></span>
-                    Cancel {{ order_ref }}?
+                    {% if order.Status == 'Pending Payment' %}Cancel this unpaid order?{% else %}Cancel online order {{ order_ref }}?{% endif %}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -414,7 +424,7 @@
                 </p>
                 {% else %}
                 <p class="modal-body-text mb-0">
-                    The customer has not paid the deposit yet, so no sale exists and no refund is needed.
+                    No stock or payment is affected. The customer has not paid the deposit, so no sale exists.
                     This <strong>cannot be undone</strong>.
                 </p>
                 {% endif %}
@@ -428,8 +438,7 @@
                 </p>
                 {% else %}
                 <p class="modal-body-text mb-0">
-                    The customer has not paid yet, so no stock was taken and no refund is needed.
-                    This <strong>cannot be undone</strong>.
+                    No stock or payment is affected. This <strong>cannot be undone</strong>.
                 </p>
                 {% endif %}
             </div>

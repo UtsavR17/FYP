@@ -1,4 +1,5 @@
 {% extends 'layout/admin_layout.html' %}
+{% from 'components/record_id.html' import id_badge %}
 
 {% block title %}Dashboard{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
@@ -216,7 +217,7 @@
                             {% for po in open_pos %}
                             <tr class="dash-row-link">
                                 <td>
-                                    <a href="{{ po.url }}" class="dash-row-anchor">PO-{{ po.id }}</a>
+                                    <a href="{{ po.url }}" class="dash-row-anchor">{{ po.id | display_id }}</a>
                                 </td>
                                 <td class="dash-wrap">{{ po.supplier }}</td>
                                 <td>
@@ -332,9 +333,9 @@
                             {% for p in recent_payments %}
                             <tr class="dash-row-link">
                                 <td>
-                                    <a href="{{ p.url }}" class="dash-row-anchor">PAY-{{ p.id }}</a>
+                                    <a href="{{ p.url }}" class="dash-row-anchor">{{ p.id | display_id }}</a>
                                 </td>
-                                <td class="text-secondary">{{ p.reference }}</td>
+                                <td class="text-secondary">{% if p.ref_type %}{{ id_badge(p.ref_type, p.ref_id) }}{% else %}-{% endif %}</td>
                                 <td>
                                     <span class="pay-type-badge pay-type-{{ p.type | lower | replace(' ', '-') }}">
                                         {{ p.type }}

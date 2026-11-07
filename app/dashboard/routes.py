@@ -5,7 +5,6 @@ from flask import render_template, session, url_for
 from app.dashboard import bp
 from app.auth.decorators import login_required
 from app.supabase_client import supabase
-from app.utils.order_ref import format_order_ref
 
 
 # -- Dashboard settings (Task 34) --------------------------------------------
@@ -610,21 +609,22 @@ def _get_recent_payments(today):
         appt_id = r.get('Appointment_AppointmentID')
         order_id = r.get('Online_Order_OrderID')
         if sale_id:
-            reference = f'SALE-{sale_id}'
+            ref_type, ref_id = 'Sale', sale_id
             link = url_for('sale.view', sale_id=sale_id)
         elif appt_id:
-            reference = f'APPT-{appt_id}'
+            ref_type, ref_id = 'Appointment', appt_id
             link = url_for('appointment.view', appt_id=appt_id)
         elif order_id:
-            reference = format_order_ref(order_id)
+            ref_type, ref_id = 'Online order', order_id
             link = url_for('online_order.view', order_id=order_id)
         else:
-            reference = '-'
+            ref_type, ref_id = None, None
             link = url_for('payment.edit', payment_id=r['PaymentID'])
 
         items.append({
             'id': r['PaymentID'],
-            'reference': reference,
+            'ref_type': ref_type,
+            'ref_id': ref_id,
             'type': r.get('PaymentType') or '-',
             'amount': _format_mur(_to_float(r.get('AmountPaid'))),
             'date': _format_short_date(_parse_date(r.get('PaymentDate')), today),

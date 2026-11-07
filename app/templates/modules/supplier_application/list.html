@@ -80,7 +80,7 @@
         <tr>
             <td style="width:70px;">
                 <a href="{{ url_for('supplier_application.view', application_id=row.ApplicationID) }}" class="fw-semibold">
-                    #{{ row.ApplicationID }}
+                    {{ row.ApplicationID | display_id }}
                 </a>
             </td>
             <td><strong>{{ row.CompanyName }}</strong></td>

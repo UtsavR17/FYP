@@ -2,14 +2,14 @@
 {% from 'components/form_field.html' import readonly_field %}
 {% from 'components/modal_confirm.html' import delete_modal %}
 
-{% block title %}PO-{{ po_id }} Detail{% endblock %}
+{% block title %}Purchase Order {{ po_id }}{% endblock %}
 {% block page_title %}Purchase Order Detail{% endblock %}
 
 {% block content %}
 
 <div class="page-header">
     <div>
-        <h2 class="page-header-title">PO-{{ po_id }}</h2>
+        <h2 class="page-header-title">Purchase Order {{ po_id }}</h2>
         <p class="page-header-subtitle">Purchase order details and line items</p>
     </div>
     <div class="d-flex gap-2">
@@ -27,7 +27,7 @@
     <p class="form-section-title">Order Information</p>
     <div class="row">
         <div class="col-md-4">
-            {{ readonly_field('PO Number', 'PO-' ~ record.PurchaseOrderID) }}
+            {{ readonly_field('PO Number', record.PurchaseOrderID | display_id) }}
         </div>
         <div class="col-md-4">
             {{ readonly_field('Supplier', supplier_name) }}
@@ -176,7 +176,7 @@
             <tbody>
                 {% for item in po_items %}
                 <tr>
-                    <td class="text-muted">#{{ item.POItem_ID }}</td>
+                    <td class="text-muted">{{ item.POItem_ID | display_id }}</td>
                     <td><strong>{{ item._sp_name }}</strong></td>
                     <td>{{ item.Quantity_Ordered }}</td>
                     <td>Rs. {{ '%.2f' | format(item.BuyingPrice | float) }}</td>
@@ -220,7 +220,7 @@
                             <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal"
                                 data-bs-target="#deleteModal"
                                 data-delete-url="{{ url_for('purchase_order.delete_item', po_id=po_id, item_id=item.POItem_ID) }}"
-                                data-record-name="Item #{{ item.POItem_ID }} ({{ item._sp_name }})">
+                                data-record-name="Item {{ item.POItem_ID }} ({{ item._sp_name }})">
                                 <i class="fa-solid fa-trash me-1"></i>
                             </button>
                             {% endif %}

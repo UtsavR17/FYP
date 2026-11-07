@@ -10,9 +10,14 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # Online order references (Task 40): {{ order_id | order_ref }} -> ORD-000012
+    # Record identifiers (Fix Phase 7, DEC-15): plain numbers everywhere.
+    # {{ id | display_id }} -> 5, {{ typed_id('sale', 5) }} -> Sale 5;
+    # {{ order_id | order_ref }} (Task 40) is a thin wrapper that also gives the number.
+    from app.utils.ids import display_id, typed_id
     from app.utils.order_ref import format_order_ref
+    app.add_template_filter(display_id, 'display_id')
     app.add_template_filter(format_order_ref, 'order_ref')
+    app.add_template_global(typed_id, 'typed_id')
 
     # ------------------------------------------------------------------
     # BLUEPRINT REGISTRATION

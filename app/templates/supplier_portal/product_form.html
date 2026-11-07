@@ -31,7 +31,8 @@
             <div class="col-md-6">
                 {{ select_field(name='Brand_Brand_ID', label='Brand', options=brand_options,
                     selected=form_data.get('Brand_Brand_ID',''), required=True,
-                    error=errors.get('Brand_Brand_ID',''), empty_label='- Select a Brand -') }}
+                    error=errors.get('Brand_Brand_ID',''), empty_label='- Select a Brand -',
+                    help_text='Brand not listed? Contact the dealership to have it added.') }}
             </div>
         </div>
         {% else %}

@@ -66,7 +66,7 @@
         {% for row in pagination.records %}
         <tr>
             <td class="text-muted" style="width:60px;">
-                <strong>#{{ row.AppointmentID }}</strong>
+                <strong>{{ row.AppointmentID | display_id }}</strong>
             </td>
             <td>{{ row._bike_label }}</td>
             <td>
@@ -102,7 +102,7 @@
                             data-bs-toggle="modal"
                             data-bs-target="#deleteModal"
                             data-delete-url="{{ url_for('appointment.delete', appt_id=row.AppointmentID) }}"
-                            data-record-name="Appointment #{{ row.AppointmentID }}">
+                            data-record-name="Appointment {{ row.AppointmentID }}">
                         <i class="fa-solid fa-trash me-1"></i>Delete
                     </button>
                 </div>

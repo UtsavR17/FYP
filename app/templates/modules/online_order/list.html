@@ -23,7 +23,7 @@
     {{ search_bar(
         url_for('online_order.index'),
         search_query,
-        'Search by order number (ORD-000012 or 12), customer name or phone...'
+        'Search by order number (e.g. 12), customer name or phone...'
     ) }}
 
     <form method="GET" action="{{ url_for('online_order.index') }}" class="oo-filter-form">
@@ -106,6 +106,10 @@
             </td>
             <td>
                 <span class="po-status-badge oo-status-{{ row._status_css }}">{{ row.Status }}</span>
+                {# Payment status (Fix Phase 7, ISS-23): display only #}
+                <div class="small text-muted mt-1">
+                    Payment: {{ 'Not paid' if row.Status == 'Pending Payment' or (row.Status == 'Cancelled' and not row.PaidAt) else 'Paid' }}
+                </div>
                 {% if row._check_stripe %}
                 <span class="oo-check-stripe" tabindex="0" data-bs-toggle="tooltip" data-bs-placement="top"
                       title="{{ check_stripe_tooltip }}" aria-label="Check Stripe: {{ check_stripe_tooltip }}">

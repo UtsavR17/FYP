@@ -7,11 +7,55 @@ console.log('[MotoAdmin] admin.js loaded successfully.');
 document.addEventListener('DOMContentLoaded', function () {
 
     // -------------------------------------------------------------------------
-    // SIDEBAR TOGGLE (mobile)
+    // SIDEBAR TOGGLE (Fix Phase 7, ISS-22)
+    // Desktop (992px and wider): the hamburger collapses or expands the sidebar;
+    // the choice is kept in localStorage ('adminSidebar') and applied before the
+    // first paint by the inline script in admin_layout.html.
+    // Smaller screens: an off-canvas drawer, closed by default, with a backdrop.
+    // It closes on Escape, on a backdrop click and when a link is chosen; focus
+    // moves into it when it opens and back to the button when it closes.
     // -------------------------------------------------------------------------
     const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebar       = document.getElementById('sidebar');
     const overlay       = document.getElementById('sidebarOverlay');
+    const rootEl        = document.documentElement;
+    const desktopQuery  = window.matchMedia('(min-width: 992px)');
+    const STORAGE_KEY   = 'adminSidebar';
+
+    function isDesktop() {
+        return desktopQuery.matches;
+    }
+
+    function drawerIsOpen() {
+        return !!sidebar && sidebar.classList.contains('open');
+    }
+
+    function syncToggleState() {
+        if (!sidebarToggle) return;
+        const expanded = isDesktop()
+            ? !rootEl.classList.contains('sidebar-collapsed')
+            : drawerIsOpen();
+        sidebarToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    }
+
+    function rememberCollapsed(collapsed) {
+        try {
+            window.localStorage.setItem(STORAGE_KEY, collapsed ? 'collapsed' : 'open');
+        } catch (e) { /* storage unavailable: the state lasts for this page only */ }
+    }
+
+    // Charts and other width-dependent widgets re-measure after the slide.
+    function announceResize() {
+        window.setTimeout(function () {
+            window.dispatchEvent(new Event('resize'));
+        }, 250);
+    }
+
+    function focusables() {
+        return sidebar
+            ? Array.from(sidebar.querySelectorAll('a[href], button:not([disabled])'))
+            : [];
+    }
 
     function openSidebar() {
         if (!sidebar) return;
@@ -20,39 +64,91 @@ document.addEventListener('DOMContentLoaded', function () {
             overlay.classList.add('active');
         }
         document.body.style.overflow = 'hidden';
-        console.log('[MotoAdmin] Sidebar opened.');
+        syncToggleState();
+        const first = sidebar.querySelector('.nav-link.active') || focusables()[0];
+        if (first) {
+            window.setTimeout(function () { first.focus(); }, 50);
+        }
     }
 
-    function closeSidebar() {
+    function closeSidebar(returnFocus) {
         if (!sidebar) return;
+        const wasOpen = drawerIsOpen();
         sidebar.classList.remove('open');
         if (overlay) {
             overlay.classList.remove('active');
         }
         document.body.style.overflow = '';
-        console.log('[MotoAdmin] Sidebar closed.');
+        syncToggleState();
+        if (wasOpen && returnFocus && sidebarToggle) {
+            sidebarToggle.focus();
+        }
     }
 
-    if (sidebarToggle) {
+    function toggleDesktop() {
+        const collapsed = rootEl.classList.toggle('sidebar-collapsed');
+        rememberCollapsed(collapsed);
+        syncToggleState();
+        announceResize();
+    }
+
+    if (sidebarToggle && sidebar) {
         sidebarToggle.addEventListener('click', function () {
-            if (sidebar.classList.contains('open')) {
-                closeSidebar();
+            if (isDesktop()) {
+                toggleDesktop();
+            } else if (drawerIsOpen()) {
+                closeSidebar(true);
             } else {
                 openSidebar();
             }
         });
-        console.log('[MotoAdmin] Sidebar toggle listener attached.');
-    } else {
-        console.warn('[MotoAdmin] sidebarToggle element not found.');
+
+        // Choosing a link in the drawer closes it (the page then navigates).
+        sidebar.addEventListener('click', function (e) {
+            if (!isDesktop() && e.target.closest('a[href]')) {
+                closeSidebar(false);
+            }
+        });
+
+        // Keep keyboard focus inside the open drawer.
+        sidebar.addEventListener('keydown', function (e) {
+            if (e.key !== 'Tab' || isDesktop() || !drawerIsOpen()) return;
+            const items = focusables();
+            if (!items.length) return;
+            const first = items[0];
+            const last = items[items.length - 1];
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        });
+
+        // Crossing the 992px breakpoint: drop the drawer state, keep the desktop choice.
+        desktopQuery.addEventListener('change', function () {
+            closeSidebar(false);
+            if (isDesktop()) {
+                let stored = null;
+                try { stored = window.localStorage.getItem(STORAGE_KEY); } catch (e) { stored = null; }
+                rootEl.classList.toggle('sidebar-collapsed', stored === 'collapsed');
+            } else {
+                rootEl.classList.remove('sidebar-collapsed');
+            }
+            syncToggleState();
+        });
+
+        syncToggleState();
     }
 
     if (overlay) {
-        overlay.addEventListener('click', closeSidebar);
+        overlay.addEventListener('click', function () { closeSidebar(true); });
     }
 
     document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && sidebar && sidebar.classList.contains('open')) {
-            closeSidebar();
+        if (e.key === 'Escape' && drawerIsOpen()) {
+            closeSidebar(true);
         }
     });
 

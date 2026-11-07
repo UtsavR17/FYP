@@ -30,7 +30,7 @@
             <tbody>
                 {% for po in pos %}
                 <tr>
-                    <td><strong>PO-{{ po.PurchaseOrderID }}</strong></td>
+                    <td><strong>{{ po.PurchaseOrderID | display_id }}</strong></td>
                     <td>{{ po.POrderDate or '-' }}</td>
                     <td>{{ po.ExpectedDate or '-' }}</td>
                     <td>
