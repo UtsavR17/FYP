@@ -2999,3 +2999,66 @@ label.form-label {
 .pay-status-unpaid { background: rgba(220, 38, 38, 0.1); color: #b91c1c; }
 .pay-status-partially-paid { background: rgba(251, 191, 36, 0.18); color: #b45309; }
 .pay-status-paid { background: rgba(22, 163, 74, 0.12); color: #15803d; }
+
+
+/* ===========================================================================
+   COLLAPSIBLE SIDEBAR (Fix Phase 7, ISS-22)
+   New rules only. Desktop (992px and wider): the hamburger collapses the
+   sidebar completely and the content takes the full width; the state is kept
+   in localStorage and applied before the first paint (html.sidebar-collapsed).
+   Smaller screens: the existing off-canvas drawer (.sidebar.open + overlay).
+   =========================================================================== */
+
+.sidebar-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sidebar-toggle:focus-visible,
+.sidebar-nav .nav-link:focus-visible,
+.sidebar-logout-link:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.main-wrapper {
+    transition: margin-left var(--transition);
+}
+
+/* Hidden only after the slide-out ends; shown at once when opening, so focus can move in. */
+
+/* Links fade colours only: a transition on "all" would also animate the
+   visibility they inherit and keep them unfocusable for a moment. */
+.sidebar-nav .nav-link,
+.sidebar-logout-link {
+    transition-property: color, background-color, border-color;
+}
+
+@media (min-width: 992px) {
+    html.sidebar-collapsed .sidebar {
+        transform: translateX(-100%);
+        visibility: hidden;
+        transition: transform var(--transition), visibility 0s linear 0.2s;
+    }
+
+    html.sidebar-collapsed .main-wrapper {
+        margin-left: 0;
+    }
+}
+
+@media (max-width: 991.98px) {
+    /* A closed drawer is hidden from keyboard and screen readers too. */
+    .sidebar:not(.open) {
+        visibility: hidden;
+        transition: transform var(--transition), visibility 0s linear 0.2s;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sidebar,
+    .main-wrapper,
+    .sidebar-overlay {
+        transition: none;
+    }
+}

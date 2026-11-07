@@ -1,5 +1,19 @@
 {# layout/admin_layout.html — Placeholder. Implemented in Task 04. #}{% extends 'layout/base.html' %}
 
+{% block head %}
+<script>
+    /* Apply the remembered desktop sidebar state before the first paint (Fix Phase 7). */
+    (function () {
+        try {
+            if (window.matchMedia('(min-width: 992px)').matches &&
+                window.localStorage.getItem('adminSidebar') === 'collapsed') {
+                document.documentElement.classList.add('sidebar-collapsed');
+            }
+        } catch (e) { /* storage unavailable: the sidebar stays open */ }
+    })();
+</script>
+{% endblock %}
+
 {% block body %}
 <div class="admin-wrapper">
 
@@ -243,8 +257,9 @@
         <!-- Header -->
         <header class="admin-header">
             <div class="header-left">
-                <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle navigation">
-                    <i class="fa-solid fa-bars"></i>
+                <button type="button" class="sidebar-toggle" id="sidebarToggle"
+                        aria-label="Toggle navigation" aria-controls="sidebar" aria-expanded="true">
+                    <i class="fa-solid fa-bars" aria-hidden="true"></i>
                 </button>
                 <h1 class="page-title">{% block page_title %}Admin Panel{% endblock %}</h1>
             </div>
