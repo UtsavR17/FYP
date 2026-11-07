@@ -42,7 +42,7 @@
         {% for row in pagination.records %}
         <tr>
             <td style="width:100px;">
-                <strong>SALE-{{ row.SaleID }}</strong>
+                <strong>{{ row.SaleID | display_id }}</strong>
             </td>
             <td>{{ row._customer_name }}</td>
             <td>
@@ -83,7 +83,7 @@
                             data-bs-toggle="modal"
                             data-bs-target="#deleteModal"
                             data-delete-url="{{ url_for('sale.delete', sale_id=row.SaleID) }}"
-                            data-record-name="SALE-{{ row.SaleID }} - {{ row._customer_name }}">
+                            data-record-name="Sale {{ row.SaleID }} - {{ row._customer_name }}">
                         <i class="fa-solid fa-trash me-1"></i>Delete
                     </button>
                     {% endif %}

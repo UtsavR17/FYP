@@ -2,17 +2,17 @@
 {% from 'components/form_field.html' import text_field, number_field, select_field,
     date_field, readonly_field %}
 
-{% block title %}Receive Motorcycle — PO-{{ po_id }}{% endblock %}
+{% block title %}Receive Motorcycle - Purchase Order {{ po_id }}{% endblock %}
 {% block page_title %}Receive Motorcycle{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <div>
-        <h2 class="page-header-title">Receive Motorcycle — PO-{{ po_id }}</h2>
+        <h2 class="page-header-title">Receive Motorcycle - Purchase Order {{ po_id }}</h2>
         <p class="page-header-subtitle">Enter the unit's details. It will be added to inventory as Available.</p>
     </div>
     <a href="{{ url_for('purchase_order.view', po_id=po_id) }}" class="btn btn-outline-secondary">
-        <i class="fa-solid fa-arrow-left me-2"></i>Back to PO-{{ po_id }}
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to Purchase Order {{ po_id }}
     </a>
 </div>
 

@@ -8,6 +8,7 @@ from app.utils.flash_messages import flash_success, flash_error
 from app.utils.validators import required_fields, is_positive_integer
 from datetime import date as date_type
 from app.utils.text import norm
+from app.utils.ids import parse_id_query
 from app.modules.payment.routes import PAYABLE_APPOINTMENT_STATUSES
 
 
@@ -298,6 +299,7 @@ def index():
 
     if search_query:
         q = search_query.lower()
+        q_id = parse_id_query(search_query, 'appointment')   # 3, #3, APPT-3 or APPT-#3
         all_records = [
             r for r in all_records
             if q in norm(r.get('_bike_label'))
@@ -305,6 +307,7 @@ def index():
             or q in norm(r.get('AppointmentType'))
             or q in norm(r.get('Status'))
             or q in str(r.get('Appointment_Date', '') or '')
+            or (q_id is not None and r.get('AppointmentID') == q_id)
         ]
 
     if list_filter == FILTER_NEEDS_CONFIRMATION:
@@ -495,12 +498,12 @@ def edit(appt_id):
                 if status_value == 'Completed' and previous_status != 'Completed':
                     _deduct_stock_for_appointment(appt_id)
                     flash_success(
-                        f'Appointment #{appt_id} was marked Completed and '
+                        f'Appointment {appt_id} was marked Completed and '
                         f'stock quantities have been updated.'
                     )
                 else:
                     flash_success(
-                        f'Appointment #{appt_id} was updated successfully.'
+                        f'Appointment {appt_id} was updated successfully.'
                     )
 
                 return redirect(url_for('appointment.index'))
@@ -598,7 +601,7 @@ def confirm(appt_id):
     if not updated.data:
         flash_error(APPOINTMENT_CHANGED_MSG)          # e.g. the customer cancelled meanwhile
         return redirect(url_for('appointment.view', appt_id=appt_id))
-    flash_success(f'Appointment #{appt_id} confirmed with {employee_name}.')
+    flash_success(f'Appointment {appt_id} confirmed with {employee_name}.')
     return redirect(url_for('appointment.view', appt_id=appt_id))
 
 
@@ -624,7 +627,7 @@ def cancel(appt_id):
     if not updated.data:
         flash_error(APPOINTMENT_CHANGED_MSG)
         return redirect(url_for('appointment.view', appt_id=appt_id))
-    flash_success(f'Appointment #{appt_id} was cancelled.')
+    flash_success(f'Appointment {appt_id} was cancelled.')
     return redirect(url_for('appointment.view', appt_id=appt_id))
 
 
@@ -663,7 +666,7 @@ def _render_view(appt_id, record, confirm_form=None, confirm_errors=None):
         for s in raw_services:
             svc = svc_lookup.get(s['Service_ServiceID'], {})
             s['_service_name'] = svc.get(
-                'Service_Name', f"Service #{s['Service_ServiceID']}"
+                'Service_Name', f"Service {s['Service_ServiceID']}"
             )
             s['_service_cost'] = svc.get('Cost', 0)
         appt_services = raw_services
@@ -730,11 +733,11 @@ def _render_view(appt_id, record, confirm_form=None, confirm_errors=None):
                 info = stk_lookup.get(s.get('Stock_Stock_ID'), {})
                 if isinstance(info, dict):
                     s['_stock_label'] = info.get(
-                        'label', f"Stock #{s.get('Stock_Stock_ID')}"
+                        'label', f"Stock {s.get('Stock_Stock_ID')}"
                     )
                     s['_stock_price'] = info.get('price', 0.0)
                 else:
-                    s['_stock_label'] = f"Stock #{s.get('Stock_Stock_ID')}"
+                    s['_stock_label'] = f"Stock {s.get('Stock_Stock_ID')}"
                     s['_stock_price'] = 0.0
         appt_stock = raw_stock
     except Exception:
@@ -823,12 +826,12 @@ def _render_view(appt_id, record, confirm_form=None, confirm_errors=None):
 def delete(appt_id):
     try:
         supabase.table('Appointment').delete().eq('AppointmentID', appt_id).execute()
-        flash_success(f'Appointment #{appt_id} was deleted successfully.')
+        flash_success(f'Appointment {appt_id} was deleted successfully.')
     except Exception as e:
         error_msg = str(e)
         if 'foreign key' in error_msg.lower() or 'violates' in error_msg.lower():
             flash_error(
-                f'Cannot delete Appointment #{appt_id} because it has an '
+                f'Cannot delete Appointment {appt_id} because it has an '
                 f'associated payment record. '
                 f'Remove the payment record first before deleting this appointment.'
             )
@@ -963,7 +966,7 @@ def edit_service(appt_id, service_id):
         return redirect(url_for('appointment.view', appt_id=appt_id))
 
     # Resolve service name for display
-    service_name = f'Service #{service_id}'
+    service_name = f'Service {service_id}'
     try:
         svc_res = (
             supabase.table('Service')
@@ -1225,7 +1228,7 @@ def edit_stock(appt_id, stock_id):
         return redirect(url_for('appointment.view', appt_id=appt_id))
 
     # Resolve stock label for display
-    stock_label = f'Stock #{stock_id}'
+    stock_label = f'Stock {stock_id}'
     try:
         stk_res = (
             supabase.table('Stock')

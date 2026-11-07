@@ -1,7 +1,7 @@
 {% extends 'layout/admin_layout.html' %}
 {% from 'components/form_field.html' import readonly_field %}
 
-{% block title %}Application #{{ application.ApplicationID }}{% endblock %}
+{% block title %}Application {{ application.ApplicationID }}{% endblock %}
 {% block page_title %}Supplier Application{% endblock %}
 
 {% block content %}
@@ -9,7 +9,7 @@
 <div class="page-header">
     <div>
         <h2 class="page-header-title">
-            Application #{{ application.ApplicationID }}
+            Application {{ application.ApplicationID }}
             <span class="po-status-badge sa-status-{{ status_css }}">{{ application.Status }}</span>
         </h2>
         <p class="page-header-subtitle">{{ application.CompanyName }}</p>

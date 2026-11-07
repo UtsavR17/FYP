@@ -188,7 +188,7 @@ class C1Confirm(Fix3Base):
     def test_confirm_success(self):
         r, _, flashes = self.confirm(1)
         self.assertEqual(r.status_code, 302)
-        self.assertEqual(flashes, ['Appointment #1 confirmed with Max Wrench.'])
+        self.assertEqual(flashes, ['Appointment 1 confirmed with Max Wrench.'])
         row = self.rows('Appointment', AppointmentID=1)[0]
         self.assertEqual((row['Status'], row['Employee_EmployeeID'], row['AppointmentType'],
                           row['Appointment_Date'], row['Appointment_time'], row['Customer_bike_BikeID']),
@@ -216,7 +216,7 @@ class C1Confirm(Fix3Base):
 
     def test_cancel_pending_without_employee(self):
         r, _, flashes = self.post(url('appointment.cancel', appt_id=1))
-        self.assertEqual(flashes, ['Appointment #1 was cancelled.'])
+        self.assertEqual(flashes, ['Appointment 1 was cancelled.'])
         self.assertEqual(self.status(1), 'Cancelled')
 
 

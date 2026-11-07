@@ -42,7 +42,7 @@
         {% for row in pagination.records %}
         <tr>
             <td class="text-muted" style="width: 80px;">
-                <strong>PO-{{ row.PurchaseOrderID }}</strong>
+                <strong>{{ row.PurchaseOrderID | display_id }}</strong>
             </td>
             <td>{{ row._supplier_name }}</td>
             <td>{{ row.POrderDate if row.POrderDate else '—' }}</td>
@@ -67,7 +67,7 @@
                             data-bs-toggle="modal"
                             data-bs-target="#deleteModal"
                             data-delete-url="{{ url_for('purchase_order.delete', po_id=row.PurchaseOrderID) }}"
-                            data-record-name="PO-{{ row.PurchaseOrderID }} ({{ row._supplier_name }})">
+                            data-record-name="Purchase order {{ row.PurchaseOrderID }} ({{ row._supplier_name }})">
                         <i class="fa-solid fa-trash me-1"></i>Delete
                     </button>
                 </div>

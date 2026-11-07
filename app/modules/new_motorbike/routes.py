@@ -8,6 +8,7 @@ from app.utils.validators import (
     required_fields, is_positive_number, is_positive_integer
 )
 from app.utils.text import norm
+from app.utils.ids import parse_id_query
 
 
 # ---------Predefined option lists -0------------------------------------
@@ -278,6 +279,7 @@ def index():
     # Search
     if search_query:
         q = search_query.lower()
+        q_id = parse_id_query(search_query, 'motorbike')   # 7, NB-7 or #7
         all_records = [
             r for r in all_records
             if q in norm(r.get('_model_label'))
@@ -285,6 +287,7 @@ def index():
             or q in str(r.get('Year', '') or '')
             or q in norm(r.get('VIN'))
             or q in norm(r.get('Status'))
+            or (q_id is not None and r.get('NB_ID') == q_id)
         ]
 
     pagination = paginate(all_records, page, per_page=10)
@@ -364,7 +367,7 @@ def edit(nb_id):
                     parsed
                 ).eq('NB_ID', nb_id).execute()
                 flash_success(
-                    f'Motorbike NB-{nb_id} was updated successfully.'
+                    f'Motorbike {nb_id} was updated successfully.'
                 )
                 return redirect(url_for('new_motorbike.index'))
             except Exception as e:

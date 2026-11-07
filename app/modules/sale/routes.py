@@ -7,6 +7,7 @@ from app.utils.pagination import paginate
 from app.utils.flash_messages import flash_success, flash_error
 from app.utils.validators import required_fields, is_positive_number
 from app.utils.order_ref import format_order_ref
+from app.utils.ids import display_id, legacy_ref, parse_id_query, typed_id
 from datetime import date as date_type
 from app.utils.text import norm
 from app.modules.online_order.routes import today_mauritius
@@ -37,8 +38,8 @@ def _validate_date(raw_value, field_label):
 
 
 def _build_bike_label(nb_id, year, model_desc, brand_name, colour=None):
-    """Display label for a New_MotorBike record: 'NB-x - Brand Model (Year), Colour'."""
-    label = f"NB-{nb_id} - {brand_name} {model_desc} ({year})"
+    """Display label for a New_MotorBike record: 'x - Brand Model (Year), Colour'."""
+    label = f"{display_id(nb_id)} - {brand_name} {model_desc} ({year})"
     return f"{label}, {colour}" if colour else label
 
 
@@ -365,12 +366,17 @@ def index():
 
     if search_query:
         q = search_query.lower()
+        q_sale_id = parse_id_query(search_query, 'sale')        # 5, SALE-5 or #5
+        q_bike_id = parse_id_query(search_query, 'motorbike')   # NB-7 (as before)
         all_records = [
             r for r in all_records
             if q in norm(r.get('_customer_name'))
             or q in norm(r.get('_bike_label'))
+            or q in legacy_ref('motorbike', r.get('New_MotorBike_NB_ID'))
             or q in norm(r.get('_employee_name'))
             or q in str(r.get('SaleDate', '') or '')
+            or (q_sale_id is not None and r.get('SaleID') == q_sale_id)
+            or (q_bike_id is not None and r.get('New_MotorBike_NB_ID') == q_bike_id)
         ]
 
     pagination = paginate(all_records, page, per_page=10)
@@ -589,7 +595,7 @@ def edit(sale_id):
                     # Mark the new bike as Sold
                     _set_bike_status(nb_id, 'Sold')
 
-                flash_success(f'Sale SALE-{sale_id} was updated successfully.')
+                flash_success(f'Sale {sale_id} was updated successfully.')
                 return redirect(url_for('sale.index'))
             except Exception as e:
                 error_msg = str(e)
@@ -615,7 +621,7 @@ def edit(sale_id):
         has_available_bikes=True,  
         bike_prices=bike_prices,
         bike_locked=bike_locked,
-        locked_bike_label=dict(bike_options).get(original_nb_id, f'NB-{original_nb_id}'),
+        locked_bike_label=dict(bike_options).get(original_nb_id, typed_id('motorbike', original_nb_id)),
         reservation_order_id=reservation_order_id,
         reservation_ref=format_order_ref(reservation_order_id) if reservation_order_id else None,
     )
@@ -758,12 +764,12 @@ def delete(sale_id):
         if nb_id:
             _set_bike_status(nb_id, 'Available')
 
-        flash_success(f'Sale SALE-{sale_id} was deleted and the motorbike has been reset to Available.')
+        flash_success(f'Sale {sale_id} was deleted and the motorbike has been reset to Available.')
     except Exception as e:
         error_msg = str(e)
         if 'foreign key' in error_msg.lower() or 'violates' in error_msg.lower():
             flash_error(
-                f'Cannot delete SALE-{sale_id} because it has an associated payment record. '
+                f'Cannot delete sale {sale_id} because it has an associated payment record. '
                 f'Remove the payment record first before deleting this sale.'
             )
         else:

@@ -1,14 +1,14 @@
 {% extends 'layout/admin_layout.html' %}
 {% from 'components/form_field.html' import readonly_field %}
 
-{% block title %}SALE-{{ sale_id }}{% endblock %}
+{% block title %}Sale {{ sale_id }}{% endblock %}
 {% block page_title %}Sale Detail{% endblock %}
 
 {% block content %}
 
 <div class="page-header">
     <div>
-        <h2 class="page-header-title">SALE-{{ sale_id }}</h2>
+        <h2 class="page-header-title">Sale {{ sale_id }}</h2>
         <p class="page-header-subtitle">Sale details and payment information</p>
     </div>
     <div class="d-flex gap-2">
@@ -39,7 +39,7 @@
     <p class="form-section-title">Sale Information</p>
     <div class="row">
         <div class="col-md-4">
-            {{ readonly_field('Sale ID', 'SALE-' ~ record.SaleID) }}
+            {{ readonly_field('Sale ID', record.SaleID | display_id) }}
         </div>
         <div class="col-md-4">
             {{ readonly_field('Sale Date', record.SaleDate if record.SaleDate else '') }}

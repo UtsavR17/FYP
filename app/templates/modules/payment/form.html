@@ -3,7 +3,7 @@
     number_field, readonly_field %}
 
 {% if is_edit %}
-    {% set heading = 'Edit Payment - PAY-' ~ record.PaymentID %}
+    {% set heading = 'Edit Payment ' ~ record.PaymentID %}
 {% elif mode == 'sale' %}
     {% set heading = 'Record sale payment' %}
 {% else %}
@@ -24,7 +24,7 @@
         <h2 class="page-header-title">{{ heading }}</h2>
         <p class="page-header-subtitle">
             {% if is_edit %}Update payment details.
-            {% elif mode == 'sale' %}Record a payment for SALE-{{ context.sale_id if context else '' }}.
+            {% elif mode == 'sale' %}Record a payment for Sale {{ context.sale_id if context else '' }}.
             {% else %}Record a payment for a confirmed, in progress or completed appointment.{% endif %}
         </p>
     </div>

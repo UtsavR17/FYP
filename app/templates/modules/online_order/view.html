@@ -1,7 +1,7 @@
 {% extends 'layout/admin_layout.html' %}
 {% from 'components/form_field.html' import readonly_field %}
 
-{% block title %}{{ order_ref }} Detail{% endblock %}
+{% block title %}Online Order {{ order_ref }}{% endblock %}
 {% block page_title %}Online Order Detail{% endblock %}
 
 {% block content %}
@@ -9,7 +9,7 @@
 <div class="page-header">
     <div>
         <h2 class="page-header-title">
-            {{ order_ref }}
+            Online Order {{ order_ref }}
             {% if is_reservation %}<span class="oo-type-badge oo-type-reservation">Bike reservation</span>{% endif %}
         </h2>
         <p class="page-header-subtitle">
@@ -26,7 +26,7 @@
     <i class="fa-solid fa-triangle-exclamation"></i>
     <div>
         <strong>Check Stripe.</strong> {{ check_stripe_tooltip }}
-        Search the Stripe Dashboard for {{ order_ref }} (the order id is in the payment metadata).
+        Search the Stripe Dashboard for order id {{ order_ref }} (it is in the payment metadata).
     </div>
 </div>
 {% endif %}
@@ -75,7 +75,7 @@
             {% if sale_id %}
             <div class="mt-2">
                 <a href="{{ url_for('sale.view', sale_id=sale_id) }}" class="btn btn-sm btn-outline-primary">
-                    <i class="fa-solid fa-handshake me-1"></i>Open SALE-{{ sale_id }}
+                    <i class="fa-solid fa-handshake me-1"></i>Open Sale {{ sale_id }}
                 </a>
             </div>
             {% endif %}
@@ -216,7 +216,7 @@
         <h3 class="oo-card-title">Reservation</h3>
         {% if sale_id %}
         <a href="{{ url_for('sale.view', sale_id=sale_id) }}" class="btn btn-sm btn-outline-primary">
-            <i class="fa-solid fa-handshake me-1"></i>View SALE-{{ sale_id }}
+            <i class="fa-solid fa-handshake me-1"></i>View Sale {{ sale_id }}
         </a>
         {% endif %}
     </div>
@@ -311,7 +311,7 @@
 <div class="admin-card mt-3">
     <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
         <h3 class="oo-card-title">
-            {% if is_reservation and sale_id %}Payments on SALE-{{ sale_id }}{% else %}Payment{% endif %}
+            {% if is_reservation and sale_id %}Payments on Sale {{ sale_id }}{% else %}Payment{% endif %}
             <span class="record-count-badge">{{ payments | length }}</span>
         </h3>
         {% if missing_payment %}
@@ -341,7 +341,7 @@
             <tbody>
                 {% for p in payments %}
                 <tr>
-                    <td><a href="{{ url_for('payment.index', q=('SALE-' ~ sale_id) if is_reservation else order_ref) }}">PAY-{{ p.PaymentID }}</a></td>
+                    <td><a href="{{ url_for('payment.index', q=('sale ' ~ sale_id) if is_reservation else ('order ' ~ order.OrderID)) }}">{{ p.PaymentID | display_id }}</a></td>
                     <td>{{ p.PaymentDate or '-' }}</td>
                     <td class="text-end"><strong>Rs. {{ '%.2f' | format(p.AmountPaid | float) }}</strong></td>
                     <td>{{ p.PaymentMethod or '-' }}</td>
@@ -370,7 +370,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title" id="completeReservationModalLabel">Complete {{ order_ref }}?</h5>
+                <h5 class="modal-title" id="completeReservationModalLabel">Complete online order {{ order_ref }}?</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -400,7 +400,7 @@
             <div class="modal-header border-0 pb-0">
                 <h5 class="modal-title d-flex align-items-center gap-2" id="cancelOrderModalLabel">
                     <span class="modal-warning-icon"><i class="fa-solid fa-triangle-exclamation"></i></span>
-                    Cancel {{ order_ref }}?
+                    Cancel online order {{ order_ref }}?
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>

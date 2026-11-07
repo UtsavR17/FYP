@@ -7,6 +7,7 @@ from app.utils.pagination import paginate
 from app.utils.flash_messages import flash_success, flash_error
 from app.utils.validators import is_positive_number
 from app.utils.order_ref import format_order_ref, parse_order_query
+from app.utils.ids import display_id, legacy_ref, parse_id_query, typed_id
 from datetime import date as date_type
 from app.utils.text import norm
 from app.modules.online_order.routes import today_mauritius
@@ -134,7 +135,7 @@ def _get_sale_options(exclude_sale_id=None):
             f'Rs. {remaining:,.2f} remaining' if remaining < total - 0.001
             else f'Rs. {total:,.2f}'
         )
-        label = f"SALE-{sid} \u2014 {cname} ({s.get('SaleDate', '?')}) [{balance_str}]"
+        label = f"{typed_id('sale', sid)} - {cname} ({s.get('SaleDate', '?')}) [{balance_str}]"
         options.append((sid, label))
 
     return options
@@ -280,7 +281,7 @@ def _get_appointment_options(current_appt_id=None):
         )
         status = a.get('Status')
         status_note = '' if status in PAYABLE_APPOINTMENT_STATUSES else f' ({status})'
-        label = f"APPT-#{aid} - {reg} ({a.get('Appointment_Date', '?')}) [{balance_str}]{status_note}"
+        label = f"{typed_id('appointment', aid)} - {reg} ({a.get('Appointment_Date', '?')}) [{balance_str}]{status_note}"
         options.append((aid, label))
 
     return options
@@ -302,7 +303,7 @@ def _enrich_payments(all_records):
         sales = supabase.table('Sale').select('SaleID, Customer_CustomerID').execute()
         for s in (sales.data or []):
             cname = customer_lookup.get(s.get('Customer_CustomerID'), 'Unknown')
-            sale_lookup[s['SaleID']] = f"SALE-{s['SaleID']} \u2014 {cname}"
+            sale_lookup[s['SaleID']] = f"{display_id(s['SaleID'])} - {cname}"
     except Exception:
         pass
 
@@ -322,7 +323,7 @@ def _enrich_payments(all_records):
         )
         for a in (appts.data or []):
             reg = bike_lookup.get(a.get('Customer_bike_BikeID'), 'Unknown')
-            appt_lookup[a['AppointmentID']] = f"APPT-#{a['AppointmentID']} \u2014 {reg} ({a.get('Appointment_Date', '?')})"
+            appt_lookup[a['AppointmentID']] = f"{display_id(a['AppointmentID'])} - {reg} ({a.get('Appointment_Date', '?')})"
     except Exception:
         pass
 
@@ -339,23 +340,30 @@ def _enrich_payments(all_records):
         if sale_id:
             pay['_reference_type']  = 'Sale'
             pay['_reference_key']   = 'sale'
-            pay['_reference_label'] = sale_lookup.get(sale_id, f'SALE-{sale_id}')
+            pay['_reference_label'] = sale_lookup.get(sale_id, display_id(sale_id))
         elif appt_id:
             pay['_reference_type']  = 'Appointment'
             pay['_reference_key']   = 'appointment'
-            pay['_reference_label'] = appt_lookup.get(appt_id, f'APPT-#{appt_id}')
+            pay['_reference_label'] = appt_lookup.get(appt_id, display_id(appt_id))
         elif order_id:
             ref   = format_order_ref(order_id)
             cname = customer_lookup.get(order_customer.get(order_id))
             pay['_reference_type']  = 'Online Order'
             pay['_reference_key']   = 'online'
-            pay['_reference_badge'] = ref
+            pay['_reference_badge'] = 'Online order'
             pay['_reference_label'] = f'{ref} - {cname}' if cname else ref
             pay['_reference_url']   = url_for('online_order.view', order_id=order_id)
         else:
             pay['_reference_type']  = '-'
             pay['_reference_key']   = 'none'
             pay['_reference_label'] = '-'
+        # Old display forms (SALE-5, APPT-#3, ORD-000012, PAY-7), searched but never shown
+        pay['_search_alias'] = ' '.join(filter(None, (
+            legacy_ref('payment', pay.get('PaymentID')),
+            legacy_ref('sale', sale_id) if sale_id else '',
+            legacy_ref('appointment', appt_id) if appt_id else '',
+            legacy_ref('order', order_id) if order_id else '',
+        )))
 
     return all_records
 
@@ -599,7 +607,7 @@ def _validate_form(form_data, mode, context_sale_id=None, current_payment=None):
     if not is_edit and mode == 'appointment' and (posted_type == 'sale' or sale_id_raw):
         errors['reference'] = 'Sale payments are recorded from the sale: open the sale and choose Record payment.'
     if not is_edit and mode == 'sale' and (posted_type == 'appointment' or appt_id_raw):
-        errors['reference'] = f'This page records a payment for SALE-{context_sale_id} only.'
+        errors['reference'] = f'This page records a payment for {typed_id("sale", context_sale_id)} only.'
 
     total, history, noun = None, None, mode
     if mode == 'sale':
@@ -610,7 +618,7 @@ def _validate_form(form_data, mode, context_sale_id=None, current_payment=None):
             errors['Sale_SaleID'] = 'Please select a valid sale.'
         elif not is_edit and sale_id != context_sale_id:
             errors['reference'] = (
-                f'This page records a payment for SALE-{context_sale_id} only. '
+                f'This page records a payment for {typed_id("sale", context_sale_id)} only. '
                 f'Open the sale you want to pay.'
             )
         else:
@@ -741,11 +749,20 @@ def index():
 
     if search_query:
         q = search_query.lower()
-        # "ORD-000012" or a plain order number also find online-order payments.
+        # A number or an old prefixed form (12, ORD-000012, SALE-5, APPT-#3, PAY-7)
+        # finds the payment or its reference; old partial forms match the hidden alias.
         q_order_id = parse_order_query(search_query)
+        q_sale_id = parse_id_query(search_query, 'sale')
+        q_appt_id = parse_id_query(search_query, 'appointment')
+        q_pay_id = parse_id_query(search_query, 'payment')
         all_records = [
             r for r in all_records
             if q in norm(r.get('_reference_label'))
+            or q in norm(r.get('_reference_type'))
+            or q in r.get('_search_alias', '')
+            or (q_sale_id is not None and r.get('Sale_SaleID') == q_sale_id)
+            or (q_appt_id is not None and r.get('Appointment_AppointmentID') == q_appt_id)
+            or (q_pay_id is not None and r.get('PaymentID') == q_pay_id)
             or q in norm(r.get('PaymentMethod'))
             or q in norm(r.get('PaymentType'))
             or q in str(r.get('PaymentDate', '') or '')
@@ -808,7 +825,7 @@ def create():
             flash_error('Could not load the sale. Please try again.')
             return redirect(url_for('sale.view', sale_id=sale_ctx_id))
         if request.method == 'GET' and sale_ctx['remaining'] <= CENT:
-            flash_error(f'SALE-{sale_ctx_id} is already fully paid.')
+            flash_error(f'{typed_id("sale", sale_ctx_id)} is already fully paid.')
             return redirect(url_for('sale.view', sale_id=sale_ctx_id))
 
     done_url = (url_for('sale.view', sale_id=sale_ctx_id) if mode == 'sale'
@@ -935,7 +952,7 @@ def edit(payment_id):
                     'PaymentMethod':             parsed['PaymentMethod'],
                     'PaymentType':               parsed['PaymentType'],
                 }).eq('PaymentID', payment_id).execute()
-                flash_success(f'Payment PAY-{payment_id} was updated successfully.')
+                flash_success(f'Payment {payment_id} was updated successfully.')
                 return redirect(url_for('payment.index'))
             except Exception as e:
                 error_msg = str(e)
@@ -991,7 +1008,7 @@ def delete(payment_id):
 
     try:
         supabase.table('Payment').delete().eq('PaymentID', payment_id).execute()
-        flash_success(f'Payment PAY-{payment_id} was deleted successfully.')
+        flash_success(f'Payment {payment_id} was deleted successfully.')
     except Exception as e:
         flash_error(f'Could not delete payment: {str(e)}')
 

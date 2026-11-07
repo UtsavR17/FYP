@@ -21,6 +21,7 @@ from app.supabase_client import supabase
 from app.utils.pagination import paginate
 from app.utils.flash_messages import flash_success, flash_error
 from app.utils.order_ref import format_order_ref, parse_order_query
+from app.utils.ids import typed_id
 
 
 # Mauritius is UTC+4 all year (no DST).
@@ -662,9 +663,9 @@ def change_status(order_id):
         return redirect(_view_url(order_id))
 
     if updated.data and order_type == TYPE_RESERVATION:
-        flash_success(f'{format_order_ref(order_id)} is completed: the motorcycle was collected.')
+        flash_success(f'{typed_id("order", order_id)} is completed: the motorcycle was collected.')
     elif updated.data:
-        flash_success(f'{format_order_ref(order_id)} is now "{new_status}".')
+        flash_success(f'{typed_id("order", order_id)} is now "{new_status}".')
     else:
         flash_error(ORDER_CHANGED_MSG)
     return redirect(_view_url(order_id))
@@ -689,7 +690,7 @@ def cancel(order_id):
         flash_error(ORDER_CHANGED_MSG)
         return redirect(_view_url(order_id))
 
-    ref = format_order_ref(order_id)
+    ref = typed_id('order', order_id)
     if order_type_of(order) == TYPE_RESERVATION:
         return _cancel_reservation(order_id, order, current, ref)
 

@@ -195,14 +195,14 @@ class M1Modes(Fix1Base):
     def test_mismatched_sale_id_refused(self):
         r, page, _ = self.pay_sale(1, 'Deposit', 300, Sale_SaleID='2')
         self.assertEqual(r.status_code, 200)
-        self.assertIn('This page records a payment for SALE-1 only.', page)
+        self.assertIn('This page records a payment for Sale 1 only.', page)
         self.assertEqual(len(self.payments()), 1)
 
     def test_appointment_post_on_sale_path_refused(self):
         r, page, _ = self.pay_sale(1, 'Deposit', 300, reference_type='appointment', Appointment_AppointmentID='102')
-        self.assertIn('This page records a payment for SALE-1 only.', page)
+        self.assertIn('This page records a payment for Sale 1 only.', page)
         r, page, _ = self.pay_sale(1, 'Deposit', 300, Appointment_AppointmentID='102')
-        self.assertIn('This page records a payment for SALE-1 only.', page)
+        self.assertIn('This page records a payment for Sale 1 only.', page)
         self.assertEqual(len(self.payments()), 1)
 
     def test_bad_or_paid_sale_context(self):
@@ -469,7 +469,7 @@ class A1Payable(Fix1Base):
     def test_edit_existing_payment_of_cancelled_appointment(self):
         self.add_payment(60, 'Deposit', 100, appt=105)
         _, page = self.get(url('payment.edit', payment_id=60))
-        self.assertRegex(page, r'<option\s+value="105"\s+selected>\s*APPT-#105[^<]*\(Cancelled\)')
+        self.assertRegex(page, r'<option\s+value="105"\s+selected>\s*Appointment 105[^<]*\(Cancelled\)')
         r, _, _ = self.post(url('payment.edit', payment_id=60), {
             'Appointment_AppointmentID': '105', 'PaymentType': 'Deposit', 'AmountPaid': '150',
             'PaymentDate': '2026-10-03', 'PaymentMethod': 'Card'})
@@ -490,10 +490,10 @@ class A1Payable(Fix1Base):
 class F1SaleForm(Fix1Base):
     def test_colour_in_bike_labels(self):
         _, page = self.get(url('sale.create'))
-        self.assertIn('NB-12 - Honda CB Shine (2026), Black', page)
+        self.assertIn('12 - Honda CB Shine (2026), Black', page)
         _, page = self.get(url('sale.index'))
-        self.assertIn('NB-10 - Honda CB Shine (2025), Red', page)
-        self.assertIn('NB-11 - Honda Wave 110 (2024)<', page)
+        self.assertIn('10 - Honda CB Shine (2025), Red', page)
+        self.assertIn('11 - Honda Wave 110 (2024)<', page)
         _, page = self.get(url('sale.view', sale_id=1))
         self.assertIn('Honda CB Shine (2025), Red', page)
 

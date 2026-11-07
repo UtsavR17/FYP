@@ -254,7 +254,7 @@ def enrich_supplier_products(client, rows):
     sp_lookup = get_spare_part_lookup(client)
     brand_lookup = get_brand_lookup(client)
     for r in rows:
-        r['_sp_name'] = sp_lookup.get(r.get('SP_id'), f"SP-{r.get('SP_id')}")
+        r['_sp_name'] = sp_lookup.get(r.get('SP_id'), f"Spare part {r.get('SP_id')}")
         r['_brand_name'] = brand_lookup.get(r.get('Brand_Brand_ID'), 'Unknown Brand')
     return rows
 
@@ -264,7 +264,7 @@ def enrich_supplier_models(client, rows):
     model_lookup = get_model_lookup(client)
     for r in rows:
         r['_model_label'] = model_lookup.get(
-            r.get('Model_Model_No'), f"Model #{r.get('Model_Model_No')}"
+            r.get('Model_Model_No'), f"Model {r.get('Model_Model_No')}"
         )
     return rows
 
@@ -424,7 +424,7 @@ def enrich_po_items(client, items):
             brand_by_product = {}
 
     for item in items:
-        item['_sp_name'] = sp_lookup.get(item.get('SP_id'), f"SP-{item.get('SP_id')}")
+        item['_sp_name'] = sp_lookup.get(item.get('SP_id'), f"Spare part {item.get('SP_id')}")
         brand_id = brand_by_product.get(item.get('SupplierProduct_ID'))
         item['_brand_name'] = brand_lookup.get(brand_id, '-') if brand_id else '-'
         item['_shipped_on'] = format_date(item.get('DateShipped'))
@@ -436,7 +436,7 @@ def enrich_po_bikes(client, bikes):
     model_lookup = get_model_lookup(client)
     for bike in bikes:
         bike['_model_label'] = model_lookup.get(
-            bike.get('Model_Model_No'), f"Model #{bike.get('Model_Model_No')}"
+            bike.get('Model_Model_No'), f"Model {bike.get('Model_Model_No')}"
         )
         bike['_shipped_on'] = format_date(bike.get('DateShipped'))
     return bikes

@@ -17,7 +17,7 @@
         </h2>
         <p class="page-header-subtitle">
             {% if is_edit %}
-                Update PO-{{ record.PurchaseOrderID }}.
+                Update purchase order {{ record.PurchaseOrderID }}.
             {% else %}
                 Choose a supplier and expected delivery date. You can add items straight after saving.
             {% endif %}
@@ -26,7 +26,7 @@
     <a href="{{ url_for('purchase_order.view', po_id=record.PurchaseOrderID) if is_edit else url_for('purchase_order.index') }}"
        class="btn btn-outline-secondary">
         <i class="fa-solid fa-arrow-left me-2"></i>
-        {{ 'Back to PO-' ~ record.PurchaseOrderID if is_edit else 'Back to Purchase Orders' }}
+        {{ 'Back to Purchase Order ' ~ record.PurchaseOrderID if is_edit else 'Back to Purchase Orders' }}
     </a>
 </div>
 

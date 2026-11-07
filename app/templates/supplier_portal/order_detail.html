@@ -1,12 +1,12 @@
 {% extends 'supplier_portal/base.html' %}
 {% from 'components/form_field.html' import readonly_field %}
 
-{% block title %}PO-{{ po_id }}{% endblock %}
+{% block title %}Purchase Order {{ po_id }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <div>
-        <h2 class="page-header-title">PO-{{ po_id }}</h2>
+        <h2 class="page-header-title">Purchase Order {{ po_id }}</h2>
         <p class="page-header-subtitle">Order details and shipping</p>
     </div>
     <a href="{{ url_for('supplier_portal.orders') }}" class="btn btn-outline-secondary">
@@ -24,7 +24,7 @@
     </div>
     <div class="sp-banner-actions">
         <form method="POST" action="{{ url_for('supplier_portal.accept_order', po_id=po_id) }}"
-              onsubmit="return confirm('Accept PO-{{ po_id }}? You commit to supplying every line on this order.');">
+              onsubmit="return confirm('Accept purchase order {{ po_id }}? You commit to supplying every line on this order.');">
             <button type="submit" class="btn btn-accent">
                 <i class="fa-solid fa-check me-2"></i>Accept Order
             </button>
@@ -56,7 +56,7 @@
 <div class="form-card">
     <p class="form-section-title">Order Information</p>
     <div class="row">
-        <div class="col-sm-6 col-lg-3">{{ readonly_field('PO Number', 'PO-' ~ po.PurchaseOrderID) }}</div>
+        <div class="col-sm-6 col-lg-3">{{ readonly_field('PO Number', po.PurchaseOrderID | display_id) }}</div>
         <div class="col-sm-6 col-lg-3">
             <div class="mb-3">
                 <label class="form-label readonly-label">Status</label>
@@ -189,7 +189,7 @@
         <div class="modal-content">
             <form method="POST" action="{{ url_for('supplier_portal.reject_order', po_id=po_id) }}" novalidate>
                 <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title" id="rejectModalLabel">Reject PO-{{ po_id }}</h5>
+                    <h5 class="modal-title" id="rejectModalLabel">Reject Purchase Order {{ po_id }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">

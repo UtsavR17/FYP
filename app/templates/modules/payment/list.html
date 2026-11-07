@@ -27,7 +27,7 @@
     {{ search_bar(
         url_for('payment.index'),
         search_query,
-        'Search by reference (e.g. ORD-000012), method, type or date...'
+        'Search by payment or reference number (e.g. 12), method, type or date...'
     ) }}
 
     {% if search_query %}
@@ -42,7 +42,7 @@
         {% for row in pagination.records %}
         <tr>
             <td style="width:90px;">
-                <strong>PAY-{{ row.PaymentID }}</strong>
+                <strong>{{ row.PaymentID | display_id }}</strong>
             </td>
             <td>
                 {% if row._reference_key == 'online' %}
@@ -86,7 +86,7 @@
                             data-bs-toggle="modal"
                             data-bs-target="#deleteModal"
                             data-delete-url="{{ url_for('payment.delete', payment_id=row.PaymentID) }}"
-                            data-record-name="PAY-{{ row.PaymentID }} ({{ row._reference_label }})">
+                            data-record-name="Payment {{ row.PaymentID }} ({{ row._reference_type }} {{ row._reference_label }})">
                         <i class="fa-solid fa-trash me-1"></i>Delete
                     </button>
                 </div>

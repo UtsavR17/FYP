@@ -14,6 +14,7 @@ from app.auth.decorators import login_required
 from app.supabase_client import supabase
 from app.utils.pagination import paginate
 from app.utils.flash_messages import flash_success, flash_error
+from app.utils.ids import parse_id_query
 
 
 # Mauritius is UTC+4 all year (no DST).
@@ -84,7 +85,13 @@ def clean_search(value):
 
 
 def matches_search(row, query):
-    """Company, contact person, email or BRN contains the query (case-insensitive)."""
+    """
+    Application number (5 or #5), or company, contact person, email or BRN contains the
+    query (case-insensitive).
+    """
+    app_id = parse_id_query(query, 'application')
+    if app_id is not None and row.get('ApplicationID') == app_id:
+        return True
     needle = query.lower()
     return any(
         needle in str(row.get(field) or '').lower()

@@ -394,7 +394,7 @@ def _enrich_supplier_products(rows):
         pass
 
     for r in rows:
-        r['_sp_name'] = sp_lookup.get(r.get('SP_id'), f"SP-{r.get('SP_id')}")
+        r['_sp_name'] = sp_lookup.get(r.get('SP_id'), f"Spare part {r.get('SP_id')}")
         r['_brand_name'] = brand_lookup.get(r.get('Brand_Brand_ID'), 'Unknown Brand')
     return rows
 
@@ -416,7 +416,7 @@ def _enrich_supplier_models(rows):
 
     for r in rows:
         r['_model_label'] = model_lookup.get(
-            r.get('Model_Model_No'), f"Model #{r.get('Model_Model_No')}"
+            r.get('Model_Model_No'), f"Model {r.get('Model_Model_No')}"
         )
     return rows
 

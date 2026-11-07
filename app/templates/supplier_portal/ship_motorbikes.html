@@ -1,17 +1,17 @@
 {% extends 'supplier_portal/base.html' %}
 
-{% block title %}Ship Motorcycles - PO-{{ po_id }}{% endblock %}
+{% block title %}Ship Motorcycles - Purchase Order {{ po_id }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <div>
-        <h2 class="page-header-title">Ship Motorcycles - PO-{{ po_id }}</h2>
+        <h2 class="page-header-title">Ship Motorcycles - Purchase Order {{ po_id }}</h2>
         <p class="page-header-subtitle">
             Fill in VIN and year for each unit you are shipping now. Leave a row empty to ship it later.
         </p>
     </div>
     <a href="{{ url_for('supplier_portal.order_detail', po_id=po_id) }}" class="btn btn-outline-secondary">
-        <i class="fa-solid fa-arrow-left me-2"></i>Back to PO-{{ po_id }}
+        <i class="fa-solid fa-arrow-left me-2"></i>Back to Purchase Order {{ po_id }}
     </a>
 </div>
 
