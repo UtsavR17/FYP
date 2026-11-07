@@ -123,7 +123,7 @@ RESERVATION_CANCEL_WARNING = (
 # "Check Stripe" flag; it is stripped from every row before rendering.
 ORDER_LIST_COLUMNS = (
     'OrderID, OrderDate, Customer_CustomerID, Status, FulfilmentMethod, '
-    'EstimatedDate, TotalAmount, OrderType, BikeDescription, ReservedUntil, Date_Created'
+    'EstimatedDate, TotalAmount, OrderType, BikeDescription, ReservedUntil, Date_Created, PaidAt'
 )
 ORDER_VIEW_COLUMNS = (
     'OrderID, OrderDate, Customer_CustomerID, Status, FulfilmentMethod, '

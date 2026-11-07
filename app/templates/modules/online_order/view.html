@@ -21,6 +21,15 @@
     </a>
 </div>
 
+{% set order_unpaid = order.Status == 'Pending Payment' or (order.Status == 'Cancelled' and not order.PaidAt) %}
+
+{% if order.Status == 'Pending Payment' %}
+<div class="oo-notice oo-notice-info" role="status">
+    <i class="fa-solid fa-circle-info"></i>
+    <div><strong>This order has not been paid. Stock has not been changed.</strong></div>
+</div>
+{% endif %}
+
 {% if check_stripe %}
 <div class="oo-notice oo-notice-warning" role="status">
     <i class="fa-solid fa-triangle-exclamation"></i>
@@ -147,6 +156,7 @@
                         </div>
                     </div>
                 </div>
+                <div class="col-sm-6">{{ readonly_field('Payment status', 'Not paid' if order_unpaid else 'Paid') }}</div>
                 <div class="col-sm-6">{{ readonly_field('Type', 'Bike reservation' if is_reservation else 'Parts') }}</div>
                 {% if is_reservation %}
                 <div class="col-sm-6">{{ readonly_field('Fulfilment', 'Collect from the dealership') }}</div>
@@ -400,7 +410,7 @@
             <div class="modal-header border-0 pb-0">
                 <h5 class="modal-title d-flex align-items-center gap-2" id="cancelOrderModalLabel">
                     <span class="modal-warning-icon"><i class="fa-solid fa-triangle-exclamation"></i></span>
-                    Cancel online order {{ order_ref }}?
+                    {% if order.Status == 'Pending Payment' %}Cancel this unpaid order?{% else %}Cancel online order {{ order_ref }}?{% endif %}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -414,7 +424,7 @@
                 </p>
                 {% else %}
                 <p class="modal-body-text mb-0">
-                    The customer has not paid the deposit yet, so no sale exists and no refund is needed.
+                    No stock or payment is affected. The customer has not paid the deposit, so no sale exists.
                     This <strong>cannot be undone</strong>.
                 </p>
                 {% endif %}
@@ -428,8 +438,7 @@
                 </p>
                 {% else %}
                 <p class="modal-body-text mb-0">
-                    The customer has not paid yet, so no stock was taken and no refund is needed.
-                    This <strong>cannot be undone</strong>.
+                    No stock or payment is affected. This <strong>cannot be undone</strong>.
                 </p>
                 {% endif %}
             </div>

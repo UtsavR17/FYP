@@ -85,5 +85,73 @@ class SidebarAssets(unittest.TestCase):
         self.assertIn("e.key !== 'Tab'", self.js)                      # focus stays in the drawer
 
 
+def order_tables():
+    t = fixtures_ids.tables()
+    t['Online_Order'].append({'OrderID': 20, 'OrderDate': '2026-10-06', 'Customer_CustomerID': 1,
+                              'Status': 'Pending Payment', 'FulfilmentMethod': 'Pickup', 'OrderType': 'Parts',
+                              'TotalAmount': 400, 'StripeSessionID': 'cs_20', 'PaidAt': None, 'Sale_SaleID': None})
+    t['Online_Order_Item'].append({'OrderItemID': 20, 'Online_Order_OrderID': 20, 'Stock_Stock_ID': 1,
+                                   'ItemDescription': 'Brake Pad', 'Quantity': 2, 'UnitPrice': 200})
+    return t
+
+
+class UnpaidOrderWording(Base):
+    """ISS-23: wording only. Pending Payment orders say they are unpaid and untouched."""
+    tables = staticmethod(order_tables)
+
+    def view(self, order_id):
+        r, body = self.get(url('online_order.view', order_id=order_id))
+        self.assertEqual(r.status_code, 200)
+        return re.sub(r'\s+', ' ', body)
+
+    def test_pending_payment_view(self):
+        body = self.view(20)
+        self.assertIn('This order has not been paid. Stock has not been changed.', body)
+        self.assertRegex(body, r'Payment status</label> <div class="readonly-value">Not paid</div>')
+        modal = body[body.index('id="cancelOrderModal"'):]
+        self.assertIn('Cancel this unpaid order?', modal)
+        self.assertIn('No stock or payment is affected.', modal)
+        self.assertNotIn('refund', modal.lower()[:modal.lower().index('</form>')])
+
+    def test_paid_view_keeps_refund_wording(self):
+        body = self.view(1)
+        self.assertNotIn('This order has not been paid.', body)
+        self.assertRegex(body, r'Payment status</label> <div class="readonly-value">Paid</div>')
+        modal = body[body.index('id="cancelOrderModal"'):]
+        self.assertIn('Cancel online order 1?', modal)
+        self.assertIn('refund the payment in the Stripe Dashboard', modal)
+        self.assertNotIn('Cancel this unpaid order?', modal)
+
+    def test_list_payment_status(self):
+        _, body = self.get(url('online_order.index'))
+        body = re.sub(r'\s+', ' ', body)
+        self.assertIn('Payment: Not paid', body)
+        self.assertIn('Payment: Paid', body)
+
+    def test_cancelling_unpaid_order_changes_no_stock_and_calls_no_function(self):
+        _, _, flashes = self.post(url('online_order.cancel', order_id=20), {'expected_status': 'Pending Payment'})
+        self.assertEqual(self.rows('Online_Order', OrderID=20)[0]['Status'], 'Cancelled')
+        self.assertEqual([u for u in self.db.updates if u[0] == 'Stock'], [])
+        self.assertEqual(self.db.rpc_calls, [])
+        self.assertEqual(self.rows('Stock', Stock_ID=1)[0]['QOH'], 5)
+        self.assertTrue(any('was cancelled' in f for f in flashes), flashes)
+
+    def test_cancelling_paid_order_still_restores_stock(self):
+        def cancel_paid(db, params):          # stands in for the database function
+            order_id = params['p_order_id']
+            for item in [i for i in db.tables['Online_Order_Item'] if i['Online_Order_OrderID'] == order_id]:
+                for stock in db.tables['Stock']:
+                    if stock['Stock_ID'] == item['Stock_Stock_ID']:
+                        stock['QOH'] += item['Quantity']
+            for order in db.tables['Online_Order']:
+                if order['OrderID'] == order_id:
+                    order['Status'] = 'Cancelled'
+            return True
+        self.db.rpc_handlers['cancel_paid_online_order'] = cancel_paid
+        self.post(url('online_order.cancel', order_id=1), {'expected_status': 'Paid'})
+        self.assertEqual(self.db.rpc_calls, [('cancel_paid_online_order', {'p_order_id': 1})])
+        self.assertEqual(self.rows('Stock', Stock_ID=1)[0]['QOH'], 7)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=1)
