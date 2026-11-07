@@ -273,6 +273,7 @@ class FakeAuthAdmin:
         self.calls.append(('delete_user', user_id))
         if 'delete_user' in self.fail_ops:
             raise FakeAuthError('simulated delete failure')
+        self._missing(user_id)
         self.users.pop(user_id, None)
 
     def update_user_by_id(self, user_id, attributes, *a, **k):
@@ -280,7 +281,9 @@ class FakeAuthAdmin:
         self.attributes.append((user_id, dict(attributes)))
         if 'update_user_by_id' in self.fail_ops:
             raise FakeAuthError('simulated update failure')
-        if user_id in self.users and 'ban_duration' in attributes:
+        if self.users and user_id not in self.users:
+            self._missing(user_id)
+        if 'ban_duration' in attributes:
             ban = attributes['ban_duration']
             self.users[user_id]['banned_until'] = None if ban == 'none' else '2126-10-01T00:00:00Z'
 
