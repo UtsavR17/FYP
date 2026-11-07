@@ -159,4 +159,56 @@
     </form>
 </div>
 
+{% if is_edit %}
+{% set acct = online_account %}
+<!-- Online account (Fix Phase 5). Separate forms, outside the customer form. -->
+<div class="form-card" id="online-account">
+    <p class="form-section-title">Online account</p>
+
+    <p class="mb-2">
+        Status:
+        {% if acct.status == 'Active' %}
+            <span class="po-status-badge po-stage-accepted">Active</span>
+        {% elif acct.status == 'Deactivated' %}
+            <span class="po-status-badge po-stage-rejected">Deactivated</span>
+        {% elif acct.status == 'No online account' %}
+            <span class="po-status-badge po-stage-draft">No online account</span>
+        {% else %}
+            <span class="po-status-badge po-stage-draft">Could not be checked</span>
+        {% endif %}
+        {% if acct.email %}<span class="text-muted ms-2">{{ acct.email }}</span>{% endif %}
+    </p>
+
+    {% if acct.status == 'No online account' %}
+        <p class="text-muted small mb-0">
+            {% if record.AuthUserID %}The linked online login no longer exists.{% else %}This customer has not registered online.{% endif %}
+        </p>
+    {% elif acct.status not in ('Active', 'Deactivated') %}
+        <p class="text-muted small mb-0">{{ acct.reason }}</p>
+    {% elif acct.protected %}
+        <p class="text-muted small mb-0">
+            <i class="fa-solid fa-circle-info me-1" aria-hidden="true"></i>This online login is also used by staff or a supplier, so it cannot be deactivated or reactivated here.
+        </p>
+    {% elif acct.status == 'Active' %}
+        <p class="text-muted small">Deactivating stops this customer from signing in to the online shop. All their records are kept.</p>
+        <form method="POST" class="d-inline"
+              action="{{ url_for('customer.deactivate_login', customer_id=customer_id) }}"
+              onsubmit="return confirm('Deactivate this online account? The customer will not be able to sign in, and resetting the password will not give access back. A session that is already open ends when its access token expires (up to an hour). All records are kept.');">
+            <button type="submit" class="btn btn-outline-danger">
+                <i class="fa-solid fa-user-slash me-2"></i>Deactivate online account
+            </button>
+        </form>
+    {% else %}
+        <p class="text-muted small">This customer cannot sign in to the online shop. Reactivating lets them sign in again with their current password.</p>
+        <form method="POST" class="d-inline"
+              action="{{ url_for('customer.reactivate_login', customer_id=customer_id) }}"
+              onsubmit="return confirm('Reactivate this online account? The customer will be able to sign in again.');">
+            <button type="submit" class="btn btn-outline-success">
+                <i class="fa-solid fa-user-check me-2"></i>Reactivate online account
+            </button>
+        </form>
+    {% endif %}
+</div>
+{% endif %}
+
 {% endblock %}

@@ -5,7 +5,9 @@ from app.supabase_client import supabase
 from app.utils.pagination import paginate
 from app.utils.flash_messages import flash_success, flash_error, flash_warning, flash_info
 from app.modules.customer.accounts import (
-    customer_history, get_service_client, is_not_found_error, login_is_protected,
+    BAN_DURATION, NOT_CONFIGURED_MSG, PROTECTED_LOGIN_MSG, UNBAN_DURATION,
+    auth_error_reason, customer_history, get_service_client, is_not_found_error,
+    login_is_protected, online_account,
 )
 from app.utils.validators import required_fields, is_valid_email
 from app.utils.text import norm
@@ -296,7 +298,9 @@ def edit(customer_id):
         form_data=form_data,
         errors=errors,
         is_edit=True,
-        record=record
+        record=record,
+        customer_id=customer_id,
+        online_account=online_account(record.get('AuthUserID')),
     )
 
 
@@ -410,3 +414,80 @@ def _delete_login(admin_client, auth_user_id):
     except Exception as e:
         return is_not_found_error(e)
     return True
+
+
+# =============================================================================
+# ONLINE ACCOUNT: deactivate and reactivate (Fix Phase 5, DEC-4 B)
+# A ban stops the login from signing in and a password reset does not lift it.
+# All of the customer's records are kept. Staff and supplier logins are refused.
+# =============================================================================
+
+@bp.route('/<int:customer_id>/deactivate-login', methods=['POST'])
+@login_required
+def deactivate_login(customer_id):
+    return _set_login_ban(customer_id, deactivate=True)
+
+
+@bp.route('/<int:customer_id>/reactivate-login', methods=['POST'])
+@login_required
+def reactivate_login(customer_id):
+    return _set_login_ban(customer_id, deactivate=False)
+
+
+def _set_login_ban(customer_id, deactivate):
+    try:
+        record = (
+            supabase.table('Customer')
+            .select('FirstName, LastName, AuthUserID')
+            .eq('CustomerID', customer_id)
+            .single()
+            .execute()
+        ).data or {}
+    except Exception:
+        flash_error(f'Customer ID {customer_id} was not found.')
+        return redirect(url_for('customer.index'))
+
+    back = redirect(url_for('customer.edit', customer_id=customer_id, _anchor='online-account'))
+    full_name = (
+        f"{record.get('FirstName') or ''} {record.get('LastName') or ''}".strip()
+        or f'ID {customer_id}'
+    )
+    action = 'deactivate' if deactivate else 'reactivate'
+
+    auth_user_id = record.get('AuthUserID')
+    if not auth_user_id:
+        flash_error(f'"{full_name}" has no online account.')
+        return back
+
+    admin_client = get_service_client()
+    if admin_client is None:
+        flash_error(NOT_CONFIGURED_MSG)
+        return back
+
+    # Checked on the server too: a forged POST for a staff or supplier login is refused
+    if login_is_protected(auth_user_id, admin_client):
+        flash_error(PROTECTED_LOGIN_MSG)
+        return back
+
+    try:
+        admin_client.auth.admin.update_user_by_id(
+            auth_user_id,
+            {'ban_duration': BAN_DURATION if deactivate else UNBAN_DURATION},
+        )
+    except Exception as e:
+        if is_not_found_error(e):
+            flash_error(
+                f'The online login of "{full_name}" no longer exists, so there is nothing to {action}.'
+            )
+        else:
+            flash_error(f'Could not {action} the online account: {auth_error_reason(e)}.')
+        return back
+
+    if deactivate:
+        flash_success(
+            f'Online account of "{full_name}" deactivated. They can no longer sign in. '
+            f'A session that is already open ends within an hour. All records are kept.'
+        )
+    else:
+        flash_success(f'Online account of "{full_name}" reactivated. They can sign in again.')
+    return back
