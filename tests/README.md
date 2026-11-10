@@ -28,5 +28,6 @@ venv/Scripts/python tests/fix5_mutate.py
 | `fixtures_ids.py`, `record_searches.py` | Search dataset, and the search results recorded on main before Phase 7 |
 | `fix7_mutate.py` | Breaks the id helper, the search normaliser and the Phase 7 wording in turn |
 | `test_appt_create_status.py`, `appt_create_mutate.py` | Appointment Create: only Pending or Confirmed offered and accepted, employee required, Edit and the transition table unchanged |
+| `test_sale_flow.py`, `sale_flow_mutate.py` | Sale Create goes to the locked payment page (fallbacks to the Sale view or the list), double submit refused, no Edit in the Sales list, Edit kept on the Sale view |
 
 Set `REPO=<other checkout>` to run the suites against another worktree.
