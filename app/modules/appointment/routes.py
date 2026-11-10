@@ -46,6 +46,13 @@ ALLOWED_TRANSITIONS = {
 }
 TRANSITION_REFUSED_MSG = 'This status change is not allowed.'
 
+# A new appointment starts Pending or Confirmed; later statuses are reached only
+# through Edit and the transition table above. Offered on the Create form and
+# enforced on the server.
+CREATE_STATUSES = ('Pending', 'Confirmed')
+CREATE_STATUS_OPTIONS = [(v, l) for v, l in STATUS_OPTIONS if v in CREATE_STATUSES]
+CREATE_STATUS_REFUSED_MSG = 'New appointments can only start as Pending or Confirmed.'
+
 # Services, parts (stock) and their changes only once confirmed (DEC-7).
 LINE_EDIT_STATUSES = ('Confirmed', 'In Progress')
 CONFIRM_FIRST_MSG = 'Confirm the appointment first.'
@@ -374,8 +381,8 @@ def create():
 
         if not status_value:
             errors['Status'] = 'Status is required.'
-        elif status_value not in VALID_STATUSES:
-            errors['Status'] = 'Please select a valid status.'
+        elif status_value not in CREATE_STATUSES:
+            errors['Status'] = CREATE_STATUS_REFUSED_MSG
 
         if not errors:
             try:
@@ -400,7 +407,7 @@ def create():
         bike_options=bike_options,
         employee_options=employee_options,
         type_options=APPOINTMENT_TYPE_OPTIONS,
-        status_options=STATUS_OPTIONS
+        status_options=CREATE_STATUS_OPTIONS
     )
 
 

@@ -27,5 +27,6 @@ venv/Scripts/python tests/fix5_mutate.py
 | `test_fix7_ui.py` | Fix Phase 7: collapsible sidebar markup and logic, unpaid online order wording, portal brand hint |
 | `fixtures_ids.py`, `record_searches.py` | Search dataset, and the search results recorded on main before Phase 7 |
 | `fix7_mutate.py` | Breaks the id helper, the search normaliser and the Phase 7 wording in turn |
+| `test_appt_create_status.py`, `appt_create_mutate.py` | Appointment Create: only Pending or Confirmed offered and accepted, employee required, Edit and the transition table unchanged |
 
 Set `REPO=<other checkout>` to run the suites against another worktree.
