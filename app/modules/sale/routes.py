@@ -25,6 +25,19 @@ NO_SALESPERSON_HELP = 'Create a role named Salesperson and assign it to employee
 
 # Helpers -----------------------------------
 
+def _inserted_sale_id(result):
+    """SaleID of the row returned by an insert, or None when it cannot be read."""
+    try:
+        rows = result.data
+        row = rows[0] if isinstance(rows, list) else rows
+        sale_id = row.get('SaleID')
+    except Exception:
+        return None
+    if isinstance(sale_id, bool) or not isinstance(sale_id, int) or sale_id <= 0:
+        return None
+    return sale_id
+
+
 def _validate_date(raw_value, field_label):
     """Validate a date string. Returns (date_str_or_None, error_or_None)."""
     value = (raw_value or '').strip()
@@ -452,7 +465,7 @@ def create():
 
         if not errors:
             try:
-                supabase.table('Sale').insert({
+                result = supabase.table('Sale').insert({
                     'Customer_CustomerID': customer_id,
                     'New_MotorBike_NB_ID': nb_id,
                     'Employee_EmployeeID': employee_id,
@@ -463,8 +476,17 @@ def create():
                 # Mark the bike as Sold
                 _set_bike_status(nb_id, 'Sold')
 
-                flash_success('Sale was recorded successfully.')
-                return redirect(url_for('sale.index'))
+                # Go straight to the locked payment page of the new sale. Without a
+                # readable id, or with nothing to pay, fall back as before.
+                new_sale_id = _inserted_sale_id(result)
+                if new_sale_id is None:
+                    flash_success('Sale was recorded successfully.')
+                    return redirect(url_for('sale.index'))
+                if total_amount <= CENT:
+                    flash_success(f'Sale {new_sale_id} recorded.')
+                    return redirect(url_for('sale.view', sale_id=new_sale_id))
+                flash_success(f'Sale {new_sale_id} recorded. Record the first payment below.')
+                return redirect(url_for('payment.create', sale=new_sale_id))
             except Exception as e:
                 error_msg = str(e)
                 if 'duplicate' in error_msg.lower() or 'unique' in error_msg.lower():
